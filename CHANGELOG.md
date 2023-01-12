@@ -16,7 +16,7 @@ limitations under the License.
 
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.1.0 (2023-01-12)
 - Initial release of Pytriton
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
