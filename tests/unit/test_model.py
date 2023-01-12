@@ -1,0 +1,373 @@
+# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+import pathlib
+import tempfile
+
+import numpy as np
+
+from pytriton.model_config.tensor import Tensor
+from pytriton.model_config.triton_model_config import TensorSpec
+from pytriton.models.model import Model, ModelConfig
+from pytriton.utils.workspace import Workspace
+
+
+def test_get_model_config_return_model_config_when_minimal_required_data():
+    def infer_func(inputs):
+        return inputs
+
+    with tempfile.TemporaryDirectory() as tempdir:
+        tempdir = pathlib.Path(tempdir)
+        workspace = Workspace(tempdir / "workspace")
+        model = Model(
+            model_name="simple",
+            model_version=2,
+            inference_fn=infer_func,
+            inputs=[
+                Tensor(dtype=np.float32, shape=(-1,)),
+                Tensor(dtype=np.float32, shape=(-1,)),
+            ],
+            outputs=[
+                Tensor(dtype=np.int32, shape=(-1,)),
+            ],
+            config=ModelConfig(max_batch_size=128, batching=True),
+            workspace=workspace,
+        )
+
+        model_config = model._get_triton_model_config()
+
+        assert model_config.model_name == "simple"
+        assert model_config.model_version == 2
+
+        assert model_config.batching is True
+        assert model_config.max_batch_size == 128
+
+        assert model_config.inputs == [
+            TensorSpec(name="INPUT_1", dtype=np.float32, shape=(-1,)),
+            TensorSpec(name="INPUT_2", dtype=np.float32, shape=(-1,)),
+        ]
+
+        assert model_config.outputs == [
+            TensorSpec(name="OUTPUT_1", dtype=np.int32, shape=(-1,)),
+        ]
+
+        ipc_socket_path = workspace.path / "ipc_proxy_backend_simple"
+        assert model_config.backend_parameters == {"shared-memory-socket": f"ipc://{ipc_socket_path.as_posix()}"}
+
+
+def test_get_model_config_return_model_config_when_custom_names():
+    def infer_func(inputs):
+        return inputs
+
+    with tempfile.TemporaryDirectory() as tempdir:
+        tempdir = pathlib.Path(tempdir)
+        workspace = Workspace(tempdir / "workspace")
+        model = Model(
+            model_name="simple",
+            model_version=2,
+            inference_fn=infer_func,
+            inputs=[
+                Tensor(name="variable1", dtype=object, shape=(2, 1)),
+                Tensor(name="variable2", dtype=np.float32().dtype, shape=(2, 1)),
+            ],
+            outputs=[
+                Tensor(name="factorials", dtype=np.int32().dtype, shape=(-1,)),
+            ],
+            config=ModelConfig(max_batch_size=128, batching=True),
+            workspace=workspace,
+        )
+
+        model_config = model._get_triton_model_config()
+
+        assert model_config.model_name == "simple"
+        assert model_config.model_version == 2
+
+        assert model_config.batching is True
+        assert model_config.max_batch_size == 128
+
+        assert model_config.inputs == [
+            TensorSpec(name="variable1", dtype=object, shape=(2, 1)),
+            TensorSpec(name="variable2", dtype=np.float32, shape=(2, 1)),
+        ]
+
+        assert model_config.outputs == [
+            TensorSpec(name="factorials", dtype=np.int32, shape=(-1,)),
+        ]
+
+
+def test_generate_model_create_model_store():
+    def infer_func(inputs):
+        return inputs
+
+    with tempfile.TemporaryDirectory() as tempdir:
+        tempdir = pathlib.Path(tempdir)
+        workspace = Workspace(tempdir / "workspace")
+        model = Model(
+            model_name="simple",
+            model_version=2,
+            inference_fn=infer_func,
+            inputs=[
+                Tensor(name="variable1", dtype=object, shape=(2, 1)),
+                Tensor(name="variable2", dtype=np.float32, shape=(2, 1)),
+            ],
+            outputs=[
+                Tensor(name="factorials", dtype=np.int32, shape=(-1,)),
+            ],
+            config=ModelConfig(max_batch_size=128, batching=True),
+            workspace=workspace,
+        )
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            model_repository = pathlib.Path(tempdir) / "model_repository"
+            model_repository.mkdir()
+
+            model.generate_model(model_repository)
+
+            assert (model_repository / "simple").is_dir()
+            assert (model_repository / "simple" / "config.pbtxt").is_file()
+
+            assert (model_repository / "simple" / "2").is_dir()
+            assert (model_repository / "simple" / "2" / "model.py").is_file()
+
+
+def test_generate_models_with_same_names_and_different_versions_create_model_store():
+    def infer_func(inputs):
+        return inputs
+
+    with tempfile.TemporaryDirectory() as tempdir:
+        tempdir = pathlib.Path(tempdir)
+        workspace = Workspace(tempdir / "workspace")
+        model1 = Model(
+            model_name="simple",
+            model_version=1,
+            inference_fn=infer_func,
+            inputs=[
+                Tensor(name="variable1", dtype=object, shape=(2, 1)),
+                Tensor(name="variable2", dtype=np.float32, shape=(2, 1)),
+            ],
+            outputs=[
+                Tensor(name="factorials", dtype=np.int32, shape=(-1,)),
+            ],
+            config=ModelConfig(max_batch_size=128, batching=True),
+            workspace=workspace,
+        )
+        model2 = Model(
+            model_name="simple",
+            model_version=2,
+            inference_fn=infer_func,
+            inputs=[
+                Tensor(name="variable1", dtype=object, shape=(2, 1)),
+                Tensor(name="variable2", dtype=np.float32, shape=(2, 1)),
+            ],
+            outputs=[
+                Tensor(name="factorials", dtype=np.int32, shape=(-1,)),
+            ],
+            config=ModelConfig(max_batch_size=128, batching=True),
+            workspace=workspace,
+        )
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            model_repository = pathlib.Path(tempdir) / "model_repository"
+            model_repository.mkdir()
+
+            model1.generate_model(model_repository)
+            model2.generate_model(model_repository)
+
+            assert (model_repository / "simple").is_dir()
+            assert (model_repository / "simple" / "config.pbtxt").is_file()
+
+            assert (model_repository / "simple" / "1").is_dir()
+            assert (model_repository / "simple" / "1" / "model.py").is_file()
+
+            assert (model_repository / "simple" / "2").is_dir()
+            assert (model_repository / "simple" / "2" / "model.py").is_file()
+
+
+def test_setup_create_proxy_backend_connection():
+    def infer_func(inputs):
+        return inputs
+
+    with tempfile.TemporaryDirectory() as tempdir:
+        tempdir = pathlib.Path(tempdir)
+        workspace = Workspace(tempdir / "workspace")
+        model = Model(
+            model_name="simple",
+            model_version=2,
+            inference_fn=infer_func,
+            inputs=[
+                Tensor(name="variable1", dtype=object, shape=(2, 1)),
+                Tensor(name="variable2", dtype=np.float32, shape=(2, 1)),
+            ],
+            outputs=[
+                Tensor(name="factorials", dtype=np.int32, shape=(-1,)),
+            ],
+            config=ModelConfig(max_batch_size=128, batching=True),
+            workspace=workspace,
+        )
+
+        model.setup()
+        try:
+            assert len(model._inference_handlers) == 1
+        finally:
+            model.clean()
+
+
+def test_setup_can_be_called_multiple_times():
+    def infer_func(inputs):
+        return inputs
+
+    with tempfile.TemporaryDirectory() as tempdir:
+        tempdir = pathlib.Path(tempdir)
+        workspace = Workspace(tempdir / "workspace")
+        model = Model(
+            model_name="simple",
+            model_version=2,
+            inference_fn=infer_func,
+            inputs=[
+                Tensor(name="variable1", dtype=object, shape=(2, 1)),
+                Tensor(name="variable2", dtype=np.float32, shape=(2, 1)),
+            ],
+            outputs=[
+                Tensor(name="factorials", dtype=np.int32, shape=(-1,)),
+            ],
+            config=ModelConfig(max_batch_size=128, batching=True),
+            workspace=workspace,
+        )
+
+        try:
+            model.setup()
+            assert len(model._inference_handlers) == 1
+            python_backend1 = model._inference_handlers[0]
+
+            assert python_backend1 is not None
+
+            model.setup()
+            assert len(model._inference_handlers) == 1
+            python_backend2 = model._inference_handlers[0]
+
+            assert python_backend2 is not None
+            assert python_backend1 == python_backend2
+
+        finally:
+            model.clean()
+
+
+def test_clean_remove_proxy_backend_connection():
+    def infer_func(inputs):
+        return inputs
+
+    with tempfile.TemporaryDirectory() as tempdir:
+        tempdir = pathlib.Path(tempdir)
+        workspace = Workspace(tempdir / "workspace")
+        model = Model(
+            model_name="simple",
+            model_version=2,
+            inference_fn=infer_func,
+            inputs=[
+                Tensor(name="variable1", dtype=object, shape=(2, 1)),
+                Tensor(name="variable2", dtype=np.float32, shape=(2, 1)),
+            ],
+            outputs=[
+                Tensor(name="factorials", dtype=np.int32, shape=(-1,)),
+            ],
+            config=ModelConfig(max_batch_size=128, batching=True),
+            workspace=workspace,
+        )
+
+        model.setup()
+        model.clean()
+        assert len(model._inference_handlers) == 0
+
+
+def test_clean_can_be_called_multiple_times():
+    def infer_func(inputs):
+        return inputs
+
+    with tempfile.TemporaryDirectory() as tempdir:
+        tempdir = pathlib.Path(tempdir)
+        workspace = Workspace(tempdir / "workspace")
+        model = Model(
+            model_name="simple",
+            model_version=2,
+            inference_fn=infer_func,
+            inputs=[
+                Tensor(name="variable1", dtype=object, shape=(2, 1)),
+                Tensor(name="variable2", dtype=np.float32, shape=(2, 1)),
+            ],
+            outputs=[
+                Tensor(name="factorials", dtype=np.int32, shape=(-1,)),
+            ],
+            config=ModelConfig(max_batch_size=128, batching=True),
+            workspace=workspace,
+        )
+
+        model.setup()
+        model.clean()
+        model.clean()
+        assert len(model._inference_handlers) == 0
+
+
+def test_is_alive_return_false_when_model_not_setup():
+    def infer_func(inputs):
+        return inputs
+
+    with tempfile.TemporaryDirectory() as tempdir:
+        tempdir = pathlib.Path(tempdir)
+        workspace = Workspace(tempdir / "workspace")
+        model = Model(
+            model_name="simple",
+            model_version=2,
+            inference_fn=infer_func,
+            inputs=[
+                Tensor(name="variable1", dtype=object, shape=(2, 1)),
+                Tensor(name="variable2", dtype=np.float32, shape=(2, 1)),
+            ],
+            outputs=[
+                Tensor(name="factorials", dtype=np.int32, shape=(-1,)),
+            ],
+            config=ModelConfig(max_batch_size=128, batching=True),
+            workspace=workspace,
+        )
+
+        assert model.is_alive() is False
+
+
+def test_is_alive_return_true_when_model_is_setup():
+    def infer_func(inputs):
+        return inputs
+
+    with tempfile.TemporaryDirectory() as tempdir:
+        tempdir = pathlib.Path(tempdir)
+        workspace = Workspace(tempdir / "workspace")
+        model = Model(
+            model_name="simple",
+            model_version=2,
+            inference_fn=infer_func,
+            inputs=[
+                Tensor(name="variable1", dtype=object, shape=(2, 1)),
+                Tensor(name="variable2", dtype=np.float32, shape=(2, 1)),
+            ],
+            outputs=[
+                Tensor(name="factorials", dtype=np.int32, shape=(-1,)),
+            ],
+            config=ModelConfig(max_batch_size=128, batching=True),
+            workspace=workspace,
+        )
+
+        model.setup()
+        try:
+            assert model.is_alive()
+            assert len(model._inference_handlers) == 1
+
+        finally:
+            model.clean()

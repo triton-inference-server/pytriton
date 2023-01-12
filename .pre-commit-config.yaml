@@ -1,0 +1,75 @@
+# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+repos:
+  - repo: https://github.com/ambv/black
+    rev: 22.8.0
+    hooks:
+      - id: black
+  - repo: https://github.com/pycqa/isort
+    rev: 5.10.1
+    hooks:
+      - id: isort
+        name: isort (python)
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.3.0
+    hooks:
+      - id: check-docstring-first
+      - id: check-executables-have-shebangs
+      - id: check-json
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: check-shebang-scripts-are-executable
+      - id: check-toml
+      - id: check-yaml
+      - id: debug-statements
+      - id: end-of-file-fixer
+        types: [python]
+      - id: fix-byte-order-marker
+      - id: no-commit-to-branch
+      - id: requirements-txt-fixer
+      - id: trailing-whitespace
+        exclude: setup.cfg
+      - id: mixed-line-ending
+        args: [--fix=lf]
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v2.37.3
+    hooks:
+      - id: pyupgrade
+        args: [--py36-plus]
+  - repo: https://github.com/pycqa/flake8
+    rev: 5.0.4
+    hooks:
+      - id: flake8
+        additional_dependencies:
+            - flake8-bugbear
+            - flake8-comprehensions
+            - flake8-print
+            - mccabe
+            - pep8-naming
+            - pycodestyle
+            - pyflakes
+  - repo: https://github.com/pycqa/pydocstyle
+    rev: 6.1.1
+    hooks:
+      - id: pydocstyle
+        name: Run pydocstyle
+        args:
+          - --convention=google
+        exclude: '(?:tests|examples)\/.*'
+        additional_dependencies: ['toml']
+  - repo: https://github.com/thlorenz/doctoc
+    rev: v2.2.0
+    hooks:
+      - id: doctoc
+        args: [ --github, --update-only ]

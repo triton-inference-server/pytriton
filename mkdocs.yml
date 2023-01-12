@@ -1,0 +1,78 @@
+# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+site_name: NVIDIA Pytriton
+theme:
+  name: material
+  custom_dir: docs/overrides
+  logo: assets/logo.png
+  favicon: assets/favicon.png
+  palette:
+      primary: black
+  features:
+    - navigation.top
+extra_css:
+  - assets/styles.css
+repo_url: https://github.com/triton-inference-server/pytriton
+repo_name: Git Repository
+plugins:
+  - autorefs
+  - htmlproofer
+  - mike
+  - mkdocstrings:
+      enable_inventory: true
+      handlers:
+        python:
+          import:
+            - https://docs.python.org/3/objects.inv
+          options:
+            docstring_style: google
+            show_root_heading: true
+            heading_level: 2
+            line_length: 120
+            docstring_section_style: table
+            merge_init_into_class: true
+  - search
+watch:
+  - pytriton
+  - docs
+  - mkdocs.yml
+  - LICENSE
+  - README.md
+  - CHANGELOG.md
+  - CONTRIBUTING.md
+view_uri_template: blob/{ref}/{path}  # used by scripts/rewrite_links_to_repo.py hook
+hooks:
+  - scripts/rewrite_links_to_repo.py
+extra:
+  version:
+    provider: mike
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+nav:
+  - Home: README.md
+  - installation.md
+  - Quick Start: quick_start.md
+  - Deploying Models: deploying_models.md
+  - Examples: examples.md
+  - API Reference: api.md
+  - Changelog: CHANGELOG.md
+  - Known Issues: known_issues.md
+  - Contributing: CONTRIBUTING.md
+  - License: LICENSE.md
