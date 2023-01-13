@@ -25,6 +25,7 @@ from typing import Callable, List
 
 import numpy as np
 
+from pytriton.decorators import batch
 from pytriton.model_config import DynamicBatcher, ModelConfig, Tensor
 from tests.functional.common.models import Framework, TestModelSpec
 
@@ -121,6 +122,7 @@ def _create_hf_tensorflow_distilbert_base_uncased_fn(model_name: str) -> Callabl
     model.config.return_dict = True
     model.config.use_cache = False
 
+    @batch
     def _infer_fn(input_ids, attention_mask):
         logger.debug(f"input_ids: {input_ids.shape}")
         logger.debug(f"attention_mask: {attention_mask.shape}")
