@@ -70,6 +70,7 @@ nav:
   - installation.md
   - Quick Start: quick_start.md
   - Deploying Models: deploying_models.md
+  - Inference Functions Design: inference_functions.md
   - Examples: examples.md
   - API Reference: api.md
   - Changelog: CHANGELOG.md
