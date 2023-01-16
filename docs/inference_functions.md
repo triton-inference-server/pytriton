@@ -184,7 +184,7 @@ def infer(mandatory_input):
     pass
 ```
 
-- `@first_values` - This decorator takes first elements from batches for selected inputs by `keys` parameter.
+- `@first_value` - This decorator takes first elements from batches for selected inputs by `keys` parameter.
 If the value is one element array, it is converted to scalar value.
 It is convenient to use with dynamic model parameters that are sent by the user in the requests.
 You can use `@group_by_values` before to have batches with the same values in each batch.
@@ -192,7 +192,7 @@ You can use `@group_by_values` before to have batches with the same values in ea
 @fill_optionals(temperature=np.array([10.0]))
 @group_by_values('temperature')
 @batch
-@first_values('temperature')
+@first_value('temperature')
 def infer(mandatory_input, temperature):
     #do inference with scalar temperature=10
     pass
@@ -220,7 +220,7 @@ We recommend putting `@triton_context` as the last decorator in chain.
 @gorup_by_keys
 @group_by_values('temperature')
 @batch
-@first_values('temperature')
+@first_value('temperature')
 @triton_context
 def infer(triton_context, mandatory_input, temperature, opt1 = None, opt2 = None):
     model_config = triton_context.model_config

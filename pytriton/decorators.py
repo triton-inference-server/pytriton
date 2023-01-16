@@ -270,7 +270,7 @@ def pad_batch(wrapped, instance, args, kwargs):
     return wrapped(*args, **kwargs)
 
 
-def first_values(*keys):
+def first_value(*keys):
     """This decorator takes first element from batch.
 
     If the value is one element array, it is converted to scalar value.

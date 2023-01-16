@@ -20,7 +20,7 @@ from pytriton.decorators import (
     TritonContext,
     batch,
     fill_optionals,
-    first_values,
+    first_value,
     group_by_keys,
     group_by_values,
     pad_batch,
@@ -167,7 +167,7 @@ def test_pad_batch_no_preffered_batch_size():
 
 
 def test_flatten():
-    @first_values("a")
+    @first_value("a")
     def flatten_fun(**inputs):
         assert "a" in inputs and "b" in inputs
         assert isinstance(inputs["a"], int) and inputs["a"] == 1
