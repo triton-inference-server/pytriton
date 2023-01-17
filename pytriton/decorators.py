@@ -22,8 +22,14 @@ import numpy as np
 import wrapt
 
 from pytriton.constants import TRITON_CONTEXT_FIELD_NAME
-from pytriton.exceptions import PytritonValidationError
+from pytriton.exceptions import PytritonBadParameterError, PytritonValidationError
 from pytriton.model_config.triton_model_config import TritonModelConfig
+
+
+def _get_triton_request_batch_size(triton_request):
+    first_input_value = next(iter(triton_request.values()))
+    batch_size, *dims = first_input_value.shape
+    return batch_size
 
 
 @dataclasses.dataclass
@@ -201,29 +207,100 @@ def group_by_keys(wrapped, instance, args, kwargs):
 
 
 def fill_optionals(**defaults):
-    """Fill missing optional inputs..
+    """This decorator ensures that any missing inputs in requests are filled with default values specified by the user.
 
-    Fills missing inputs in requests with default values provided by the user.
+    Default values should be NumPy arrays without batch axis.
+
+    If you plan to group requests ex. with
+    [@group_by_keys][pytriton.decorators.group_by_keys] or
+    [@group_by_vales][pytriton.decorators.group_by_values] decorators
+    provide default values for optional parameters at the beginning of decorators stack.
+    The other decorators can then group requests into bigger batches resulting in a better model performance.
+
+    Typical use:
+
+        @fill_optionals()
+        @group_by_keys()
+        @batch
+        def infer_fun(**inputs):
+            ...
+            return outputs
+
+    Args:
+        defaults: keyword arguments containing default values for missing inputs
+
+
     If you have default values for some optional parameter it is good idea to provide them at the very beginning,
     so the other decorators (e.g. @group_by_keys) can make bigger consistent groups.
     """
 
+    def _verify_defaults(_triton_context: TritonContext):
+        inputs = {spec.name: spec for spec in _triton_context.model_config.inputs}
+        not_matching_default_names = sorted(set(defaults) - set(inputs))
+        if not_matching_default_names:
+            raise PytritonBadParameterError(f"Could not found {', '.join(not_matching_default_names)} inputs")
+
+        non_numpy_items = {k: v for k, v in defaults.items() if not isinstance(v, np.ndarray)}
+        if non_numpy_items:
+            raise PytritonBadParameterError(
+                f"Could not use {', '.join([f'{k}={v}' for k, v in non_numpy_items.items()])} defaults "
+                "as they are not NumPy arrays"
+            )
+
+        not_matching_dtypes = {k: (v.dtype, inputs[k].dtype) for k, v in defaults.items() if v.dtype != inputs[k].dtype}
+        if not_matching_dtypes:
+            non_matching_dtypes_str_list = [
+                f"{name}: dtype={have_dtype} expected_dtype={expected_dtype}"
+                for name, (have_dtype, expected_dtype) in not_matching_dtypes.items()
+            ]
+            raise PytritonBadParameterError(
+                f"Could not use {', '.join(non_matching_dtypes_str_list)} "
+                f"defaults as they have different than input signature dtypes"
+            )
+
+        def _shape_match(_have_shape, _expected_shape):
+            return len(_have_shape) == len(_expected_shape) and all(
+                [e == -1 or h == e for h, e in zip(_have_shape, _expected_shape)]
+            )
+
+        not_matching_shapes = {
+            k: (v.shape, inputs[k].shape) for k, v in defaults.items() if not _shape_match(v.shape, inputs[k].shape)
+        }
+        if not_matching_shapes:
+            non_matching_shapes_str_list = [
+                f"{name}: shape={have_shape} expected_shape={expected_shape}"
+                for name, (have_shape, expected_shape) in not_matching_shapes.items()
+            ]
+            raise PytritonBadParameterError(
+                f"Could not use {', '.join(non_matching_shapes_str_list)} "
+                f"defaults as they have different than input signature shapes"
+            )
+
     @wrapt.decorator
-    def wrapper(wrapped, instance, args, kwargs):
-        """Fill optionals."""
-        req_list = args[0]
-        for request in req_list:
-            first_input = next(iter(request.values()))
-            batch_size = first_input.shape[0]
-            for default_key in defaults:
-                if default_key not in request:
-                    val = defaults[default_key]
-                    k = [1] * (len(val.shape) + 1)
-                    k[0] = batch_size
-                    request[default_key] = np.tile(val, k)
+    def _wrapper(wrapped, instance, args, kwargs):
+        _triton_context = get_triton_context(wrapped, instance)
+
+        _verify_defaults(_triton_context)
+        # verification if not after group wrappers is in group wrappers
+
+        (requests,) = args
+
+        model_supports_batching = _triton_context.model_config.batching
+        for request in requests:
+            batch_size = _get_triton_request_batch_size(request) if model_supports_batching else None
+            for default_key, default_value in defaults.items():
+                if default_key in request:
+                    continue
+
+                if model_supports_batching:
+                    ones_reps = (1,) * default_value.ndim  # repeat once default_value on each axis
+                    axis_reps = (batch_size,) + ones_reps  # ... except on batch axis. we repeat it batch_size times
+                    default_value = np.tile(default_value, axis_reps)
+
+                request[default_key] = default_value
         return wrapped(*args, **kwargs)
 
-    return wrapper
+    return _wrapper
 
 
 @wrapt.decorator

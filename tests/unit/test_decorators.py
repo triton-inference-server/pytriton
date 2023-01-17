@@ -14,6 +14,7 @@
 """Inference decorators tests."""
 import numpy as np
 import pytest
+import wrapt
 
 from pytriton.constants import TRITON_CONTEXT_FIELD_NAME
 from pytriton.decorators import (
@@ -21,13 +22,14 @@ from pytriton.decorators import (
     batch,
     fill_optionals,
     first_value,
+    get_triton_context,
     group_by_keys,
     group_by_values,
     pad_batch,
     sample,
     triton_context,
 )
-from pytriton.exceptions import PytritonValidationError
+from pytriton.exceptions import PytritonBadParameterError, PytritonValidationError
 from pytriton.model_config import DynamicBatcher
 from pytriton.model_config.triton_model_config import TensorSpec, TritonModelConfig
 from pytriton.proxy.inference_handler import triton_context_inject
@@ -208,7 +210,7 @@ def test_group_by_values():
 
 
 def test_fill_optionals():
-    @fill_optionals(a=np.array([-1, -2]), b=np.array((-5, -6)))
+    @fill_optionals(a=np.array([-1, -2]), b=np.array([-5, -6]))
     def fill_fun(inputs):
         for req in inputs:
             assert "a" in req and "b" in req
@@ -217,8 +219,100 @@ def test_fill_optionals():
         assert np.all(inputs[-1]["b"] == np.array([[-5, -6], [-5, -6], [-5, -6]]))
         return inputs
 
+    fill_fun.__triton_context__ = TritonContext(
+        model_config=TritonModelConfig(
+            model_name="foo",
+            inputs=[TensorSpec("a", shape=(2,), dtype=np.int64), TensorSpec("b", shape=(2,), dtype=np.int64)],
+            outputs=[TensorSpec("a", shape=(2,), dtype=np.int64), TensorSpec("b", shape=(2,), dtype=np.int64)],
+        )
+    )
     results = fill_fun(input_requests)
     assert len(results) == len(input_requests)
+
+
+def test_fill_optionals_for_not_batching_models():
+    @fill_optionals(a=np.array([-1, -2]), b=np.array([-5, -6]))
+    def infer_fn(inputs):
+        return inputs
+
+    infer_fn.__triton_context__ = TritonContext(
+        model_config=TritonModelConfig(
+            model_name="foo",
+            batching=False,
+            inputs=[TensorSpec("a", shape=(2,), dtype=np.int64), TensorSpec("b", shape=(2,), dtype=np.int64)],
+            outputs=[TensorSpec("a", shape=(2,), dtype=np.int64), TensorSpec("b", shape=(2,), dtype=np.int64)],
+        )
+    )
+
+    inputs = [
+        {"a": np.array([1, 9]), "b": np.array([1, 2])},
+        {"b": np.array([3, 4])},
+    ]
+    expected_results = [
+        {"a": np.array([1, 9]), "b": np.array([1, 2])},
+        {"a": np.array([-1, -2]), "b": np.array([3, 4])},
+    ]
+
+    results = infer_fn(inputs)
+    for result, expected_result in zip(results, expected_results):
+        assert not set(result) ^ set(expected_result)
+        for input_name in result:
+            np.testing.assert_array_equal(result[input_name], expected_result[input_name])
+
+
+def test_fill_optionals_raise_on_non_numpy_defaults():
+    @fill_optionals(a=1, b=np.array([-5, -6]))
+    def infer_fn(inputs):
+        return inputs
+
+    infer_fn.__triton_context__ = TritonContext(
+        model_config=TritonModelConfig(
+            model_name="foo",
+            inputs=[TensorSpec("a", shape=(2,), dtype=np.int64), TensorSpec("b", shape=(2,), dtype=np.int64)],
+            outputs=[TensorSpec("a", shape=(2,), dtype=np.int64), TensorSpec("b", shape=(2,), dtype=np.int64)],
+        )
+    )
+
+    with pytest.raises(PytritonBadParameterError, match="Could not use a=.* they are not NumPy arrays"):
+        infer_fn(input_requests)
+
+
+def test_fill_optionals_raise_error_on_dtype_mismatch():
+    @fill_optionals(a=np.array([-1, -2]), b=np.array([-5, -6]))
+    def infer_fn(inputs):
+        return inputs
+
+    infer_fn.__triton_context__ = TritonContext(
+        model_config=TritonModelConfig(
+            model_name="foo",
+            inputs=[TensorSpec("a", shape=(2,), dtype=np.int32), TensorSpec("b", shape=(2,), dtype=np.int64)],
+            outputs=[TensorSpec("a", shape=(2,), dtype=np.int64), TensorSpec("b", shape=(2,), dtype=np.int64)],
+        )
+    )
+
+    with pytest.raises(
+        PytritonBadParameterError, match="Could not use a: dtype=.* have different than input signature dtypes"
+    ):
+        infer_fn(input_requests)
+
+
+def test_fill_optionals_raise_error_on_shape_mismatch():
+    @fill_optionals(a=np.array([[-1, -2]]), b=np.array([-5, -6]))
+    def infer_fn(inputs):
+        return inputs
+
+    infer_fn.__triton_context__ = TritonContext(
+        model_config=TritonModelConfig(
+            model_name="foo",
+            inputs=[TensorSpec("a", shape=(2,), dtype=np.int64), TensorSpec("b", shape=(2,), dtype=np.int64)],
+            outputs=[TensorSpec("a", shape=(2,), dtype=np.int64), TensorSpec("b", shape=(2,), dtype=np.int64)],
+        )
+    )
+
+    with pytest.raises(
+        PytritonBadParameterError, match="Could not use a: shape=.*have different than input signature shapes"
+    ):
+        infer_fn(input_requests)
 
 
 def test_triton_context():
@@ -290,3 +384,21 @@ def test_inject_and_acquire_triton_context():
     caller2()
     caller3()
     caller4()
+
+
+def test_get_triton_context_with_decorators_stack():
+    """There should be possible to obtain TritonContext from any decorator in wrappers stack"""
+    dummy_triton_context = TritonContext(model_config=TritonModelConfig("foo"))
+
+    @wrapt.decorator
+    def my_decorator(wrapped, instance, args, kwargs):
+        _triton_context = get_triton_context(wrapped, instance)
+        assert _triton_context == dummy_triton_context
+
+    @my_decorator
+    @batch
+    def infer_fn(**kwargs):
+        return kwargs
+
+    infer_fn.__triton_context__ = dummy_triton_context
+    infer_fn()
