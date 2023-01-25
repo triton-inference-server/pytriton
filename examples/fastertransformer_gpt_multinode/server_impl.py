@@ -124,4 +124,7 @@ class FasterTransformerTritonServer:
         shared_parameters_list = [None]
         broadcast_inputs(cls._shared_tensors_dict, shared_parameters_list)
         (shared_parameters,) = shared_parameters_list
-        return {**cls._shared_tensors_dict, **shared_parameters}
+        if shared_parameters:
+            return {**cls._shared_tensors_dict, **shared_parameters}
+        else:
+            return cls._shared_tensors_dict.copy()
