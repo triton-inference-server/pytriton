@@ -37,7 +37,6 @@ logger = logging.get_logger(__name__)
 
 _CHECKPOINT_FOR_DOC = "facebook/opt-350m"
 _CONFIG_FOR_DOC = "OPTConfig"
-_TOKENIZER_FOR_DOC = "GPT2Tokenizer"
 
 
 OPT_START_DOCSTRING = r"""
@@ -714,9 +713,7 @@ class FlaxOPTModel(FlaxOPTPreTrainedModel):
     module_class = FlaxOPTModule
 
 
-append_call_sample_docstring(
-    FlaxOPTModel, _TOKENIZER_FOR_DOC, _CHECKPOINT_FOR_DOC, FlaxBaseModelOutput, _CONFIG_FOR_DOC
-)
+append_call_sample_docstring(FlaxOPTModel, _CHECKPOINT_FOR_DOC, FlaxBaseModelOutput, _CONFIG_FOR_DOC)
 
 
 @add_start_docstrings(
@@ -815,10 +812,4 @@ class FlaxOPTForCausalLM(FlaxOPTPreTrainedModel):
         return model_kwargs
 
 
-append_call_sample_docstring(
-    FlaxOPTForCausalLM,
-    _TOKENIZER_FOR_DOC,
-    _CHECKPOINT_FOR_DOC,
-    FlaxBaseModelOutput,
-    _CONFIG_FOR_DOC,
-)
+append_call_sample_docstring(FlaxOPTForCausalLM, _CHECKPOINT_FOR_DOC, FlaxBaseModelOutput, _CONFIG_FOR_DOC)

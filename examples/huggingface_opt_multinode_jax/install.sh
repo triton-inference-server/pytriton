@@ -14,4 +14,4 @@
 # limitations under the License.
 
 pip install --upgrade -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html jax[cuda]
-pip install --upgrade flax omegaconf sacrebleu SentencePiece tokenizers transformers>=4.20
+pip install --upgrade flax omegaconf sacrebleu SentencePiece tokenizers transformers>=4.26
