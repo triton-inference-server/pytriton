@@ -23,10 +23,17 @@ from pytriton.model_config.triton_model_config import TritonModelConfig
 
 
 def verify_equalness_of_dicts_with_ndarray(a_dict, b_dict):
-    assert b_dict.keys() == a_dict.keys()
-    assert all(np.allclose(b_dict[output_name], a_dict[output_name]) for output_name in b_dict)
-    assert all(b_dict[output_name].shape == a_dict[output_name].shape for output_name in b_dict)
-    assert all(b_dict[output_name].dtype == a_dict[output_name].dtype for output_name in b_dict)
+    assert a_dict.keys() == b_dict.keys(), f"{a_dict} != {b_dict}"
+    for output_name in a_dict:
+        assert isinstance(
+            a_dict[output_name], type(b_dict[output_name])
+        ), f"type(a[{output_name}])={type(a_dict[output_name])} != type(b[{output_name}])={type(b_dict[output_name])}"
+        if isinstance(a_dict[output_name], np.ndarray):
+            assert a_dict[output_name].dtype == b_dict[output_name].dtype
+            assert a_dict[output_name].shape == b_dict[output_name].shape
+            assert np.allclose(b_dict[output_name], a_dict[output_name])
+        else:
+            assert a_dict[output_name] == b_dict[output_name]
 
 
 def wrap_to_grpc_infer_result(

@@ -17,8 +17,12 @@ limitations under the License.
 # Changelog
 
 ## 0.1.1 (unreleased)
-- change: `@first_values` decorator name change to `@first_value`
-- fix: `@fill_optionals` decorator supports non-batching models
+- Change: The `@first_value` decorator has been updated with new features:
+  - Renamed from `@first_values` to `@first_value`
+  - Added a `strict` flag to toggle the checking of equality of values on a single selected input of the request. Default is True
+  - Added a `squeeze_single_values` flag to toggle the squeezing of single value ND arrays to scalars. Default is True
+- Fix: `@fill_optionals` now supports non-batching models
+- Fix: `@first_value` fixed to work with optional inputs
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 - Version of external components used during testing:

@@ -22,7 +22,7 @@ import numpy as np
 import wrapt
 
 from pytriton.constants import TRITON_CONTEXT_FIELD_NAME
-from pytriton.exceptions import PytritonBadParameterError, PytritonValidationError
+from pytriton.exceptions import PytritonBadParameterError, PytritonRuntimeError, PytritonValidationError
 from pytriton.model_config.triton_model_config import TritonModelConfig
 
 
@@ -347,25 +347,96 @@ def pad_batch(wrapped, instance, args, kwargs):
     return wrapped(*args, **kwargs)
 
 
-def first_value(*keys):
-    """This decorator takes first element from batch.
+_SPECIAL_KEYS = ["__triton_context__"]
 
-    If the value is one element array, it is converted to scalar value.
-    It is useful for dynamic arguments sent in requests.
+
+def first_value(*keys: str, squeeze_single_values=True, strict: bool = True):
+    """This decorator overwrites selected inputs with first element of the given input.
+
+    It can be used in two ways:
+
+    1. Wrapping a single request inference function by chaining with @batch decorator:
+        @batch
+        @first_value("temperature")
+        def infer_fn(**inputs):
+            ...
+            return result
+
+    2. Wrapping a multiple requests inference function:
+        @first_value("temperature")
+        def infer_fn(requests):
+            ...
+            return results
+
+    By default, the decorator squeezes single value arrays to scalars.
+    This behavior can be disabled by setting the `squeeze_single_values` flag to False.
+
+    By default, the decorator checks the equality of the values on selected values.
+    This behavior can be disabled by setting the `strict` flag to False.
+
+    Wrapper can only be used with models that support batching.
 
     Args:
-        keys: input keys selected for conversion
+        keys: The input keys selected for conversion.
+        squeeze_single_values: squeeze single value ND array to scalar values. Defaults to True.
+        strict: enable checking if all values on single selected input of request are equal. Defaults to True.
+
+    Raises:
+        PytritonRuntimeError: if not all values on a single selected input of the request are equal
+        and the strict flag is set to True. Additionally, if the decorator is used with a model that doesn't support batching,
+        PytritonBadParameterError: if any of the keys passed to the decorator are not allowed.
     """
+    if any(k in _SPECIAL_KEYS for k in keys):
+        not_allowed_keys = [key for key in keys if key in _SPECIAL_KEYS]
+        raise PytritonBadParameterError(
+            f"The keys {', '.join(not_allowed_keys)} are not allowed as keys for @first_value wrapper. "
+            f"The set of not allowed keys are {', '.join(_SPECIAL_KEYS)}"
+        )
 
     @wrapt.decorator
     def wrapper(wrapped, instance, args, kwargs):
-        inputs = {k: v for k, v in kwargs.items() if k != "__triton_context__"}
-        for key in keys:
-            res = inputs[key][0]
-            if max(res.shape) == 1:
-                res = res.flatten().item()
-            inputs[key] = res
-        kwargs.update(inputs)
-        return wrapped(*args, **kwargs)
+
+        model_config = get_model_config(wrapped, instance)
+        if not model_config.batching:
+            raise PytritonRuntimeError("The @first_value decorator can only be used with models that support batching.")
+
+        def _replace_inputs_with_first_value(_request):
+            for input_name in keys:
+                if input_name not in _request:
+                    continue
+
+                values = _request[input_name]
+                if strict:
+                    # do not set axis for arrays with strings (object) or models not supporting batching
+                    axis_of_uniqueness = None if values.dtype == object else 0
+                    unique_values = np.unique(values, axis=axis_of_uniqueness)
+                    if len(unique_values) > 1:
+                        raise PytritonRuntimeError(
+                            f"The values on the {input_name!r} input are not equal. "
+                            "To proceed, either disable strict mode in @first_value wrapper "
+                            "or ensure that the values always are consistent. "
+                            f"The current values of {input_name!r} are {_request[input_name]!r}."
+                        )
+
+                _first_value = values[0]
+                if (
+                    squeeze_single_values
+                    and not np.isscalar(_first_value)
+                    and all(dim == 1 for dim in _first_value.shape)
+                ):
+                    _dim_0_array = np.squeeze(_first_value)
+                    _first_value = _dim_0_array[()]  # obtain scalar from 0-dim array with numpy type
+
+                _request[input_name] = _first_value
+            return _request
+
+        inputs_names = set(kwargs) - set(_SPECIAL_KEYS)
+        if inputs_names:
+            kwargs = _replace_inputs_with_first_value(kwargs)
+            return wrapped(*args, **kwargs)
+        else:
+            requests, *other_args = args
+            requests = [_replace_inputs_with_first_value(request) for request in requests]
+            return wrapped(requests, *other_args, **kwargs)
 
     return wrapper

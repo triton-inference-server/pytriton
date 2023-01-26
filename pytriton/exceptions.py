@@ -72,3 +72,9 @@ class PytritonUnrecoverableError(PytritonError):
     """Unrecoverable error occurred in inference function, thus no further inferences possible."""
 
     pass
+
+
+class PytritonRuntimeError(PytritonError):
+    """Raised when an error is detected that doesn’t fall in any of the other categories."""
+
+    pass

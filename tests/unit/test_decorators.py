@@ -29,10 +29,11 @@ from pytriton.decorators import (
     sample,
     triton_context,
 )
-from pytriton.exceptions import PytritonBadParameterError, PytritonValidationError
+from pytriton.exceptions import PytritonBadParameterError, PytritonRuntimeError, PytritonValidationError
 from pytriton.model_config import DynamicBatcher
 from pytriton.model_config.triton_model_config import TensorSpec, TritonModelConfig
 from pytriton.proxy.inference_handler import triton_context_inject
+from tests.unit.utils import verify_equalness_of_dicts_with_ndarray
 
 input_requests = [
     {"b": np.array([[1, 2]]), "a": np.array([[1, 9]])},
@@ -168,16 +169,166 @@ def test_pad_batch_no_preffered_batch_size():
     assert results["a"].shape[0] == config.max_batch_size and results["b"].shape[0] == config.max_batch_size
 
 
-def test_flatten():
-    @first_value("a")
-    def flatten_fun(**inputs):
-        assert "a" in inputs and "b" in inputs
-        assert isinstance(inputs["a"], int) and inputs["a"] == 1
-        return {"b": inputs["b"]}
+_FIRST_VALUE_TRITON_CONTEXT = TritonContext(model_config=TritonModelConfig(model_name="foo", inputs=[], outputs=[]))
 
-    results = flatten_fun(**(input_batch_with_params.copy()))
-    assert len(results.keys()) == 1 and "b" in results
-    assert np.all(results["b"] == input_batch_with_params["b"])
+
+@pytest.mark.parametrize(
+    "inputs, keys, expected",
+    (
+        (  # extract 1st item (scalar) from 1D array
+            {"a": np.array([1, 2, 3]), "b": np.array([1, 1, 1])},
+            ["b"],
+            {"a": np.array([1, 2, 3]), "b": np.int64(1)},
+        ),
+        (  # extract 1st item (scalar) from 3D array of shape (batch_size, 1, 1)
+            {"a": np.array([1, 2, 3]), "b": np.array([[[1]], [[1]], [[1]]])},
+            ["b"],
+            {"a": np.array([1, 2, 3]), "b": np.int64(1)},
+        ),
+        (  # extract 1st item (2D) from 3D array of shape != (batch_size, 1, 1)
+            {"a": np.array([1, 2, 3]), "b": np.array([[[1], [2]], [[1], [2]], [[1], [2]]])},
+            ["b"],
+            {"a": np.array([1, 2, 3]), "b": np.array([[1], [2]])},
+        ),
+        (  # extract 1st item (scalar) from 1D array of strings (objects)
+            {"a": np.array([1, 2, 3]), "b": np.array(["val1", "val1"], dtype=object)},
+            ["b"],
+            {"a": np.array([1, 2, 3]), "b": np.object_("val1")},
+        ),
+        (  # extract 1st item (scalar) from 3D array of strings (objects) with shape (batch_size, 1, 1)
+            {"a": np.array([1, 2, 3]), "b": np.array([[["val1"]], [["val1"]]], dtype=object)},
+            ["b"],
+            {"a": np.array([1, 2, 3]), "b": np.object_("val1")},
+        ),
+        (  # do not raise error when key is missing in inputs
+            {"a": np.array([1, 2, 3]), "b": np.array([1, 1, 1])},
+            ["c"],  # optional name
+            {"a": np.array([1, 2, 3]), "b": np.array([1, 1, 1])},
+        ),
+        (  # extract 1st item (scalar) from 1D array + do not raise error when key is missing in inputs
+            {"a": np.array([1, 2, 3]), "b": np.array([1, 1, 1])},
+            ["b", "c"],  # optional name
+            {"a": np.array([1, 2, 3]), "b": np.int64(1)},
+        ),
+        (  # extract 1st item (scalar) from 1D array on 2 inputs
+            {"a": np.array([2, 2, 2]), "b": np.array([1, 1, 1])},
+            ["a", "b"],
+            {"a": np.int64(2), "b": np.int64(1)},
+        ),
+    ),
+)
+def test_first_value_with_single_request(mocker, inputs, keys, expected):
+    """Assume @batch is before decorator"""
+
+    class PassTrough:
+        def __call__(self, **_inputs):
+            return _inputs
+
+    passtrough = PassTrough()
+    spy_passtrough = mocker.spy(passtrough, "__call__")
+
+    @first_value(*keys)
+    def _fn(**_inputs):
+        return spy_passtrough(**_inputs)
+
+    _fn.__triton_context__ = _FIRST_VALUE_TRITON_CONTEXT
+
+    result = _fn(**inputs)
+    verify_equalness_of_dicts_with_ndarray(result, expected)
+
+    for call_args, expected_args in zip(spy_passtrough.call_args_list, [expected]):
+        verify_equalness_of_dicts_with_ndarray(call_args.kwargs, expected_args)
+
+
+@pytest.mark.parametrize(
+    "requests, keys, expected",
+    (
+        (  # single request - extract 1st item (scalar) from 1D array
+            [{"a": np.array([1, 2, 3]), "b": np.array([1, 1, 1])}],
+            ["b"],
+            [{"a": np.array([1, 2, 3]), "b": np.int64(1)}],
+        ),
+        (  # multiple requests - extract 1st item (scalar) from 3D array of shape (batch_size, 1, 1)
+            [
+                {"a": np.array([1, 2, 3]), "b": np.array([[[1]], [[1]], [[1]]])},
+                {"a": np.array([1, 2, 3]), "b": np.array([[[1]], [[1]], [[1]]])},
+            ],
+            ["b", "optional"],
+            [
+                {"a": np.array([1, 2, 3]), "b": np.int64(1)},
+                {"a": np.array([1, 2, 3]), "b": np.int64(1)},
+            ],
+        ),
+    ),
+)
+def test_first_value_with_requests(mocker, requests, keys, expected):
+    """Assume no @batch is before decorator"""
+
+    class PassTrough:
+        def __call__(self, _requests):
+            return _requests
+
+    passtrough = PassTrough()
+    spy_passtrough = mocker.spy(passtrough, "__call__")
+
+    @first_value(*keys)
+    def _fn(_requests):
+        return spy_passtrough(_requests)
+
+    _fn.__triton_context__ = _FIRST_VALUE_TRITON_CONTEXT
+
+    results = _fn(requests)
+    assert len(results) == len(expected)
+    for result, expected_request in zip(results, expected):
+        verify_equalness_of_dicts_with_ndarray(result, expected_request)
+
+    for call_args, expected_requests in zip(spy_passtrough.call_args_list, [expected]):
+        called_requests, *_ = call_args.args
+        for called_request, expected_request in zip(called_requests, expected_requests):
+            verify_equalness_of_dicts_with_ndarray(called_request, expected_request)
+
+
+def test_first_value_raises_on_special_key():
+
+    with pytest.raises(PytritonBadParameterError, match="not allowed as keys for @first_value wrapper."):
+
+        @first_value("__triton_context__")
+        def _fn(**inputs):
+            pass
+
+
+def test_first_value_raises_on_not_equal_values():
+    @first_value("a")
+    def _fn(**inputs):
+        pass
+
+    _fn.__triton_context__ = _FIRST_VALUE_TRITON_CONTEXT
+
+    with pytest.raises(PytritonRuntimeError, match="The values on the .* input are not equal"):
+        _fn(a=np.array([[1], [2], [2]]))
+
+    # test disabling strict check
+    @first_value("a", strict=False)
+    def _fn(**inputs):
+        pass
+
+    _fn.__triton_context__ = _FIRST_VALUE_TRITON_CONTEXT
+    _fn(a=np.array([[1], [2], [2]]))
+
+
+def test_first_value_raises_on_models_not_supporting_batching():
+    @first_value("a")
+    def _fn(**inputs):
+        pass
+
+    _fn.__triton_context__ = TritonContext(
+        model_config=TritonModelConfig(model_name="foo", inputs=[], outputs=[], batching=False)
+    )
+
+    with pytest.raises(
+        PytritonRuntimeError, match="The @first_value decorator can only be used with models that support batching."
+    ):
+        _fn(a=np.array([[1], [2], [2]]))
 
 
 def test_group_by_keys():
