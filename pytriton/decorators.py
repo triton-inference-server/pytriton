@@ -144,43 +144,41 @@ def batch(wrapped, instance, args, kwargs):
 def group_by_values(*keys):
     """Group by values.
 
-    Decorator prepares groups of requests with the same input value (for selected keys) and calls wrapped function
+    Decorator prepares groups of requests with the same request value (for selected keys) and calls wrapped function
     for each group separately (it is especially convenient to use with models that requires dynamic parameters
     sent by the user e.g. temperature - in this case we would like to run model only for requests with the same
     temperature value)
     """
 
     @wrapt.decorator
-    def wrapper(wrapped, instance, args, kwargs):
-        """Group by values."""
-        inputs = args[0]
+    def _wrapper(wrapped, instance, args, kwargs):
+        requests = args[0]
 
-        idx_inputs = []
-        for idx, input in enumerate(inputs):
-            req_key_list = []
-            for requested_key in keys:
-                if requested_key in input:
-                    arr = np.unique(input[requested_key], axis=0)
+        indexed_requests = []
+        for request_idx, request in enumerate(requests):
+            req_keys = []
+            for input_name in keys:
+                if input_name in request:
+                    arr = request[input_name]
+                    arr = np.unique(arr, axis=None if arr.dtype == object else 0)
                     key = (arr.shape, tuple(arr.flatten()))
-                    req_key_list.append(key)
+                    req_keys.append(key)
                 else:
-                    req_key_list.append(((-1,), (-1,)))
-            req_key = tuple(req_key_list)
-            idx_inputs.append((idx, req_key, input))
+                    req_keys.append(((-1,), (-1,)))
+            req_keys = tuple(req_keys)
+            indexed_requests.append((request_idx, req_keys, request))
 
-        idx_inputs.sort(key=operator.itemgetter(1))
-        idx_groups_res = []
-        for _, group in itertools.groupby(idx_inputs, key=operator.itemgetter(1)):
-            idx, _key, sample_list = zip(*group)
-            args = (list(sample_list),) + args[1:]
-            out = wrapped(*args, **kwargs)
-            idx_groups_res.extend(zip(idx, out))
+        indexed_requests.sort(key=operator.itemgetter(1))  # required by groupby to make bigger groups
+        requests_idx_with_results = []
+        for _, group in itertools.groupby(indexed_requests, key=operator.itemgetter(1)):
+            request_idx, _key, grouped_requests = zip(*group)
+            result = wrapped(list(grouped_requests), *args[1:], **kwargs)
+            requests_idx_with_results.extend(zip(request_idx, result))
 
-        idx_groups_res.sort(key=operator.itemgetter(0))
-        res_flat = [r[1] for r in idx_groups_res]
-        return res_flat
+        requests_idx_with_results.sort(key=operator.itemgetter(0))
+        return [result for request_idx, result in requests_idx_with_results]
 
-    return wrapper
+    return _wrapper
 
 
 @wrapt.decorator

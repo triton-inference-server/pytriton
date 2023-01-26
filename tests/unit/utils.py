@@ -31,7 +31,10 @@ def verify_equalness_of_dicts_with_ndarray(a_dict, b_dict):
         if isinstance(a_dict[output_name], np.ndarray):
             assert a_dict[output_name].dtype == b_dict[output_name].dtype
             assert a_dict[output_name].shape == b_dict[output_name].shape
-            assert np.allclose(b_dict[output_name], a_dict[output_name])
+            if np.issubdtype(a_dict[output_name].dtype, np.number):
+                assert np.allclose(b_dict[output_name], a_dict[output_name])
+            else:
+                assert np.array_equal(b_dict[output_name], a_dict[output_name])
         else:
             assert a_dict[output_name] == b_dict[output_name]
 

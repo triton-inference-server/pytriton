@@ -52,14 +52,6 @@ input_requests_for_batching = [
     {"b": np.array([[1, 2]]), "a": np.array([[1]])},
 ]
 
-input_requests_for_groupby_values = [
-    {"b": np.array([[7, 5], [8, 6]]), "a": np.array([[1], [1]])},
-    {"b": np.array([[1, 2], [1, 2], [11, 12]]), "a": np.array([[1], [1], [1]])},
-    {"b": np.array([[1, 2]]), "a": np.array([[1]])},
-    {"b": np.array([[5, 6]]), "a": np.array([[2]])},
-    {"b": np.array([[7, 2], [4, 2], [1, 122]]), "a": np.array([[2], [2], [2]])},
-]
-
 input_batch_with_params = {"b": np.array([[1, 2], [1, 2], [9, 9]]), "a": np.array([[1], [1], [1]])}
 
 
@@ -347,17 +339,74 @@ def test_group_by_keys():
             assert np.all(req[key] * len(req.keys()) == res[key])
 
 
-def test_group_by_values():
-    @group_by_values("a")
-    def groupby_vals_fun(inputs):
-        k = inputs[0]["a"].flatten()[0]
-        results = [{"a": inp["a"], "b": inp["b"] * k} for inp in inputs]
-        return results
+@pytest.mark.parametrize(
+    "requests, keys, expected",
+    (
+        (  # diverse batch sizes + multiple values
+            (  # input requests
+                {"a": np.array([[1], [1]]), "b": np.array([[7, 5], [8, 6]])},
+                {"a": np.array([[1], [1], [1]]), "b": np.array([[1, 2], [1, 2], [11, 12]])},
+                {"a": np.array([[1]]), "b": np.array([[1, 2]])},
+                {"a": np.array([[2]]), "b": np.array([[5, 6]])},
+                {"a": np.array([[2], [2], [2]]), "b": np.array([[7, 2], [4, 2], [1, 122]])},
+            ),
+            ["a"],
+            (  # expected requests groupings
+                (  # group#1 with a_key=((1,1), (1,))
+                    {"a": np.array([[1], [1]]), "b": np.array([[7, 5], [8, 6]])},
+                    {"a": np.array([[1], [1], [1]]), "b": np.array([[1, 2], [1, 2], [11, 12]])},
+                    {"a": np.array([[1]]), "b": np.array([[1, 2]])},
+                ),
+                (  # group#2 with a_key=((1,1), (2,))
+                    {"a": np.array([[2]]), "b": np.array([[5, 6]])},
+                    {"a": np.array([[2], [2], [2]]), "b": np.array([[7, 2], [4, 2], [1, 122]])},
+                ),
+            ),
+        ),
+        (  # diverse batch sizes + multiple values + string values
+            (
+                {"a": np.array([[1], [1]]), "s": np.array(["t1", "t2"], dtype=object)},
+                {"a": np.array([[1], [1], [1]]), "s": np.array(["t1", "t1", "t2"], dtype=object)},
+                {"a": np.array([[1]]), "s": np.array(["t2"], dtype=object)},
+                {"a": np.array([[2]]), "s": np.array(["t1"], dtype=object)},
+                {"a": np.array([[2], [2], [2]]), "s": np.array(["t1", "t1", "t1"], dtype=object)},
+            ),
+            ["s"],
+            (
+                (  # group#1 with s_key=((1,), ("t1"))
+                    {"a": np.array([[2]]), "s": np.array(["t1"], dtype=object)},
+                    {"a": np.array([[2], [2], [2]]), "s": np.array(["t1", "t1", "t1"], dtype=object)},
+                ),
+                ({"a": np.array([[1]]), "s": np.array(["t2"], dtype=object)},),  # group#2 with s_key=((1,), ("t2"))
+                (  # group#2 with s_key=((2,), ("t1", "t2"))
+                    {"a": np.array([[1], [1]]), "s": np.array(["t1", "t2"], dtype=object)},
+                    {"a": np.array([[1], [1], [1]]), "s": np.array(["t1", "t1", "t2"], dtype=object)},
+                ),
+            ),
+        ),
+    ),
+)
+def test_group_by_values(mocker, requests, keys, expected):
+    class PassTrough:
+        def __call__(self, _requests):
+            return _requests
 
-    results = groupby_vals_fun(input_requests_for_groupby_values)
-    for req, res in zip(input_requests_for_groupby_values, results):
-        assert req.keys() == res.keys()
-        assert np.all(req["b"] * req["a"].flatten()[0] == res["b"])
+    passtrough = PassTrough()
+    spy_passtrough = mocker.spy(passtrough, "__call__")
+
+    @group_by_values(*keys)
+    def _fn(_requests):
+        return spy_passtrough(_requests)
+
+    results = _fn(requests)
+    assert len(results) == len(requests)
+    for result, expected_request in zip(results, requests):
+        verify_equalness_of_dicts_with_ndarray(result, expected_request)
+
+    for call_args, expected_requests in zip(spy_passtrough.call_args_list, expected):
+        called_requests, *_ = call_args.args
+        for called_request, expected_request in zip(called_requests, expected_requests):
+            verify_equalness_of_dicts_with_ndarray(called_request, expected_request)
 
 
 def test_fill_optionals():
