@@ -117,7 +117,7 @@ def main():
     parser.add_argument("--pp", default=1, type=int, help="Pipeline model parallel size")
     parser.add_argument(
         "--lib-path",
-        default="${FT_REPO_DIR}/build/lib/libth_parallel_gpt.so",
+        default="${FT_REPO_DIR}/build/lib/libth_transformer.so",
         help="Path of FasterTransformer PyTorch GPT op library",
     )
 
