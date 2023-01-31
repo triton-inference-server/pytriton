@@ -24,6 +24,7 @@ limitations under the License.
 - Fix: `@fill_optionals` now supports non-batching models
 - Fix: `@first_value` fixed to work with optional inputs
 - Fix: `@group_by_values` fixed to work with string inputs
+- Fix: `@group_by_values` fixed to work per sample-wise
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 - Version of external components used during testing:

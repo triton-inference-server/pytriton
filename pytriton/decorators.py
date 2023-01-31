@@ -15,8 +15,9 @@
 import dataclasses
 import itertools
 import operator
+import typing
 from bisect import bisect_left
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
 import wrapt
@@ -25,11 +26,39 @@ from pytriton.constants import TRITON_CONTEXT_FIELD_NAME
 from pytriton.exceptions import PytritonBadParameterError, PytritonRuntimeError, PytritonValidationError
 from pytriton.model_config.triton_model_config import TritonModelConfig
 
+_WrappedWithWrapper = NamedTuple(
+    "WrappedWithWrapper", [("wrapped", Optional[Callable]), ("wrapper", Optional[Callable])]
+)
 
-def _get_triton_request_batch_size(triton_request):
-    first_input_value = next(iter(triton_request.values()))
+
+InputNames = typing.List[str]
+InferenceRequest = typing.Dict[str, np.ndarray]
+InferenceRequests = typing.Union[typing.List[InferenceRequest], typing.Tuple[InferenceRequest, ...]]
+
+
+def get_inference_request_batch_size(inference_request: InferenceRequest) -> int:
+    """Get batch size from triton request.
+
+    Args:
+        inference_request (InferenceRequest): Triton request.
+
+    Returns:
+        int: Batch size.
+    """
+    first_input_value = next(iter(inference_request.values()))
     batch_size, *dims = first_input_value.shape
     return batch_size
+
+
+def _get_wrapt_stack(wrapped) -> List[_WrappedWithWrapper]:
+    """Returns stack of wrapped functions with wrappers applied to inference callable."""
+    stack = []
+    infer_callable = wrapped
+    while infer_callable is not None:
+        stack.append(_WrappedWithWrapper(infer_callable, getattr(infer_callable, "_self_wrapper", None)))
+        infer_callable = getattr(infer_callable, "__wrapped__", None)
+
+    return stack
 
 
 @dataclasses.dataclass
@@ -150,33 +179,46 @@ def group_by_values(*keys):
     temperature value)
     """
 
+    def _value2key(_v):
+        return _v.tobytes() if isinstance(_v, np.ndarray) else _v
+
+    def _get_sort_key_for_sample(_request, _sample_idx: int):
+        return tuple(_value2key(_request[_key][_sample_idx]) for _key in keys)
+
+    def _group_request(
+        _request: InferenceRequest, _batch_size: int
+    ) -> typing.Generator[Tuple[Tuple[int, ...], InferenceRequest], None, None]:
+        idx_inputs = [(sample_idx, _get_sort_key_for_sample(_request, sample_idx)) for sample_idx in range(_batch_size)]
+        idx_inputs.sort(key=operator.itemgetter(1))
+        for _, group in itertools.groupby(idx_inputs, key=operator.itemgetter(1)):
+            _samples_idxes, _ = zip(*group)
+            grouped_request = {input_name: value[_samples_idxes, ...] for input_name, value in _request.items()}
+            yield _samples_idxes, grouped_request
+
     @wrapt.decorator
     def _wrapper(wrapped, instance, args, kwargs):
-        requests = args[0]
 
-        indexed_requests = []
-        for request_idx, request in enumerate(requests):
-            req_keys = []
-            for input_name in keys:
-                if input_name in request:
-                    arr = request[input_name]
-                    arr = np.unique(arr, axis=None if arr.dtype == object else 0)
-                    key = (arr.shape, tuple(arr.flatten()))
-                    req_keys.append(key)
-                else:
-                    req_keys.append(((-1,), (-1,)))
-            req_keys = tuple(req_keys)
-            indexed_requests.append((request_idx, req_keys, request))
+        wrappers_stack = [
+            callable_with_wrapper.wrapper
+            for callable_with_wrapper in _get_wrapt_stack(wrapped)
+            if callable_with_wrapper.wrapper is not None
+        ]
+        if batch in wrappers_stack:
+            raise PytritonRuntimeError("The @group_by_values decorator must be used after the @batch decorator.")
 
-        indexed_requests.sort(key=operator.itemgetter(1))  # required by groupby to make bigger groups
-        requests_idx_with_results = []
-        for _, group in itertools.groupby(indexed_requests, key=operator.itemgetter(1)):
-            request_idx, _key, grouped_requests = zip(*group)
-            result = wrapped(list(grouped_requests), *args[1:], **kwargs)
-            requests_idx_with_results.extend(zip(request_idx, result))
+        request = {k: v for k, v in kwargs.items() if k not in _SPECIAL_KEYS}
+        other_kwargs = {k: v for k, v in kwargs.items() if k in _SPECIAL_KEYS}
 
-        requests_idx_with_results.sort(key=operator.itemgetter(0))
-        return [result for request_idx, result in requests_idx_with_results]
+        batch_size = get_inference_request_batch_size(request)
+        result = {}
+        for samples_idxes, _grouped_sub_request in _group_request(request, batch_size):
+            interim_result = wrapped(*args, **_grouped_sub_request, **other_kwargs)
+
+            for key, result_data in interim_result.items():
+                result.setdefault(key, np.empty((batch_size, *result_data.shape[1:]), dtype=result_data.dtype))
+                result[key][samples_idxes, ...] = result_data  # make copy here
+
+        return result
 
     return _wrapper
 
@@ -285,7 +327,7 @@ def fill_optionals(**defaults):
 
         model_supports_batching = _triton_context.model_config.batching
         for request in requests:
-            batch_size = _get_triton_request_batch_size(request) if model_supports_batching else None
+            batch_size = get_inference_request_batch_size(request) if model_supports_batching else None
             for default_key, default_value in defaults.items():
                 if default_key in request:
                     continue

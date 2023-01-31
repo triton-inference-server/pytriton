@@ -12,12 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Inference decorators tests."""
+import typing
+
 import numpy as np
 import pytest
 import wrapt
 
 from pytriton.constants import TRITON_CONTEXT_FIELD_NAME
 from pytriton.decorators import (
+    InferenceRequest,
+    InferenceRequests,
+    InputNames,
     TritonContext,
     batch,
     fill_optionals,
@@ -339,74 +344,149 @@ def test_group_by_keys():
             assert np.all(req[key] * len(req.keys()) == res[key])
 
 
+class GroupByValuesTestCase(typing.NamedTuple):
+    inference_request: InferenceRequest
+    keys: InputNames
+    expected: InferenceRequests
+
+
 @pytest.mark.parametrize(
-    "requests, keys, expected",
+    "inference_request, keys, expected",
     (
-        (  # diverse batch sizes + multiple values
-            (  # input requests
-                {"a": np.array([[1], [1]]), "b": np.array([[7, 5], [8, 6]])},
-                {"a": np.array([[1], [1], [1]]), "b": np.array([[1, 2], [1, 2], [11, 12]])},
-                {"a": np.array([[1]]), "b": np.array([[1, 2]])},
-                {"a": np.array([[2]]), "b": np.array([[5, 6]])},
-                {"a": np.array([[2], [2], [2]]), "b": np.array([[7, 2], [4, 2], [1, 122]])},
-            ),
-            ["a"],
-            (  # expected requests groupings
-                (  # group#1 with a_key=((1,1), (1,))
-                    {"a": np.array([[1], [1]]), "b": np.array([[7, 5], [8, 6]])},
-                    {"a": np.array([[1], [1], [1]]), "b": np.array([[1, 2], [1, 2], [11, 12]])},
-                    {"a": np.array([[1]]), "b": np.array([[1, 2]])},
-                ),
-                (  # group#2 with a_key=((1,1), (2,))
-                    {"a": np.array([[2]]), "b": np.array([[5, 6]])},
-                    {"a": np.array([[2], [2], [2]]), "b": np.array([[7, 2], [4, 2], [1, 122]])},
-                ),
+        GroupByValuesTestCase(
+            inference_request={
+                "a": np.array([[1], [1], [1], [1], [1], [1], [2], [2], [2], [2]]),
+                "b": np.array([[7, 5], [8, 6], [1, 2], [1, 2], [11, 12], [1, 2], [5, 6], [7, 2], [4, 2], [1, 122]]),
+            },
+            keys=["a"],
+            expected=(
+                {
+                    "a": np.array([[1], [1], [1], [1], [1], [1]]),
+                    "b": np.array([[7, 5], [8, 6], [1, 2], [1, 2], [11, 12], [1, 2]]),
+                },
+                {"a": np.array([[2], [2], [2], [2]]), "b": np.array([[5, 6], [7, 2], [4, 2], [1, 122]])},
             ),
         ),
-        (  # diverse batch sizes + multiple values + string values
-            (
-                {"a": np.array([[1], [1]]), "s": np.array(["t1", "t2"], dtype=object)},
-                {"a": np.array([[1], [1], [1]]), "s": np.array(["t1", "t1", "t2"], dtype=object)},
-                {"a": np.array([[1]]), "s": np.array(["t2"], dtype=object)},
-                {"a": np.array([[2]]), "s": np.array(["t1"], dtype=object)},
-                {"a": np.array([[2], [2], [2]]), "s": np.array(["t1", "t1", "t1"], dtype=object)},
+        GroupByValuesTestCase(  # string values
+            inference_request={
+                "a": np.array([[1], [1], [1], [1], [1], [1], [2], [2], [2], [2]]),
+                "s": np.array(["t1", "t2", "t1", "t1", "t2", "t2", "t1", "t1", "t1", "t1"], dtype=object),
+            },
+            keys=["s"],
+            expected=(
+                {
+                    "a": np.array([[1], [1], [1], [2], [2], [2], [2]]),
+                    "s": np.array(["t1", "t1", "t1", "t1", "t1", "t1", "t1"], dtype=object),
+                },
+                {"a": np.array([[1], [1], [1]]), "s": np.array(["t2", "t2", "t2"], dtype=object)},
             ),
-            ["s"],
-            (
-                (  # group#1 with s_key=((1,), ("t1"))
-                    {"a": np.array([[2]]), "s": np.array(["t1"], dtype=object)},
-                    {"a": np.array([[2], [2], [2]]), "s": np.array(["t1", "t1", "t1"], dtype=object)},
+        ),
+        GroupByValuesTestCase(  # 2d array of string values
+            inference_request={
+                "a": np.array([[1], [1], [1], [1], [1], [1], [2], [2], [2], [2]]),
+                "s": np.array(
+                    [
+                        ["t1", "t1"],
+                        ["t2", "t2"],
+                        ["t1", "t1"],
+                        ["t1", "t1"],
+                        ["t2", "t2"],
+                        ["t2", "t1"],
+                        ["t1", "t1"],
+                        ["t1", "t1"],
+                        ["t1", "t1"],
+                        ["t1", "t1"],
+                    ],
+                    dtype=object,
                 ),
-                ({"a": np.array([[1]]), "s": np.array(["t2"], dtype=object)},),  # group#2 with s_key=((1,), ("t2"))
-                (  # group#2 with s_key=((2,), ("t1", "t2"))
-                    {"a": np.array([[1], [1]]), "s": np.array(["t1", "t2"], dtype=object)},
-                    {"a": np.array([[1], [1], [1]]), "s": np.array(["t1", "t1", "t2"], dtype=object)},
+            },
+            keys=["s"],
+            expected=(
+                {
+                    "a": np.array([[1], [1], [1], [2], [2], [2], [2]]),
+                    "s": np.array(
+                        [
+                            ["t1", "t1"],
+                            ["t1", "t1"],
+                            ["t1", "t1"],
+                            ["t1", "t1"],
+                            ["t1", "t1"],
+                            ["t1", "t1"],
+                            ["t1", "t1"],
+                        ],
+                        dtype=object,
+                    ),
+                },
+                {"a": np.array([[1]]), "s": np.array([["t2", "t1"]], dtype=object)},
+                {"a": np.array([[1], [1]]), "s": np.array([["t2", "t2"], ["t2", "t2"]], dtype=object)},
+            ),
+        ),
+        GroupByValuesTestCase(  # group by 2 keys
+            inference_request={
+                "a": np.array([[1], [1], [1], [1], [1], [1], [2], [2], [2], [2]]),
+                "s": np.array(
+                    [
+                        ["t1", "t1"],
+                        ["t2", "t2"],
+                        ["t1", "t1"],
+                        ["t1", "t1"],
+                        ["t2", "t2"],
+                        ["t2", "t1"],
+                        ["t1", "t1"],
+                        ["t1", "t1"],
+                        ["t1", "t1"],
+                        ["t1", "t1"],
+                    ],
+                    dtype=object,
                 ),
+            },
+            keys=["a", "s"],
+            expected=(
+                {
+                    "a": np.array([[1], [1], [1]]),
+                    "s": np.array([["t1", "t1"], ["t1", "t1"], ["t1", "t1"]], dtype=object),
+                },
+                {"a": np.array([[1]]), "s": np.array([["t2", "t1"]], dtype=object)},
+                {"a": np.array([[1], [1]]), "s": np.array([["t2", "t2"], ["t2", "t2"]], dtype=object)},
+                {
+                    "a": np.array([[2], [2], [2], [2]]),
+                    "s": np.array([["t1", "t1"], ["t1", "t1"], ["t1", "t1"], ["t1", "t1"]], dtype=object),
+                },
             ),
         ),
     ),
 )
-def test_group_by_values(mocker, requests, keys, expected):
+def test_group_by_values(mocker, inference_request, keys, expected):
     class PassTrough:
-        def __call__(self, _requests):
-            return _requests
+        def __call__(self, **inputs):
+            return inputs
 
     passtrough = PassTrough()
     spy_passtrough = mocker.spy(passtrough, "__call__")
 
     @group_by_values(*keys)
-    def _fn(_requests):
-        return spy_passtrough(_requests)
+    def _fn(**inputs):
+        return spy_passtrough(**inputs)
 
-    results = _fn(requests)
-    assert len(results) == len(requests)
-    for result, expected_request in zip(results, requests):
-        verify_equalness_of_dicts_with_ndarray(result, expected_request)
+    result = _fn(**inference_request)
+    verify_equalness_of_dicts_with_ndarray(result, inference_request)
 
-    for call_args, expected_requests in zip(spy_passtrough.call_args_list, expected):
-        called_requests, *_ = call_args.args
-        for called_request, expected_request in zip(called_requests, expected_requests):
-            verify_equalness_of_dicts_with_ndarray(called_request, expected_request)
+    for call_args, expected_request in zip(spy_passtrough.call_args_list, expected):
+        called_request = call_args.kwargs
+        verify_equalness_of_dicts_with_ndarray(called_request, expected_request)
+
+
+def test_group_by_values_raise_error_if_placed_before_batch():
+    with pytest.raises(
+        PytritonRuntimeError, match="The @group_by_values decorator must be used after the @batch decorator."
+    ):
+
+        @group_by_values("a")
+        @batch
+        def _fn(**_requests):
+            return _requests
+
+        _fn([{"a": np.zeros((1,))}, {"a": np.zeros((1,))}])
 
 
 def test_fill_optionals():
