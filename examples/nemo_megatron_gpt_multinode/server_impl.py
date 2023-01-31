@@ -19,7 +19,7 @@ import torch  # pytype: disable=import-error
 from nemo.collections.nlp.modules.common.text_generation_utils import generate  # pytype: disable=import-error
 
 from pytriton.decorators import batch
-from pytriton.exceptions import PytritonUnrecoverableError
+from pytriton.exceptions import PyTritonUnrecoverableError
 from pytriton.model_config import ModelConfig, Tensor
 from pytriton.triton import Triton, TritonConfig
 
@@ -151,7 +151,7 @@ class MegatronTritonServer:
             try:
                 output = generate(self._model, inputs=sentences, **parameters)
             except RuntimeError as e:
-                raise PytritonUnrecoverableError("Fatal error occurred - no further inferences possible.") from e
+                raise PyTritonUnrecoverableError("Fatal error occurred - no further inferences possible.") from e
             output = {
                 output_name: _cast_output(data, self._outputs[output_name].dtype)
                 for output_name, data in output.items()

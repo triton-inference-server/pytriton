@@ -24,7 +24,7 @@ The ModelManager is responsible for maintaining the models that has to be server
 import logging
 from typing import Dict, Iterable, Tuple
 
-from pytriton.exceptions import PytritonInvalidOperationError
+from pytriton.exceptions import PyTritonInvalidOperationError
 from pytriton.models.model import Model
 from pytriton.server.model_repository import TritonModelRepository
 
@@ -60,7 +60,7 @@ class ModelManager:
         """
         key = self._format_key(model)
         if key in self._models:
-            raise PytritonInvalidOperationError("Cannot add model with the same name twice.")
+            raise PyTritonInvalidOperationError("Cannot add model with the same name twice.")
 
         LOGGER.debug(f"Adding {model.model_name} ({model.model_version}) to registry under {key}.")
         self._models[key] = model

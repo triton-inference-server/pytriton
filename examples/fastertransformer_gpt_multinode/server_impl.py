@@ -18,7 +18,7 @@ import torch  # pytype: disable=import-error
 from utils import broadcast_inputs  # pytype: disable=import-error
 
 from pytriton.decorators import batch
-from pytriton.exceptions import PytritonUnrecoverableError
+from pytriton.exceptions import PyTritonUnrecoverableError
 from pytriton.model_config import ModelConfig, Tensor
 from pytriton.triton import Triton, TritonConfig
 
@@ -102,7 +102,7 @@ class FasterTransformerTritonServer:
                 outputs_ids, _, output_cum_log_probs = self._model(**tensors, **parameters)
 
             except RuntimeError as e:
-                raise PytritonUnrecoverableError("Fatal error occurred - no further inferences possible.") from e
+                raise PyTritonUnrecoverableError("Fatal error occurred - no further inferences possible.") from e
 
         original_shape = outputs_ids.shape
         outputs_ids = outputs_ids.reshape((-1, outputs_ids.shape[-1]))  # stack batch_axis with beam_axis

@@ -33,7 +33,7 @@ from typing import Dict
 import numpy as np
 from google.protobuf import json_format, text_format  # pytype: disable=pyi-error
 
-from pytriton.exceptions import PytritonModelConfigError
+from pytriton.exceptions import PyTritonModelConfigError
 
 from .common import QueuePolicy, TimeoutAction
 from .triton_model_config import DeviceKind, DynamicBatcher, ResponseCache, TensorSpec, TritonModelConfig
@@ -147,15 +147,15 @@ class ModelConfigParser:
         """
         name = item.get("name")
         if not name:
-            raise PytritonModelConfigError(f"Name for {io_type} at index {idx} not provided.")
+            raise PyTritonModelConfigError(f"Name for {io_type} at index {idx} not provided.")
 
         data_type = item.get("data_type")
         if not data_type:
-            raise PytritonModelConfigError(f"Data type for {io_type} with name `{name}` not defined.")
+            raise PyTritonModelConfigError(f"Data type for {io_type} with name `{name}` not defined.")
 
         data_type_val = data_type.split("_")
         if len(data_type_val) != 2:
-            raise PytritonModelConfigError(
+            raise PyTritonModelConfigError(
                 f"Invalid data type `{data_type}` for {io_type} with name `{name}` not defined. "
                 "The expected name is TYPE_{type}."
             )
@@ -166,13 +166,13 @@ class ModelConfigParser:
         else:
             dtype = client_utils.triton_to_np_dtype(data_type)
             if dtype is None:
-                raise PytritonModelConfigError(f"Unsupported data type `{data_type}` for {io_type} with name `{name}`")
+                raise PyTritonModelConfigError(f"Unsupported data type `{data_type}` for {io_type} with name `{name}`")
 
             dtype = np.dtype("bool") if dtype == bool else dtype
 
         dims = item.get("dims", [])
         if not dims:
-            raise PytritonModelConfigError(f"Dimension for {io_type} with name `{name}` not defined.")
+            raise PyTritonModelConfigError(f"Dimension for {io_type} with name `{name}` not defined.")
 
         shape = tuple(int(s) for s in dims)
 

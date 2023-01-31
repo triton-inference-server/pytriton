@@ -22,7 +22,7 @@ from typing import Callable, Optional, Sequence, Union
 
 import zmq
 
-from pytriton.exceptions import PytritonValidationError
+from pytriton.exceptions import PyTritonValidationError
 from pytriton.model_config.generator import ModelConfigGenerator
 from pytriton.model_config.model_config import ModelConfig
 from pytriton.model_config.tensor import Tensor
@@ -68,7 +68,7 @@ class Model:
             workspace: workspace for storing artifacts
 
         Raises:
-            PytritonValidationError if one or more of provided values are incorrect.
+            PyTritonValidationError if one or more of provided values are incorrect.
         """
         self.model_name = model_name
         self.model_version = model_version
@@ -77,13 +77,13 @@ class Model:
 
         self.infer_functions = [inference_fn] if isinstance(inference_fn, Callable) else inference_fn
         if not isinstance(self.infer_functions, (Sequence, Callable)):
-            raise PytritonValidationError("inference_fn has to be either callable or sequence of callables")
+            raise PyTritonValidationError("inference_fn has to be either callable or sequence of callables")
 
         self.inputs = inputs
         self.outputs = outputs
 
         if any([output.optional for output in self.outputs]):
-            raise PytritonValidationError("Output tensors cannot be optional.")
+            raise PyTritonValidationError("Output tensors cannot be optional.")
 
         self.config = config
         self._workspace = workspace

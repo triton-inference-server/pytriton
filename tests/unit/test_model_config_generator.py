@@ -17,7 +17,7 @@ import tempfile
 import numpy as np
 import pytest
 
-from pytriton.exceptions import PytritonBadParameterError
+from pytriton.exceptions import PyTritonBadParameterError
 from pytriton.model_config.common import DeviceKind, DynamicBatcher, QueuePolicy, TimeoutAction
 from pytriton.model_config.generator import ModelConfigGenerator
 from pytriton.model_config.triton_model_config import ResponseCache, TensorSpec, TritonModelConfig
@@ -50,7 +50,7 @@ def test_set_batching_raise_error_when_mbs_is_0_and_batching_is_not_disabled():
     generator = ModelConfigGenerator(model_config)
 
     model_config_data = {}
-    with pytest.raises(PytritonBadParameterError, match="The `max_batch_size` must be greater or equal to 1."):
+    with pytest.raises(PyTritonBadParameterError, match="The `max_batch_size` must be greater or equal to 1."):
         generator._set_batching(model_config_data)
 
 
@@ -59,7 +59,7 @@ def test_set_batching_raise_error_when_mbs_is_less_then_0_and_batching_is_not_di
     generator = ModelConfigGenerator(model_config)
 
     model_config_data = {}
-    with pytest.raises(PytritonBadParameterError, match="The `max_batch_size` must be greater or equal to 1."):
+    with pytest.raises(PyTritonBadParameterError, match="The `max_batch_size` must be greater or equal to 1."):
         generator._set_batching(model_config_data)
 
 
@@ -156,7 +156,7 @@ def test_set_batching_raise_exception_when_invalid_default_priority_level_passed
 
     model_config_data = {}
 
-    with pytest.raises(PytritonBadParameterError, match="The `default_priority_level` must be between 1 and 5."):
+    with pytest.raises(PyTritonBadParameterError, match="The `default_priority_level` must be between 1 and 5."):
         generator._set_batching(model_config_data)
 
 
@@ -213,7 +213,7 @@ def test_set_batching_raise_exception_when_priority_queue_policy_passed_but_no_d
     model_config_data = {}
 
     with pytest.raises(
-        PytritonBadParameterError,
+        PyTritonBadParameterError,
         match="Provide the `priority_levels` if you want to define `priority_queue_policy` for Dynamic Batching.",
     ):
         generator._set_batching(model_config_data)
@@ -242,7 +242,7 @@ def test_set_batching_raise_exception_when_invalid_priority_queue_policy_passed(
     model_config_data = {}
 
     with pytest.raises(
-        PytritonBadParameterError, match="Invalid `priority`=6 provided. The value must be between 1 and 5."
+        PyTritonBadParameterError, match="Invalid `priority`=6 provided. The value must be between 1 and 5."
     ):
         generator._set_batching(model_config_data)
 
@@ -415,7 +415,7 @@ def test_set_model_signature_raise_error_when_output_marked_as_optional():
 
     model_config_data = {}
     with pytest.raises(
-        PytritonBadParameterError,
+        PyTritonBadParameterError,
         match="Optional flag for outputs is not supported. Outputs marked as optional: OUTPUT_1.",
     ):
         generator._set_model_signature(model_config_data)

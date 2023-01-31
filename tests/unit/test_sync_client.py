@@ -21,11 +21,11 @@ import tritonclient.http
 
 from pytriton.client import ModelClient
 from pytriton.client.exceptions import (
-    PytritonClientModelDoesntSupportBatchingError,
-    PytritonClientModelUnavailableError,
-    PytritonClientTimeoutError,
-    PytritonClientUrlParseError,
-    PytritonClientValueError,
+    PyTritonClientModelDoesntSupportBatchingError,
+    PyTritonClientModelUnavailableError,
+    PyTritonClientTimeoutError,
+    PyTritonClientUrlParseError,
+    PyTritonClientValueError,
 )
 from pytriton.model_config import DeviceKind
 from pytriton.model_config.generator import ModelConfigGenerator
@@ -124,12 +124,12 @@ def _patch_http_client__model_up_and_ready(mocker, model_config: TritonModelConf
 
 
 def test_sync_client_init_raises_error_when_invalid_url_provided():
-    with pytest.raises(PytritonClientUrlParseError, match="Could not parse url"):
+    with pytest.raises(PyTritonClientUrlParseError, match="Could not parse url"):
         ModelClient(["localhost:8001"], "dummy")  # pytype: disable=wrong-arg-types
 
 
 def test_sync_grpc_client_init_raises_error_when_use_non_lazy_init_on_non_responding_server():
-    with pytest.raises(PytritonClientTimeoutError, match="Waiting for (.*) to be ready timed out."):
+    with pytest.raises(PyTritonClientTimeoutError, match="Waiting for (.*) to be ready timed out."):
         ModelClient("dummy:43299", "dummy", lazy_init=False, init_timeout_s=1)
 
 
@@ -144,10 +144,10 @@ def test_sync_grpc_client_init_raises_error_when_requested_unavailable_model_and
         ]
     )
 
-    with pytest.raises(PytritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+    with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
         ModelClient(_GRPC_LOCALHOST_URL, "NotExistentModel", lazy_init=False, init_timeout_s=10)
 
-    with pytest.raises(PytritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+    with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
         ModelClient(_GRPC_LOCALHOST_URL, "OtherName", "2", lazy_init=False, init_timeout_s=10)
 
 
@@ -175,11 +175,11 @@ def test_sync_grpc_client_model_config_raises_error_when_requested_unavailable_m
         ]
     )
     with ModelClient(_GRPC_LOCALHOST_URL, "NonExistentModel") as client:
-        with pytest.raises(PytritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
             _ = client.model_config
 
     with ModelClient(_GRPC_LOCALHOST_URL, "OtherName", "2") as client:
-        with pytest.raises(PytritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
             _ = client.model_config
 
 
@@ -198,19 +198,19 @@ def test_sync_grpc_client_infer_raises_error_when_requested_unavailable_model(mo
     b = np.array([1], dtype=np.float32)
 
     with ModelClient(_GRPC_LOCALHOST_URL, "NonExistentModel") as client:
-        with pytest.raises(PytritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
             _ = client.infer_sample(a, b)
 
     with ModelClient(_GRPC_LOCALHOST_URL, "NonExistentModel") as client:
-        with pytest.raises(PytritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
             _ = client.infer_batch(a, b)
 
     with ModelClient(_GRPC_LOCALHOST_URL, "OtherName", "2") as client:
-        with pytest.raises(PytritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
             _ = client.infer_sample(a, b)
 
     with ModelClient(_GRPC_LOCALHOST_URL, "OtherName", "2") as client:
-        with pytest.raises(PytritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
             _ = client.infer_batch(a, b)
 
 
@@ -405,7 +405,7 @@ def test_sync_grpc_client_infer_batch_raises_error_when_model_doesnt_support_bat
     b = np.array([1], dtype=np.float32)
 
     with ModelClient(_GRPC_LOCALHOST_URL, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name) as client:
-        with pytest.raises(PytritonClientModelDoesntSupportBatchingError):
+        with pytest.raises(PyTritonClientModelDoesntSupportBatchingError):
             client.infer_batch(a=a, b=b)
 
 
@@ -418,14 +418,14 @@ def test_sync_grpc_client_infer_raises_error_when_mixed_args_convention_used(moc
 
     with ModelClient(_GRPC_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
         with pytest.raises(
-            PytritonClientValueError,
+            PyTritonClientValueError,
             match="Use either positional either keyword method arguments convention",
         ):
             client.infer_sample(a, b=b)
 
     with ModelClient(_GRPC_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
         with pytest.raises(
-            PytritonClientValueError,
+            PyTritonClientValueError,
             match="Use either positional either keyword method arguments convention",
         ):
             client.infer_batch(a, b=b)
@@ -436,11 +436,11 @@ def test_sync_grpc_client_infer_raises_error_when_no_args_provided(mocker):
     _patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
 
     with ModelClient(_GRPC_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
-        with pytest.raises(PytritonClientValueError, match="Provide input data"):
+        with pytest.raises(PyTritonClientValueError, match="Provide input data"):
             client.infer_sample()
 
     with ModelClient(_GRPC_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
-        with pytest.raises(PytritonClientValueError, match="Provide input data"):
+        with pytest.raises(PyTritonClientValueError, match="Provide input data"):
             client.infer_batch()
 
 
@@ -456,7 +456,7 @@ def test_sync_http_client_init_obtain_expected_model_config_when_lazy_init_is_di
 
 
 def test_sync_http_client_init_raises_error_when_use_non_lazy_init():
-    with pytest.raises(PytritonClientTimeoutError, match="Waiting for (.*) to be ready timed out."):
+    with pytest.raises(PyTritonClientTimeoutError, match="Waiting for (.*) to be ready timed out."):
         ModelClient("http://dummy:43299", "dummy", lazy_init=False, init_timeout_s=1)
 
 
@@ -465,10 +465,10 @@ def test_sync_http_client_init_raises_error_when_requested_unavailable_model_and
     mock_get_repo_index = mocker.patch.object(tritonclient.http.InferenceServerClient, "get_model_repository_index")
     mock_get_repo_index.return_value = [{"name": "OtherName", "version": "1", "state": "READY", "reason": ""}]
 
-    with pytest.raises(PytritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+    with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
         ModelClient(_HTTP_LOCALHOST_URL, "NotExistentModel", lazy_init=False, init_timeout_s=10)
 
-    with pytest.raises(PytritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+    with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
         ModelClient(_HTTP_LOCALHOST_URL, "OtherName", "2", lazy_init=False, init_timeout_s=10)
 
 
@@ -478,11 +478,11 @@ def test_sync_http_client_model_config_raises_error_when_requested_unavailable_m
     mock_get_repo_index.return_value = [{"name": "OtherName", "version": "1", "state": "READY", "reason": ""}]
 
     with ModelClient(_HTTP_LOCALHOST_URL, "NonExistentModel") as client:
-        with pytest.raises(PytritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
             _ = client.model_config
 
     with ModelClient(_HTTP_LOCALHOST_URL, "OtherName", "2") as client:
-        with pytest.raises(PytritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
             _ = client.model_config
 
 
@@ -495,19 +495,19 @@ def test_sync_http_client_infer_raises_error_when_requested_unavailable_model(mo
     b = np.array([1], dtype=np.float32)
 
     with ModelClient(_HTTP_LOCALHOST_URL, "NonExistentModel") as client:
-        with pytest.raises(PytritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
             _ = client.infer_sample(a, b)
 
     with ModelClient(_HTTP_LOCALHOST_URL, "NonExistentModel") as client:
-        with pytest.raises(PytritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
             _ = client.infer_batch(a, b)
 
     with ModelClient(_HTTP_LOCALHOST_URL, "OtherName", "2") as client:
-        with pytest.raises(PytritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
             _ = client.infer_sample(a, b)
 
     with ModelClient(_HTTP_LOCALHOST_URL, "OtherName", "2") as client:
-        with pytest.raises(PytritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
             _ = client.infer_batch(a, b)
 
 
@@ -700,7 +700,7 @@ def test_sync_http_client_infer_batch_raises_error_when_model_doesnt_support_bat
     b = np.array([1], dtype=np.float32)
 
     with ModelClient(_HTTP_LOCALHOST_URL, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name) as client:
-        with pytest.raises(PytritonClientModelDoesntSupportBatchingError):
+        with pytest.raises(PyTritonClientModelDoesntSupportBatchingError):
             client.infer_batch(a, b)
 
 
@@ -713,14 +713,14 @@ def test_sync_http_client_infer_raises_error_when_mixed_args_convention_used(moc
 
     with ModelClient(_HTTP_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
         with pytest.raises(
-            PytritonClientValueError,
+            PyTritonClientValueError,
             match="Use either positional either keyword method arguments convention",
         ):
             client.infer_sample(a, b=b)
 
     with ModelClient(_HTTP_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
         with pytest.raises(
-            PytritonClientValueError,
+            PyTritonClientValueError,
             match="Use either positional either keyword method arguments convention",
         ):
             client.infer_batch(a, b=b)
@@ -731,9 +731,9 @@ def test_sync_http_client_infer_raises_error_when_no_args_provided(mocker):
     _patch_http_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
 
     with ModelClient(_HTTP_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
-        with pytest.raises(PytritonClientValueError, match="Provide input data"):
+        with pytest.raises(PyTritonClientValueError, match="Provide input data"):
             client.infer_sample()
 
     with ModelClient(_HTTP_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
-        with pytest.raises(PytritonClientValueError, match="Provide input data"):
+        with pytest.raises(PyTritonClientValueError, match="Provide input data"):
             client.infer_batch()

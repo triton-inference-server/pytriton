@@ -14,7 +14,7 @@
 """Exceptions thrown in pytriton.client module."""
 
 
-class PytritonClientError(Exception):
+class PyTritonClientError(Exception):
     """Generic pytriton client exception."""
 
     def __init__(self, message: str):
@@ -44,37 +44,37 @@ class PytritonClientError(Exception):
         return self._message
 
 
-class PytritonClientValueError(PytritonClientError):
+class PyTritonClientValueError(PyTritonClientError):
     """Generic error raised in case of incorrect values are provided into API."""
 
     pass
 
 
-class PytritonClientUrlParseError(PytritonClientValueError):
+class PyTritonClientUrlParseError(PyTritonClientValueError):
     """Error raised on problems with parsing Triton Inference Server url."""
 
     pass
 
 
-class PytritonClientTimeoutError(PytritonClientError):
+class PyTritonClientTimeoutError(PyTritonClientError):
     """Timeout occurred during communication with the Triton Inference Server."""
 
     pass
 
 
-class PytritonClientModelUnavailableError(PytritonClientError):
+class PyTritonClientModelUnavailableError(PyTritonClientError):
     """Model with given name and version is unavailable on the given Triton Inference Server."""
 
     pass
 
 
-class PytritonClientModelDoesntSupportBatchingError(PytritonClientError):
+class PyTritonClientModelDoesntSupportBatchingError(PyTritonClientError):
     """Error raised in case of trying to infer batch on model not supporting batching."""
 
     pass
 
 
-class PytritonClientInferenceServerError(PytritonClientError):
+class PyTritonClientInferenceServerError(PyTritonClientError):
     """Error raised in case of error on inference function or Triton Inference Server side."""
 
     pass

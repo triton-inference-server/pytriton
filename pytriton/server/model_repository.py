@@ -16,7 +16,7 @@ import pathlib
 import shutil
 from typing import Optional
 
-from pytriton.exceptions import PytritonError
+from pytriton.exceptions import PyTritonError
 from pytriton.utils.workspace import Workspace
 
 
@@ -33,7 +33,7 @@ class TritonModelRepository:
             workspace: Workspace details.
         """
         if path is not None and not path.exists():
-            raise PytritonError("Provided model repository path not exists")
+            raise PyTritonError("Provided model repository path not exists")
 
         if path is not None:
             self._path = path

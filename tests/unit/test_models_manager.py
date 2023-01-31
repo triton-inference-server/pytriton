@@ -18,7 +18,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from pytriton.exceptions import PytritonInvalidOperationError
+from pytriton.exceptions import PyTritonInvalidOperationError
 from pytriton.models.manager import ModelManager
 from pytriton.server.model_repository import TritonModelRepository
 from pytriton.utils.workspace import Workspace
@@ -82,7 +82,7 @@ def test_add_model_raise_error_when_models_have_same_names_and_versions():
 
         model_manager.add_model(model1)
 
-        with pytest.raises(PytritonInvalidOperationError, match="Cannot add model with the same name twice."):
+        with pytest.raises(PyTritonInvalidOperationError, match="Cannot add model with the same name twice."):
             model_manager.add_model(model2)
 
 

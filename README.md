@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# NVIDIA Pytriton
+# NVIDIA PyTriton
 
-The NVIDIA Pytriton is Flask/FastAPI-like interface to simplify Triton's deployment in Python environments.
+The NVIDIA PyTriton is Flask/FastAPI-like interface to simplify Triton's deployment in Python environments.
 The library allows to serve Machine Learning models directly from Python through
 NVIDIA [Triton Inference Server](https://github.com/triton-inference-server).
 
@@ -37,7 +37,7 @@ NVIDIA [Triton Inference Server](https://github.com/triton-inference-server).
 
 ## How it works?
 
-In NVIDIA Pytriton, same as in Flask or FastAPI, you can define any Python function that execute a Machine Learning model prediction and expose
+In NVIDIA PyTriton, same as in Flask or FastAPI, you can define any Python function that execute a Machine Learning model prediction and expose
 it through HTTP/gRPC API. The library installs Triton Inference Server in your environment and use it for handling the
 HTTP/gRPC requests and responses. Our library provides a Python API that allow to attach a Python function to the Triton
 and a communication layer to send/receive data between Triton and the function. The solution helps use of the
@@ -78,9 +78,10 @@ pip install -U pytriton
 
 **Building from source**
 
-The package can be also build from the source using `Make` commands run from the main project directory. The build
-process requires Docker installed in your system. The instruction can be found
-in [Docker documentation](https://docs.docker.com/engine/install/ubuntu/).
+The package can be also build from the source using `Make` commands run from the main project directory. The
+prerequisites for building wheel:
+- installed Docker in your system - more in [Docker documentation](https://docs.docker.com/engine/install/ubuntu/)
+- access to Docker daemon from system or container
 
 To prepare the wheel you need first install additional packages using:
 
@@ -288,7 +289,7 @@ through the same route and response is created on by Triton.
 ## Examples
 
 We provide simple examples how to integrate the PyTorch, TensorFlow2, JAX and simple Python models with Triton Inference
-Server using pytriton. Each example provide an instruction describing how
+Server using PyTriton. Each example provide an instruction describing how
 
 The list of available model examples:
 

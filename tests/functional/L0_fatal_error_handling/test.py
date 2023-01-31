@@ -20,7 +20,7 @@ import random
 import time
 
 from pytriton.decorators import batch
-from pytriton.exceptions import PytritonUnrecoverableError
+from pytriton.exceptions import PyTritonUnrecoverableError
 from tests.utils import ProcessMonitoring
 
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
@@ -31,7 +31,7 @@ METADATA = {
 
 @batch
 def _throw_unrecoverable_error(**_):
-    raise PytritonUnrecoverableError("Some unrecoverable error occurred thus no further inferences possible.")
+    raise PyTritonUnrecoverableError("Some unrecoverable error occurred thus no further inferences possible.")
 
 
 def main():
@@ -39,7 +39,7 @@ def main():
     import pytest
 
     from pytriton.client import ModelClient
-    from pytriton.client.exceptions import PytritonClientInferenceServerError
+    from pytriton.client.exceptions import PyTritonClientInferenceServerError
     from pytriton.model_config import ModelConfig, Tensor
     from pytriton.triton import Triton, TritonConfig
     from tests.utils import DEFAULT_LOG_FORMAT, find_free_port
@@ -53,7 +53,7 @@ def main():
         required=False,
         default=300,
         type=float,
-        help="Timeout for server to shutdown on PytritonUnrecoverableError",
+        help="Timeout for server to shutdown on PyTritonUnrecoverableError",
     )
     parser.add_argument("--seed", type=int, help="PRNG seed", required=False)
     parser.add_argument("--verbose", "-v", action="store_true", help="Timeout for test")
@@ -84,7 +84,7 @@ def main():
     protocol = random.choice(["http", "grpc"])
     url = f"{protocol}://localhost:{getattr(triton_config, f'{protocol}_port')}"
     with ModelClient(url, "proxy", init_timeout_s=args.init_timeout_s) as client:
-        with pytest.raises(PytritonClientInferenceServerError, match="no further inferences possible"):
+        with pytest.raises(PyTritonClientInferenceServerError, match="no further inferences possible"):
             client.infer_batch(input1)
 
     # wait for shutting down of server and proxy_backend

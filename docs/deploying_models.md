@@ -289,7 +289,7 @@ tensor3 = Tensor(name="tensor3", dtype="float32", shape=(-1,)),
 ### Unrecoverable errors
 
 When the model gets into a state where further inference is impossible,
-you can throw [PytritonUnrecoverableError][pytriton.exceptions.PytritonUnrecoverableError]
+you can throw [PyTritonUnrecoverableError][pytriton.exceptions.PyTritonUnrecoverableError]
 from the inference function. This will cause NVIDIA Triton Inference Server to shut down.
 This might be useful when the model is deployed on a cluster in a multi-node setup. In that case
 to recover the model you need to restart all "workers" on the cluster.
@@ -297,7 +297,7 @@ to recover the model you need to restart all "workers" on the cluster.
 ```python
 from typing import Dict
 import numpy as np
-from pytriton.exceptions import PytritonUnrecoverableError
+from pytriton.exceptions import PyTritonUnrecoverableError
 
 @batch
 def infer_fn(**inputs: np.ndarray) -> Dict[str, np.ndarray]:
@@ -306,7 +306,7 @@ def infer_fn(**inputs: np.ndarray) -> Dict[str, np.ndarray]:
     try:
         outputs = model(**inputs)
     except Exception as e:
-        raise PytritonUnrecoverableError(
+        raise PyTritonUnrecoverableError(
             "Some unrecoverable error occurred thus no further inferences possible.") from e
 
     ...

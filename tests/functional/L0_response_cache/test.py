@@ -55,7 +55,7 @@ def main():
         required=False,
         default=300,
         type=float,
-        help="Timeout for server to shutdown on PytritonUnrecoverableError",
+        help="Timeout for server to shutdown on PyTritonUnrecoverableError",
     )
     parser.add_argument("--seed", type=int, help="PRNG seed", required=False)
     parser.add_argument("--verbose", "-v", action="store_true", help="Timeout for test")

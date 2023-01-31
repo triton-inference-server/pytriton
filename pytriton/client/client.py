@@ -24,7 +24,7 @@ Inference inputs can be provided either as positional or keyword arguments:
     result_dict = client.infer_sample(input1, input2)
     result_dict = client.infer_sample(a=input1, b=input2)
 
-Mixing of argument passing conventions is not supported and will raise PytritonClientValueError.
+Mixing of argument passing conventions is not supported and will raise PyTritonClientValueError.
 """
 
 import itertools
@@ -39,10 +39,10 @@ import tritonclient.http
 import tritonclient.utils
 
 from pytriton.client.exceptions import (
-    PytritonClientInferenceServerError,
-    PytritonClientModelDoesntSupportBatchingError,
-    PytritonClientUrlParseError,
-    PytritonClientValueError,
+    PyTritonClientInferenceServerError,
+    PyTritonClientModelDoesntSupportBatchingError,
+    PyTritonClientUrlParseError,
+    PyTritonClientValueError,
 )
 from pytriton.client.utils import _DEFAULT_WAIT_FOR_MODEL_TIMEOUT_S, get_model_config, wait_for_model_ready
 from pytriton.constants import DEFAULT_GRPC_PORT, DEFAULT_HTTP_PORT
@@ -56,9 +56,9 @@ _IOType = Union[Tuple[np.ndarray, ...], Dict[str, np.ndarray]]
 
 def _verify_inputs_args(inputs, named_inputs):
     if not inputs and not named_inputs:
-        raise PytritonClientValueError("Provide input data")
+        raise PyTritonClientValueError("Provide input data")
     if not bool(inputs) ^ bool(named_inputs):
-        raise PytritonClientValueError("Use either positional either keyword method arguments convention")
+        raise PyTritonClientValueError("Use either positional either keyword method arguments convention")
 
 
 class ModelClient:
@@ -96,13 +96,13 @@ class ModelClient:
             init_timeout_s: timeout for server and model being ready.
 
         Raises:
-            PytritonClientModelUnavailableError: If model with given name (and version) is unavailable.
-            PytritonClientTimeoutError:
+            PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
+            PyTritonClientTimeoutError:
                 if `lazy_init` argument is False and wait time for server and model being ready exceeds `init_timeout_s`.
-            PytritonClientUrlParseError: In case of problems with parsing url.
+            PyTritonClientUrlParseError: In case of problems with parsing url.
         """
         if not isinstance(url, str):
-            raise PytritonClientUrlParseError(f"Could not parse url {url}")
+            raise PyTritonClientUrlParseError(f"Could not parse url {url}")
 
         parsed_url = urllib.parse.urlparse(url)
         if not parsed_url.scheme or parsed_url.scheme.lower() not in ["grpc", "http"]:
@@ -147,8 +147,8 @@ class ModelClient:
             timeout_s: timeout to server and model get into readiness state.
 
         Raises:
-            PytritonClientTimeoutError: If server and model are not in readiness state before given timeout.
-            PytritonClientModelUnavailableError: If model with given name (and version) is unavailable.
+            PyTritonClientTimeoutError: If server and model are not in readiness state before given timeout.
+            PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
             KeyboardInterrupt: If hosting process receives SIGINT
         """
         wait_for_model_ready(self._client, self._model_name, self._model_version, timeout_s=timeout_s)
@@ -178,7 +178,7 @@ class ModelClient:
             result_dict = client.infer_sample(input1, input2)
             result_dict = client.infer_sample(a=input1, b=input2)
 
-        Mixing of argument passing conventions is not supported and will raise PytritonClientRuntimeError.
+        Mixing of argument passing conventions is not supported and will raise PyTritonClientRuntimeError.
 
         Args:
             *inputs: inference inputs provided as positional arguments.
@@ -188,13 +188,13 @@ class ModelClient:
             dictionary with inference results, where dictionary keys are output names.
 
         Raises:
-            PytritonClientValueError: if mixing of positional and named arguments passing detected.
-            PytritonClientTimeoutError:
+            PyTritonClientValueError: if mixing of positional and named arguments passing detected.
+            PyTritonClientTimeoutError:
                 in case of first method call, `lazy_init` argument is False
                 and wait time for server and model being ready exceeds `init_timeout_s`
                 or inference time exceeds `timeout_s`.
-            PytritonClientModelUnavailableError: If model with given name (and version) is unavailable.
-            PytritonClientInferenceServerError: If error occurred on inference function or Triton Inference Server side.
+            PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
+            PyTritonClientInferenceServerError: If error occurred on inference function or Triton Inference Server side.
         """
         _verify_inputs_args(inputs, named_inputs)
 
@@ -224,7 +224,7 @@ class ModelClient:
             result_dict = client.infer_batch(input1, input2)
             result_dict = client.infer_batch(a=input1, b=input2)
 
-        Mixing of argument passing conventions is not supported and will raise PytritonClientValueError.
+        Mixing of argument passing conventions is not supported and will raise PyTritonClientValueError.
 
         Args:
             *inputs: inference inputs provided as positional arguments.
@@ -234,20 +234,20 @@ class ModelClient:
             dictionary with inference results, where dictionary keys are output names.
 
         Raises:
-            PytritonClientValueError: if mixing of positional and named arguments passing detected.
-            PytritonClientTimeoutError:
+            PyTritonClientValueError: if mixing of positional and named arguments passing detected.
+            PyTritonClientTimeoutError:
                 in case of first method call, `lazy_init` argument is False
                 and wait time for server and model being ready exceeds `init_timeout_s`
                 or inference time exceeds `timeout_s`.
-            PytritonClientModelDoesntSupportBatchingError: if model doesn't support batching.
-            PytritonClientModelUnavailableError: If model with given name (and version) is unavailable.
-            PytritonClientInferenceServerError: If error occurred on inference function or Triton Inference Server side.
+            PyTritonClientModelDoesntSupportBatchingError: if model doesn't support batching.
+            PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
+            PyTritonClientInferenceServerError: If error occurred on inference function or Triton Inference Server side.
         """
         _verify_inputs_args(inputs, named_inputs)
 
         model_supports_batching = self.model_config.max_batch_size > 0
         if not model_supports_batching:
-            raise PytritonClientModelDoesntSupportBatchingError(
+            raise PyTritonClientModelDoesntSupportBatchingError(
                 f"Model {self.model_config.model_name} doesn't support batching - use infer_sample method instead"
             )
 
@@ -260,8 +260,8 @@ class ModelClient:
             init_timeout_s: timeout for server and model being ready.
 
         Raises:
-            PytritonClientTimeoutError: if wait time for server and model being ready exceeds `init_timeout_s`
-            PytritonClientModelUnavailableError: If model with given name (and version) is unavailable.
+            PyTritonClientTimeoutError: if wait time for server and model being ready exceeds `init_timeout_s`
+            PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
         """
         should_finish_before_s = time.time() + init_timeout_s
         self.wait_for_model(init_timeout_s)
@@ -307,7 +307,7 @@ class ModelClient:
                 request_id=str(next(self._request_id_generator)),
             )
         except tritonclient.utils.InferenceServerException as e:
-            raise PytritonClientInferenceServerError(
+            raise PyTritonClientInferenceServerError(
                 f"Error occurred on Triton Inference Server side:\n {e.message()}"
             ) from e
 

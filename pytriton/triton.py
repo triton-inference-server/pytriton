@@ -45,7 +45,7 @@ import typing_inspect
 
 from pytriton.client import ModelClient
 from pytriton.constants import DEFAULT_GRPC_PORT, DEFAULT_HTTP_PORT, TRITON_LOCAL_URL
-from pytriton.exceptions import PytritonValidationError
+from pytriton.exceptions import PyTritonValidationError
 from pytriton.model_config.tensor import Tensor
 from pytriton.models.manager import ModelManager
 from pytriton.models.model import Model, ModelConfig, ModelEvent
@@ -186,7 +186,7 @@ class TritonConfig:
     def __post_init__(self):
         """Validate configuration for early error handling."""
         if self.allow_http not in [True, None] and self.allow_grpc not in [True, None]:
-            raise PytritonValidationError("The `http` or `grpc` endpoint has to be allowed.")
+            raise PyTritonValidationError("The `http` or `grpc` endpoint has to be allowed.")
 
     def to_dict(self):
         """Map config object to dictionary."""

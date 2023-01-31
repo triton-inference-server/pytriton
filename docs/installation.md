@@ -50,9 +50,10 @@ pip install -U pytriton
 
 ## Building from source
 
-The package can be also build from the source using `Make` commands run from the main project directory. The build
-process requires Docker installed in your system. The instruction can be found
-in [Docker documentation](https://docs.docker.com/engine/install/ubuntu/).
+The package can be also build from the source using `Make` commands run from the main project directory. The
+prerequisites for building wheel:
+- installed Docker in your system - more in [Docker documentation](https://docs.docker.com/engine/install/ubuntu/)
+- access to Docker daemon from system or container
 
 To prepare the wheel you need first install additional packages using:
 

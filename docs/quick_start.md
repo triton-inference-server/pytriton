@@ -16,7 +16,7 @@ limitations under the License.
 
 # Quick Start
 
-The prerequisite for this section is installing the NVIDIA Pytriton which can be found
+The prerequisite for this section is installing the NVIDIA PyTriton which can be found
 in [installation](installation.md)
 section.
 

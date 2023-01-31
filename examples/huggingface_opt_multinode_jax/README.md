@@ -16,7 +16,7 @@ limitations under the License.
 
 # Huggingface OPT JAX Multi-node Deployment
 
-This example shows how to easily deploy JAX large language models in a multi-node environment using pytriton. In this tutorial we will be working with [HuggingFace OPT](https://huggingface.co/docs/transformers/model_doc/opt) with up to 530B parameters.
+This example shows how to easily deploy JAX large language models in a multi-node environment using PyTriton. In this tutorial we will be working with [HuggingFace OPT](https://huggingface.co/docs/transformers/model_doc/opt) with up to 530B parameters.
 
 ## Quick start
 

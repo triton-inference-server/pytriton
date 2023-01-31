@@ -21,7 +21,7 @@ from typing import Optional, Union
 import tritonclient.grpc
 import tritonclient.http
 
-from pytriton.client.exceptions import PytritonClientModelUnavailableError, PytritonClientTimeoutError
+from pytriton.client.exceptions import PyTritonClientModelUnavailableError, PyTritonClientTimeoutError
 from pytriton.model_config.parser import ModelConfigParser
 
 _LOGGER = logging.getLogger(__name__)
@@ -143,8 +143,8 @@ def get_model_config(
         Configuration of requested model.
 
     Raises:
-        PytritonClientTimeoutError: If obtain of model configuration didn't finish before given timeout.
-        PytritonClientModelUnavailableError: If model with given name (and version) is unavailable.
+        PyTritonClientTimeoutError: If obtain of model configuration didn't finish before given timeout.
+        PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
     """
     should_finish_before_s = time.time() + timeout_s
     wait_for_model_ready(client, model_name=model_name, model_version=model_version, timeout_s=timeout_s)
@@ -188,8 +188,8 @@ def wait_for_model_ready(
         timeout_s: timeout to server and model get into readiness state.
 
     Raises:
-        PytritonClientTimeoutError: If server and model are not in readiness state before given timeout.
-        PytritonClientModelUnavailableError: If model with given name (and version) is unavailable.
+        PyTritonClientTimeoutError: If server and model are not in readiness state before given timeout.
+        PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
     """
     model_version_msg = model_version if model_version is not None else "<latest>"
     should_finish_before_s = time.time() + timeout_s
@@ -204,7 +204,7 @@ def wait_for_model_ready(
     def _is_model_ready():
         model_state = get_model_state(client, model_name, model_version)
         if model_state == _ModelState.UNAVAILABLE:
-            raise PytritonClientModelUnavailableError(f"Model {model_name}/{model_version_msg} is unavailable.")
+            raise PyTritonClientModelUnavailableError(f"Model {model_name}/{model_version_msg} is unavailable.")
 
         return model_state == _ModelState.READY and client.is_model_ready(model_name)
 
@@ -215,7 +215,7 @@ def wait_for_model_ready(
         while not is_server_ready:
             is_server_ready = condition.wait_for(_is_server_ready, timeout=min(1.0, timeout_s))
             if time.time() >= should_finish_before_s:
-                raise PytritonClientTimeoutError("Waiting for server to be ready timed out.")
+                raise PyTritonClientTimeoutError("Waiting for server to be ready timed out.")
 
         timeout_s = max(0.0, should_finish_before_s - time.time())
         _LOGGER.debug(f"Waiting for model {model_name}/{model_version_msg} to be ready (timeout={timeout_s})")
@@ -223,6 +223,6 @@ def wait_for_model_ready(
         while not is_model_ready:
             is_model_ready = condition.wait_for(_is_model_ready, timeout=min(1.0, timeout_s))
             if time.time() >= should_finish_before_s:
-                raise PytritonClientTimeoutError(
+                raise PyTritonClientTimeoutError(
                     f"Waiting for model {model_name}/{model_version_msg} to be ready timed out."
                 )

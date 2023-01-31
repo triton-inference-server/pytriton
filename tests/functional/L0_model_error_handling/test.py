@@ -35,7 +35,7 @@ def main():
     import pytest
 
     from pytriton.client import ModelClient
-    from pytriton.client.exceptions import PytritonClientInferenceServerError
+    from pytriton.client.exceptions import PyTritonClientInferenceServerError
     from pytriton.model_config import ModelConfig, Tensor
     from pytriton.triton import Triton, TritonConfig
     from tests.utils import DEFAULT_LOG_FORMAT, find_free_port
@@ -73,7 +73,7 @@ def main():
         protocol = random.choice(["http", "grpc"])
         url = f"{protocol}://localhost:{getattr(triton_config, f'{protocol}_port')}"
         with ModelClient(url, "proxy", init_timeout_s=args.init_timeout_s) as client:
-            with pytest.raises(PytritonClientInferenceServerError, match="division by zero"):
+            with pytest.raises(PyTritonClientInferenceServerError, match="division by zero"):
                 client.infer_batch(input1)
 
 

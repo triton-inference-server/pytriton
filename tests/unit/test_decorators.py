@@ -34,7 +34,7 @@ from pytriton.decorators import (
     sample,
     triton_context,
 )
-from pytriton.exceptions import PytritonBadParameterError, PytritonRuntimeError, PytritonValidationError
+from pytriton.exceptions import PyTritonBadParameterError, PyTritonRuntimeError, PyTritonValidationError
 from pytriton.model_config import DynamicBatcher
 from pytriton.model_config.triton_model_config import TensorSpec, TritonModelConfig
 from pytriton.proxy.inference_handler import triton_context_inject
@@ -287,7 +287,7 @@ def test_first_value_with_requests(mocker, requests, keys, expected):
 
 def test_first_value_raises_on_special_key():
 
-    with pytest.raises(PytritonBadParameterError, match="not allowed as keys for @first_value wrapper."):
+    with pytest.raises(PyTritonBadParameterError, match="not allowed as keys for @first_value wrapper."):
 
         @first_value("__triton_context__")
         def _fn(**inputs):
@@ -301,7 +301,7 @@ def test_first_value_raises_on_not_equal_values():
 
     _fn.__triton_context__ = _FIRST_VALUE_TRITON_CONTEXT
 
-    with pytest.raises(PytritonRuntimeError, match="The values on the .* input are not equal"):
+    with pytest.raises(PyTritonRuntimeError, match="The values on the .* input are not equal"):
         _fn(a=np.array([[1], [2], [2]]))
 
     # test disabling strict check
@@ -323,7 +323,7 @@ def test_first_value_raises_on_models_not_supporting_batching():
     )
 
     with pytest.raises(
-        PytritonRuntimeError, match="The @first_value decorator can only be used with models that support batching."
+        PyTritonRuntimeError, match="The @first_value decorator can only be used with models that support batching."
     ):
         _fn(a=np.array([[1], [2], [2]]))
 
@@ -478,7 +478,7 @@ def test_group_by_values(mocker, inference_request, keys, expected):
 
 def test_group_by_values_raise_error_if_placed_before_batch():
     with pytest.raises(
-        PytritonRuntimeError, match="The @group_by_values decorator must be used after the @batch decorator."
+        PyTritonRuntimeError, match="The @group_by_values decorator must be used after the @batch decorator."
     ):
 
         @group_by_values("a")
@@ -553,7 +553,7 @@ def test_fill_optionals_raise_on_non_numpy_defaults():
         )
     )
 
-    with pytest.raises(PytritonBadParameterError, match="Could not use a=.* they are not NumPy arrays"):
+    with pytest.raises(PyTritonBadParameterError, match="Could not use a=.* they are not NumPy arrays"):
         infer_fn(input_requests)
 
 
@@ -571,7 +571,7 @@ def test_fill_optionals_raise_error_on_dtype_mismatch():
     )
 
     with pytest.raises(
-        PytritonBadParameterError, match="Could not use a: dtype=.* have different than input signature dtypes"
+        PyTritonBadParameterError, match="Could not use a: dtype=.* have different than input signature dtypes"
     ):
         infer_fn(input_requests)
 
@@ -590,7 +590,7 @@ def test_fill_optionals_raise_error_on_shape_mismatch():
     )
 
     with pytest.raises(
-        PytritonBadParameterError, match="Could not use a: shape=.*have different than input signature shapes"
+        PyTritonBadParameterError, match="Could not use a: shape=.*have different than input signature shapes"
     ):
         infer_fn(input_requests)
 
@@ -628,11 +628,11 @@ def test_triton_context_not_set():
     try:
         _ = fun_without_tr_context({"a": np.array([1, 2])})
         pytest.fail("Error should me raised")
-    except PytritonValidationError as ex:
+    except PyTritonValidationError as ex:
         assert "Wrapped function or object must bound with triton to get  __triton_context__" in ex.message
     except Exception as ex:
-        raise RuntimeError("PytritonValidationError should be raised") from ex
-        pytest.fail("PytritonValidationError should be raised")
+        raise RuntimeError("PyTritonValidationError should be raised") from ex
+        pytest.fail("PyTritonValidationError should be raised")
 
 
 def test_inject_and_acquire_triton_context():

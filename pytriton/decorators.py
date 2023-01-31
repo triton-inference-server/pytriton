@@ -23,7 +23,7 @@ import numpy as np
 import wrapt
 
 from pytriton.constants import TRITON_CONTEXT_FIELD_NAME
-from pytriton.exceptions import PytritonBadParameterError, PytritonRuntimeError, PytritonValidationError
+from pytriton.exceptions import PyTritonBadParameterError, PyTritonRuntimeError, PyTritonValidationError
 from pytriton.model_config.triton_model_config import TritonModelConfig
 
 _WrappedWithWrapper = NamedTuple(
@@ -76,7 +76,7 @@ def get_triton_context(wrapped, instance) -> TritonContext:
     """
     caller = instance or wrapped
     if not hasattr(caller, "__triton_context__"):
-        raise PytritonValidationError("Wrapped function or object must bound with triton to get  __triton_context__")
+        raise PyTritonValidationError("Wrapped function or object must bound with triton to get  __triton_context__")
     return caller.__triton_context__
 
 
@@ -105,11 +105,11 @@ def convert_output(
         if model_config is None:
             model_config = get_model_config(wrapped, instance)
         if len(outputs) != len(model_config.outputs):
-            raise PytritonValidationError("Outputs length different than config outputs length")
+            raise PyTritonValidationError("Outputs length different than config outputs length")
         outputs = {config_output.name: output for config_output, output in zip(model_config.outputs, outputs)}
         return outputs
     else:
-        raise PytritonValidationError(f"Unsupported output type {type(outputs)}.")
+        raise PyTritonValidationError(f"Unsupported output type {type(outputs)}.")
 
 
 @wrapt.decorator
@@ -140,7 +140,7 @@ def batch(wrapped, instance, args, kwargs):
 
     for req_dict2 in req_list[1:]:
         if input_names != req_dict2.keys():
-            raise PytritonValidationError("Cannot batch requests with different set of inputs keys")
+            raise PyTritonValidationError("Cannot batch requests with different set of inputs keys")
 
     inputs = {}
     for model_input in input_names:
@@ -204,7 +204,7 @@ def group_by_values(*keys):
             if callable_with_wrapper.wrapper is not None
         ]
         if batch in wrappers_stack:
-            raise PytritonRuntimeError("The @group_by_values decorator must be used after the @batch decorator.")
+            raise PyTritonRuntimeError("The @group_by_values decorator must be used after the @batch decorator.")
 
         request = {k: v for k, v in kwargs.items() if k not in _SPECIAL_KEYS}
         other_kwargs = {k: v for k, v in kwargs.items() if k in _SPECIAL_KEYS}
@@ -278,11 +278,11 @@ def fill_optionals(**defaults):
         inputs = {spec.name: spec for spec in _triton_context.model_config.inputs}
         not_matching_default_names = sorted(set(defaults) - set(inputs))
         if not_matching_default_names:
-            raise PytritonBadParameterError(f"Could not found {', '.join(not_matching_default_names)} inputs")
+            raise PyTritonBadParameterError(f"Could not found {', '.join(not_matching_default_names)} inputs")
 
         non_numpy_items = {k: v for k, v in defaults.items() if not isinstance(v, np.ndarray)}
         if non_numpy_items:
-            raise PytritonBadParameterError(
+            raise PyTritonBadParameterError(
                 f"Could not use {', '.join([f'{k}={v}' for k, v in non_numpy_items.items()])} defaults "
                 "as they are not NumPy arrays"
             )
@@ -293,7 +293,7 @@ def fill_optionals(**defaults):
                 f"{name}: dtype={have_dtype} expected_dtype={expected_dtype}"
                 for name, (have_dtype, expected_dtype) in not_matching_dtypes.items()
             ]
-            raise PytritonBadParameterError(
+            raise PyTritonBadParameterError(
                 f"Could not use {', '.join(non_matching_dtypes_str_list)} "
                 f"defaults as they have different than input signature dtypes"
             )
@@ -311,7 +311,7 @@ def fill_optionals(**defaults):
                 f"{name}: shape={have_shape} expected_shape={expected_shape}"
                 for name, (have_shape, expected_shape) in not_matching_shapes.items()
             ]
-            raise PytritonBadParameterError(
+            raise PyTritonBadParameterError(
                 f"Could not use {', '.join(non_matching_shapes_str_list)} "
                 f"defaults as they have different than input signature shapes"
             )
@@ -422,13 +422,13 @@ def first_value(*keys: str, squeeze_single_values=True, strict: bool = True):
         strict: enable checking if all values on single selected input of request are equal. Defaults to True.
 
     Raises:
-        PytritonRuntimeError: if not all values on a single selected input of the request are equal
+        PyTritonRuntimeError: if not all values on a single selected input of the request are equal
         and the strict flag is set to True. Additionally, if the decorator is used with a model that doesn't support batching,
-        PytritonBadParameterError: if any of the keys passed to the decorator are not allowed.
+        PyTritonBadParameterError: if any of the keys passed to the decorator are not allowed.
     """
     if any(k in _SPECIAL_KEYS for k in keys):
         not_allowed_keys = [key for key in keys if key in _SPECIAL_KEYS]
-        raise PytritonBadParameterError(
+        raise PyTritonBadParameterError(
             f"The keys {', '.join(not_allowed_keys)} are not allowed as keys for @first_value wrapper. "
             f"The set of not allowed keys are {', '.join(_SPECIAL_KEYS)}"
         )
@@ -438,7 +438,7 @@ def first_value(*keys: str, squeeze_single_values=True, strict: bool = True):
 
         model_config = get_model_config(wrapped, instance)
         if not model_config.batching:
-            raise PytritonRuntimeError("The @first_value decorator can only be used with models that support batching.")
+            raise PyTritonRuntimeError("The @first_value decorator can only be used with models that support batching.")
 
         def _replace_inputs_with_first_value(_request):
             for input_name in keys:
@@ -451,7 +451,7 @@ def first_value(*keys: str, squeeze_single_values=True, strict: bool = True):
                     axis_of_uniqueness = None if values.dtype == object else 0
                     unique_values = np.unique(values, axis=axis_of_uniqueness)
                     if len(unique_values) > 1:
-                        raise PytritonRuntimeError(
+                        raise PyTritonRuntimeError(
                             f"The values on the {input_name!r} input are not equal. "
                             "To proceed, either disable strict mode in @first_value wrapper "
                             "or ensure that the values always are consistent. "

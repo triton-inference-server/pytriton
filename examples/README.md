@@ -17,7 +17,7 @@ limitations under the License.
 # Examples
 
 We provide simple examples how to integrate the PyTorch, TensorFlow2, JAX and simple Python models with Triton Inference
-Server using pytriton. The examples are available
+Server using PyTriton. The examples are available
 at [GitHub repository](../examples).
 
 ## Samples Models Deployment
@@ -41,6 +41,6 @@ The list of example models deployments:
 ## Profiling models
 
 The [Perf Analyzer](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/perf_analyzer.md) can be
-used to profile the models served through pytriton. We have prepared the example of
+used to profile the models served through PyTriton. We have prepared the example of
 using Perf Analyzer to profile BART PyTorch. See the example code in
 [GitHub repository](../examples/perf_analyzer).

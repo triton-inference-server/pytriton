@@ -40,7 +40,7 @@ import wrapt
 import zmq  # pytype: disable=import-error
 
 from pytriton.decorators import TritonContext
-from pytriton.exceptions import PytritonUnrecoverableError
+from pytriton.exceptions import PyTritonUnrecoverableError
 from pytriton.model_config.triton_model_config import TritonModelConfig
 from pytriton.proxy.communication import Request, Response, ShmManager
 
@@ -131,7 +131,7 @@ class InferenceHandler(th.Thread):
                     response = Response(
                         outputs=output_tensor_infos, memory_name=self.shm_response_manager.memory_name()
                     )
-                except PytritonUnrecoverableError:
+                except PyTritonUnrecoverableError:
                     error = traceback.format_exc()
                     response = Response(error=error)
                     LOGGER.error(

@@ -34,7 +34,7 @@ limitations under the License.
     for a detailed summary.
 
 ## 0.1.0 (2023-01-12)
-- Initial release of Pytriton
+- Initial release of PyTriton
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 - Version of external components used during testing:

@@ -14,7 +14,7 @@
 [project]
 name = "pytriton"
 readme = "docs/pypi.md"
-description = "NVIDIA Pytriton - Flask/FastAPI-like interface to simplify Triton's deployment in Python environments."
+description = "NVIDIA PyTriton - Flask/FastAPI-like interface to simplify Triton's deployment in Python environments."
 dynamic = ["version"]
 classifiers = [
     "Development Status :: 3 - Alpha",

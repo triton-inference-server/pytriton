@@ -16,7 +16,7 @@ import pathlib
 import numpy as np
 import pytest
 
-from pytriton.exceptions import PytritonModelConfigError
+from pytriton.exceptions import PyTritonModelConfigError
 from pytriton.model_config.common import DeviceKind, DynamicBatcher, TimeoutAction
 from pytriton.model_config.parser import ModelConfigParser
 from pytriton.model_config.triton_model_config import ResponseCache, TensorSpec
@@ -193,18 +193,18 @@ add_model_config_with_advanced_dynamic_batching = {
 
 
 def test_rewrite_io_spec_raise_error_when_empty_dict():
-    with pytest.raises(PytritonModelConfigError, match="Name for input at index 0 not provided."):
+    with pytest.raises(PyTritonModelConfigError, match="Name for input at index 0 not provided."):
         ModelConfigParser.rewrite_io_spec({}, io_type="input", idx=0)
 
 
 def test_rewrite_io_spec_raise_error_when_no_data_type():
-    with pytest.raises(PytritonModelConfigError, match="Data type for input with name `input` not defined."):
+    with pytest.raises(PyTritonModelConfigError, match="Data type for input with name `input` not defined."):
         ModelConfigParser.rewrite_io_spec({"name": "input"}, io_type="input", idx=0)
 
 
 def test_rewrite_io_spec_raise_error_when_no_invalid_data_type():
     with pytest.raises(
-        PytritonModelConfigError,
+        PyTritonModelConfigError,
         match="Invalid data type `FLOAT32` for input with name `input` not defined. The expected name is TYPE_{type}.",
     ):
         ModelConfigParser.rewrite_io_spec(
@@ -219,7 +219,7 @@ def test_rewrite_io_spec_raise_error_when_no_invalid_data_type():
 
 def test_rewrite_io_spec_raise_error_when_unsupported_data_type():
     with pytest.raises(
-        PytritonModelConfigError,
+        PyTritonModelConfigError,
         match="Invalid data type `FLOAT32` for input with name `input` not defined. The expected name is TYPE_{type}.",
     ):
         ModelConfigParser.rewrite_io_spec(
@@ -233,7 +233,7 @@ def test_rewrite_io_spec_raise_error_when_unsupported_data_type():
 
 
 def test_rewrite_io_spec_raise_error_when_no_dimension():
-    with pytest.raises(PytritonModelConfigError, match="Dimension for input with name `input` not defined."):
+    with pytest.raises(PyTritonModelConfigError, match="Dimension for input with name `input` not defined."):
         ModelConfigParser.rewrite_io_spec(
             {"name": "input", "data_type": "TYPE_FP32", "dims": None},
             io_type="input",
@@ -252,7 +252,7 @@ def test_rewrite_io_spec_return_tensor_spec_when_valid_data():
 
 
 def test_parse_from_dict_raise_error_when_invalid_data_type_in_config():
-    with pytest.raises(PytritonModelConfigError, match="Unsupported data type `FLOAT32` for input with name `INPUT_0`"):
+    with pytest.raises(PyTritonModelConfigError, match="Unsupported data type `FLOAT32` for input with name `INPUT_0`"):
         ModelConfigParser.from_dict(model_config_dict=invalid_model_config)
 
 
@@ -472,7 +472,7 @@ def test_parse_from_dict_return_model_config_when_response_cache_config_used():
 
 def test_parse_from_file_raise_error_when_file_with_invalid_model_config_passed():
     config_path = pathlib.Path(__file__).parent.resolve() / "assets" / "invalid_config.pbtxt"
-    with pytest.raises(PytritonModelConfigError):
+    with pytest.raises(PyTritonModelConfigError):
         ModelConfigParser.from_file(config_path=config_path)
 
 

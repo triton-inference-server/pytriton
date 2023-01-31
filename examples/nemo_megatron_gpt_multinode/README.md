@@ -16,7 +16,7 @@ limitations under the License.
 
 # NeMo Megatron GPT model deployment
 
-This example shows how to deploy NeMo Megatron GPT model using pytriton.
+This example shows how to deploy NeMo Megatron GPT model using PyTriton.
 
 ## Introduction
 
@@ -52,7 +52,7 @@ If you select to use container we recommend to install
 
     For more information on docker/cluster deployments see [documentation](../../docs/deploying_models.md#deploying-in-cluster).
 
-2. While being in just started container, [install pytriton](../../docs/installation.md):
+2. While being in just started container, [install PyTriton](../../docs/installation.md):
     ```bash
     pip install -U pytriton
     ```
@@ -85,7 +85,7 @@ If you select to use container we recommend to install
 Server script will:
 1. Ensure model and tokenizer data are downloaded
 2. Load downloaded model and initialize environment for it
-3. Start pytriton server on listening on [configured ports](../../docs/deploying_models.md#configuring-triton).
+3. Start PyTriton server on listening on [configured ports](../../docs/deploying_models.md#configuring-triton).
 
    In this example HTTP endpoint will listen on 8000 port and thanks to
    [Docker port publishing](https://docs.docker.com/config/containers/container-networking/#published-ports)
@@ -112,7 +112,7 @@ For that we can use [Slurm](https://slurm.schedmd.com/) cluster management syste
 
    set -x
 
-   # assume that your current working directory is pytriton repository
+   # assume that your current working directory is PyTriton repository
    # use github.com/nvidia/pyxis plugin
    srun --output slurm_job-%x-%J.out \
         --container-name nemo_megatron_gpt_container \
@@ -213,7 +213,7 @@ For multi-node scenario you can run client:
       --container-workdir "${PWD}" \
       --no-container-mount-home \
       bash
-   # in newly created container install pytriton and execute
+   # in newly created container install PyTriton and execute
    pip install -U pytriton
    ./examples/nemo_megatron_gpt_multinode/client.py --url http://<pytriton_hostname>:8000
    ```

@@ -11,11 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""pytriton exceptions definition."""
+"""PyTriton exceptions definition."""
 
 
-class PytritonError(Exception):
-    """Generic pytriton exception."""
+class PyTritonError(Exception):
+    """Generic PyTriton exception."""
 
     def __init__(self, message: str):
         """Initialize exception with message.
@@ -44,37 +44,37 @@ class PytritonError(Exception):
         return self._message
 
 
-class PytritonValidationError(PytritonError):
-    """pytriton configuration validation exception."""
+class PyTritonValidationError(PyTritonError):
+    """PyTriton configuration validation exception."""
 
     pass
 
 
-class PytritonInvalidOperationError(PytritonError):
-    """pytriton invalid operation exception."""
+class PyTritonInvalidOperationError(PyTritonError):
+    """PyTriton invalid operation exception."""
 
     pass
 
 
-class PytritonBadParameterError(PytritonError):
-    """pytriton invalid parameter exception."""
+class PyTritonBadParameterError(PyTritonError):
+    """PyTriton invalid parameter exception."""
 
     pass
 
 
-class PytritonModelConfigError(PytritonError):
-    """pytriton invalid model config exception."""
+class PyTritonModelConfigError(PyTritonError):
+    """PyTriton invalid model config exception."""
 
     pass
 
 
-class PytritonUnrecoverableError(PytritonError):
+class PyTritonUnrecoverableError(PyTritonError):
     """Unrecoverable error occurred in inference function, thus no further inferences possible."""
 
     pass
 
 
-class PytritonRuntimeError(PytritonError):
+class PyTritonRuntimeError(PyTritonError):
     """Raised when an error is detected that doesn’t fall in any of the other categories."""
 
     pass

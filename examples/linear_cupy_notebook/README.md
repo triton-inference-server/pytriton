@@ -28,7 +28,7 @@ Example consists of following scripts:
 
 The step-by-step guide:
 
-1. Install `pytriton` following the [installation instruction](../../README.md#installation)
+1. Install NVIDIA PyTriton following the [installation instruction](../../README.md#installation)
 2. In current terminal run jupyter notebook and open `linear.ipynb` file
 
 ```shell

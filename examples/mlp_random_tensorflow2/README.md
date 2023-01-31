@@ -45,7 +45,7 @@ If you select to use container we recommend to install
 
 The step-by-step guide:
 
-1. Install `pytriton` following the [installation instruction](../../README.md#installation)
+1. Install NVIDIA PyTriton following the [installation instruction](../../README.md#installation)
 2. Install the additional packages using `install.sh`
 
 ```shell

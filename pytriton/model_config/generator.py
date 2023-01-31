@@ -30,7 +30,7 @@ from typing import Dict, Union
 import numpy as np
 from google.protobuf import json_format, text_format  # pytype: disable=pyi-error
 
-from pytriton.exceptions import PytritonBadParameterError
+from pytriton.exceptions import PyTritonBadParameterError
 
 from .triton_model_config import DynamicBatcher, TensorSpec, TritonModelConfig
 
@@ -120,7 +120,7 @@ class ModelConfigGenerator:
             LOGGER.debug("Batching for model is disabled. The `max_batch_size` field value set to 0.")
             return
         elif self._config.max_batch_size < 1:
-            raise PytritonBadParameterError("The `max_batch_size` must be greater or equal to 1.")
+            raise PyTritonBadParameterError("The `max_batch_size` must be greater or equal to 1.")
 
         model_config["max_batch_size"] = self._config.max_batch_size
         if isinstance(self._config.batcher, DynamicBatcher):
@@ -143,7 +143,7 @@ class ModelConfigGenerator:
 
             if self._config.batcher.default_priority_level:
                 if self._config.batcher.default_priority_level > self._config.batcher.priority_levels:
-                    raise PytritonBadParameterError(
+                    raise PyTritonBadParameterError(
                         "The `default_priority_level` must be between 1 and " f"{self._config.batcher.priority_levels}."
                     )
                 dynamic_batching_config["defaultPriorityLevel"] = self._config.batcher.default_priority_level
@@ -161,7 +161,7 @@ class ModelConfigGenerator:
 
             if self._config.batcher.priority_queue_policy:
                 if not self._config.batcher.priority_levels:
-                    raise PytritonBadParameterError(
+                    raise PyTritonBadParameterError(
                         "Provide the `priority_levels` if you want to define `priority_queue_policy` "
                         "for Dynamic Batching."
                     )
@@ -169,7 +169,7 @@ class ModelConfigGenerator:
                 priority_queue_policy_config = {}
                 for priority, queue_policy in self._config.batcher.priority_queue_policy.items():
                     if priority < 0 or priority > self._config.batcher.priority_levels:
-                        raise PytritonBadParameterError(
+                        raise PyTritonBadParameterError(
                             f"Invalid `priority`={priority} provided. The value must be between "
                             f"1 and {self._config.batcher.priority_levels}."
                         )
@@ -258,7 +258,7 @@ class ModelConfigGenerator:
             if outputs:
                 optional_outputs = [o for o in outputs if o.get("optional")]
                 if optional_outputs:
-                    raise PytritonBadParameterError(
+                    raise PyTritonBadParameterError(
                         "Optional flag for outputs is not supported. "
                         f"Outputs marked as optional: {', '.join([o['name'] for o in optional_outputs])}."
                     )

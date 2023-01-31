@@ -23,7 +23,7 @@ Use to configure the CLI argument for starting the Triton Inference Server proce
 """
 from typing import Any, Dict, List, Optional
 
-from pytriton.exceptions import PytritonError
+from pytriton.exceptions import PyTritonError
 
 
 class TritonServerConfig:
@@ -205,12 +205,12 @@ class TritonServerConfig:
             value: The value to which the argument is being set
 
         Raises:
-            PytritonError: if key is unsupported or undefined in the config class
+            PyTritonError: if key is unsupported or undefined in the config class
         """
         kebab_cased_key = key.strip().replace("_", "-")
         if kebab_cased_key in self._server_args:
             self._server_args[kebab_cased_key] = value
         else:
-            raise PytritonError(
+            raise PyTritonError(
                 f"The argument '{key}' to the Triton Inference " "Server is not supported by the pytriton."
             )
