@@ -16,7 +16,7 @@ limitations under the License.
 
 # Changelog
 
-## 0.1.1 (unreleased)
+## 0.1.1 (2023-01-31)
 - Change: The `@first_value` decorator has been updated with new features:
   - Renamed from `@first_values` to `@first_value`
   - Added a `strict` flag to toggle the checking of equality of values on a single selected input of the request. Default is True
