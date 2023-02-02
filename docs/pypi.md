@@ -34,6 +34,8 @@ framework-agnostic and can be used along with frameworks like PyTorch, TensorFlo
 
 The package can be installed from `pypi.org` using:
 
+<!--pytest.mark.skip-->
+
 ```shell
 pip install -U pytriton
 ```
@@ -44,6 +46,8 @@ The example presents how to run Python model in Triton Inference Server without 
 environment. In the example we are using a simple `Linear` PyTorch model.
 
 The requirement for the example is to have installed PyTorch in your environment. You can do it running:
+
+<!--pytest.mark.skip-->
 
 ```shell
 pip install torch
@@ -59,11 +63,15 @@ model = torch.nn.Linear(2, 3).to("cuda").eval()
 
 Create a function for handling inference request:
 
+<!--pytest-codeblocks:cont-->
+
 ```python
 import numpy as np
+from pytriton.decorators import batch
+
 
 @batch
-def infer_func(**inputs: np.ndarray):
+def infer_fn(**inputs: np.ndarray):
     (input1_batch,) = inputs.values()
     input1_batch_tensor = torch.from_numpy(input1_batch).to("cuda")
     output1_batch_tensor = model(input1_batch_tensor)  # Calling the Python model inference
@@ -71,7 +79,10 @@ def infer_func(**inputs: np.ndarray):
     return [output1_batch]
 ```
 
-Bind the function to Triton Inference Server and start server to handle HTTP/gRPC requests:
+In the next step, create the connection between the model and Triton Inference Server using the bind method:
+
+<!--pytest-codeblocks:cont-->
+
 ```python
 from pytriton.model_config import ModelConfig, Tensor
 from pytriton.triton import Triton
@@ -81,7 +92,7 @@ with Triton() as triton:
     # Load model into Triton Inference Server
     triton.bind(
         model_name="Linear",
-        infer_func=infer_func,
+        infer_func=infer_fn,
         inputs=[
             Tensor(dtype=np.float32, shape=(-1,)),
         ],
@@ -90,17 +101,27 @@ with Triton() as triton:
         ],
         config=ModelConfig(max_batch_size=128)
     )
-    # Serve model through Triton Inference Server
+```
+
+Finally, serve the model with Triton Inference Server:
+
+<!--pytest.mark.skip-->
+
+```python
+from pytriton.triton import Triton
+
+with Triton() as triton:
+    ...  # Load models here
     triton.serve()
 ```
 
-The `bind` method is creating a connection between Triton Inference Server and the `infer_func` which handle
+The `bind` method is creating a connection between Triton Inference Server and the `infer_fn` which handle
 the inference queries. The `inputs` and `outputs` describe the model inputs and outputs that are exposed in
 Triton. The config field allow to provide more parameters for model deployment.
 
 The `serve` method is blocking and at this point the application will wait for incoming HTTP/gRPC request. From that
 point the model is available under name `Linear` in Triton server. The inference queries can be sent to
-`localhost:8000/v2/models/Linear/infer` which are passed to the `infer_func` function.
+`localhost:8000/v2/models/Linear/infer` which are passed to the `infer_fn` function.
 
 
 # Links

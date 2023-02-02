@@ -68,6 +68,8 @@ with Triton(config=triton_config) as triton:
 
 and through environment variables for example set as in the command below:
 
+<!--pytest.mark.skip-->
+
 ```sh
 PYTRITON_TRITON_CONFIG_LOG_VERBOSITY=4 python my_script.py
 ```
@@ -83,6 +85,8 @@ The order of precedence of configuration methods is:
 The blocking mode will stop the execution of current thread and wait for incoming HTTP/gRPC request for inference
 execution. This mode make you application behave as a pure server. The example of using blocking mode:
 
+<!--pytest.mark.skip-->
+
 ```python
 from pytriton.triton import Triton
 
@@ -95,6 +99,8 @@ with Triton() as triton:
 
 The background mode run Triton as subprocess and does not block execution of current thread. In this mode you can run
 Triton Inference Server and interact with it from current context. The example of using background mode:
+
+<!--pytest.mark.skip-->
 
 ```python
 from pytriton.triton import Triton
@@ -111,18 +117,31 @@ triton.stop()  # Triton Server stopped
 The Triton class provide method to load models one or multiple models to Triton server:
 
 ```python
-triton.bind(
-    model_name="ModelName",
-    infer_func=infer_func,
-    inputs=[
-        Tensor(dtype=np.bytes_, shape=(1,)),  # sample containing single bytes value
-        Tensor(dtype=np.bytes_, shape=(-1,))  # sample containing vector of bytes
-    ],
-    outputs=[
-        Tensor(dtype=np.float32, shape=(-1,)),
-    ],
-    config=ModelConfig(max_batch_size=8)
-)
+import numpy as np
+from pytriton.decorators import batch
+from pytriton.model_config import ModelConfig, Tensor
+from pytriton.triton import Triton
+
+
+@batch
+def infer_fn(**inputs: np.ndarray):
+    input1, input2 = inputs.values()
+    outputs = model(input1, input2)
+    return [outputs]
+
+with Triton() as triton:
+  triton.bind(
+      model_name="ModelName",
+      infer_func=infer_fn,
+      inputs=[
+          Tensor(shape=(1,), dtype=np.bytes_),  # sample containing single bytes value
+          Tensor(shape=(-1,), dtype=np.bytes_)  # sample containing vector of bytes
+      ],
+      outputs=[
+          Tensor(shape=(-1,), dtype=np.float32),
+      ],
+      config=ModelConfig(max_batch_size=8)
+  )
 ```
 
 The `bind` method mandatory arguments:
@@ -147,16 +166,19 @@ in separate section - [Inference Functions Design](inference_functions.md)**
 In simplest implementation for functionality that pass input data on output the lambda can be used:
 
 ```python
-triton.bind(
-    model_name="Identity",
-    infer_func=lambda INPUT_1: [INPUT_1],
-    inputs=[Tensor(dtype=np.float32)],
-    outputs=[Tensor(dtype=np.float32)],
-    config=ModelConfig(max_batch_size=8)
-)
+import numpy as np
+from pytriton.model_config import ModelConfig, Tensor
+from pytriton.triton import Triton
+
+with Triton() as triton:
+  triton.bind(
+      model_name="Identity",
+      infer_func=lambda requests: requests,
+      inputs=[Tensor(dtype=np.float32, shape=(1,))],
+      outputs=[Tensor(dtype=np.float32, shape=(1,))],
+      config=ModelConfig(max_batch_size=8)
+  )
 ```
-
-
 
 ### Multi-instance model inference
 
@@ -173,6 +195,7 @@ arguments. The inference handling is done by method `__call__` where the `model`
 
 ```python
 import torch
+from pytriton.decorators import batch
 
 
 class _InferFuncWrapper:
@@ -187,35 +210,44 @@ class _InferFuncWrapper:
         output1_batch_tensor = self._model(input1_batch_tensor)
         output1_batch = output1_batch_tensor.cpu().detach().numpy()
         return [output1_batch]
-
 ```
 
 Next, create a factory function where a model and instances of `_InferFuncWrapper` are created - one per each device:
 
+<!--pytest-codeblocks:cont-->
+
 ```python
 def _infer_function_factory(devices):
-    infer_funcs = []
+    infer_fns = []
     for device in devices:
         model = torch.nn.Linear(20, 30).to(device).eval()
-        infer_funcs.append(_InferFuncWrapper(model=model, device=device))
+        infer_fns.append(_InferFuncWrapper(model=model, device=device))
 
-    return infer_funcs
+    return infer_fns
 ```
 
-Finally, the list of callable objects is passed to `infer_func` inside the `Triton.bind` function:
+Finally, the list of callable objects is passed to `infer_func` parameter of the `Triton.bind` function:
+
+<!--pytest-codeblocks:cont-->
 
 ```python
-triton.bind(
-    model_name="Linear",
-    infer_func=_infer_function_factory(devices=["cuda", "cpu"]),
-    inputs=[
-        Tensor(dtype=np.float32, shape=(-1,)),
-    ],
-    outputs=[
-        Tensor(dtype=np.float32, shape=(-1,)),
-    ],
-    config=ModelConfig(max_batch_size=16),
-)
+import numpy as np
+from pytriton.triton import Triton
+from pytriton.model_config import ModelConfig, Tensor
+
+with Triton() as triton:
+  triton.bind(
+      model_name="Linear",
+      infer_func=_infer_function_factory(devices=["cuda", "cpu"]),
+      inputs=[
+          Tensor(dtype=np.float32, shape=(-1,)),
+      ],
+      outputs=[
+          Tensor(dtype=np.float32, shape=(-1,)),
+      ],
+      config=ModelConfig(max_batch_size=16),
+  )
+  ...
 ```
 
 Once the multiple callable objects are passed to `infer_func` the Triton server get information that multiple instances
@@ -230,6 +262,9 @@ correctly map the input and output data passed through Triton Inference Server.
 The simplest definition on model inputs and outputs expect to provide the type of data and the shape per input:
 
 ```python
+import numpy as np
+from pytriton.model_config import Tensor
+
 inputs = [
     Tensor(dtype=np.float32, shape=(-1,)),
 ]
@@ -252,6 +287,9 @@ The `-1` mean a dynamic shape of the input or output.
 In order to define the name of input and exact shapes the following definition can be used:
 
 ```python
+import numpy as np
+from pytriton.model_config import Tensor
+
 inputs = [
     Tensor(name="image", dtype=np.float32, shape=(224, 224, 3)),
 ]
@@ -268,9 +306,12 @@ This definition describe that model has:
 The `dtype` parameter can be either `numpy.dtype`, `numpy.dtype.type` or `str`. Example:
 
 ```python
-tensor1 = Tensor(name="tensor1", dtype=np.float32, shape=(-1,)),
-tensor2 = Tensor(name="tensor2", dtype=np.float32().dtype, shape=(-1)),
-tensor3 = Tensor(name="tensor3", dtype="float32", shape=(-1,)),
+import numpy as np
+from pytriton.model_config import Tensor
+
+tensor1 = Tensor(name="tensor1", shape=(-1,), dtype=np.float32),
+tensor2 = Tensor(name="tensor2", shape=(-1,), dtype=np.float32().dtype),
+tensor3 = Tensor(name="tensor3", shape=(-1,), dtype="float32"),
 ```
 
 !!! warning "dtype for bytes and string inputs/outputs"
@@ -297,7 +338,9 @@ to recover the model you need to restart all "workers" on the cluster.
 ```python
 from typing import Dict
 import numpy as np
+from pytriton.decorators import batch
 from pytriton.exceptions import PyTritonUnrecoverableError
+
 
 @batch
 def infer_fn(**inputs: np.ndarray) -> Dict[str, np.ndarray]:
@@ -320,6 +363,8 @@ argument in `bind` method. This section describe the possible configurations enh
 The config of model can be adjusted through overriding the defaults for `ModelConfig` object.
 
 ```python
+from pytriton.model_config.common import DynamicBatcher
+
 class ModelConfig:
     batching: bool = True
     max_batch_size: int = 4
@@ -339,7 +384,7 @@ The Triton Inference Server is responsible to collect multiple incoming requests
 passed to the model what improve the inference performance (throughput and latency). This feature called
 `dynamic batching`- collect samples from multiple clients into a single batch processed by model.
 
-On the pytriton side, the `infer_func` obtain the fully created batch by Triton Inference Server so the only
+On the PyTriton side, the `infer_fn` obtain the fully created batch by Triton Inference Server so the only
 responsibility is to perform computation and return the output.
 
 By default, batching is enabled for the model. The default behavior for Triton is to have dynamic batching enabled.
@@ -359,6 +404,9 @@ The dynamic batching is a Triton Inference Server feature and can be configured 
 object:
 
 ```python
+from typing import Dict, Optional
+from pytriton.model_config.common import QueuePolicy
+
 class DynamicBatcher:
     max_queue_delay_microseconds: int = 0
     preferred_batch_size: Optional[list] = None
@@ -383,19 +431,32 @@ The Triton Inference Server provide functionality to use a cached response for t
 Example:
 
 ```python
+import numpy as np
+
+from pytriton.decorators import batch
+from pytriton.model_config import ModelConfig, Tensor
+from pytriton.triton import Triton, TritonConfig
+
 triton_config = TritonConfig(
     response_cache_byte_size=1024 * 1024,  # 1 MB
 )
 
+@batch
+def _add_sub(**inputs):
+    a_batch, b_batch = inputs.values()
+    add_batch = a_batch + b_batch
+    sub_batch = a_batch - b_batch
+    return {"add": add_batch, "sub": sub_batch}
+
 with Triton(config=triton_config) as triton:
     triton.bind(
-        model_name="Identity",
-        infer_func=[_add_sum_fn1, _add_sum_fn2],
-        inputs=[Tensor(dtype=np.float32)],
-        outputs=[Tensor(dtype=np.float32)],
+        model_name="AddSub",
+        infer_func=_add_sub,
+        inputs=[Tensor(shape=(1,), dtype=np.float32), Tensor(shape=(1,), dtype=np.float32)],
+        outputs=[Tensor(shape=(1,), dtype=np.float32), Tensor(shape=(1,), dtype=np.float32)],
         config=ModelConfig(max_batch_size=8, response_cache=True)
     )
-    triton.server()
+    ...
 ```
 
 ## Deploying in Cluster
@@ -424,6 +485,8 @@ configuration the following ports has to be exposed:
 If the library inside Docker container the ports can be exposed through passing extra argument to `docker run`
 command. Example of passing ports configuration:
 
+<!--pytest.mark.skip-->
+
 ```shell
 docker run -p 8000:8000 -p 8001:8001 -p 8002:8002 {image}
 ```
@@ -450,6 +513,8 @@ processes. The Docker container the default amount of shared memory is 64MB whic
 output data of model. In order to increase available shared memory size pass additional flag to `docker run` command.
 Example of increasing shared memory size to 8GB:
 
+<!--pytest.mark.skip-->
+
 ```shell
 docker run --shm-size 8GB {image}
 ```
@@ -475,4 +540,4 @@ spec:
 You can use the [`--init` flag](https://docs.docker.com/engine/reference/run/#specify-an-init-process) of `docker run`
 command to indicate that an init process should be used as the PID 1 in the container.
 Specifying an init process ensures the reaping zombie processes are performed inside the container. The reaping zombie
-processes functionality is important in case of an unexpected errors occurrence in scripts hosting pytriton.
+processes functionality is important in case of an unexpected errors occurrence in scripts hosting PyTriton.

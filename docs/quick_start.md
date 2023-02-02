@@ -30,6 +30,9 @@ The integration of model requires to provide following elements:
 - Python function connection with Triton Inference Server - a binding for communication between Triton and Python callback
 
 The requirement for the example is to have installed PyTorch in your environment. You can do it running:
+
+<!--pytest.mark.skip-->
+
 ```shell
 pip install torch
 ```
@@ -47,11 +50,17 @@ request data in form of numpy array. The expected return object is also numpy ar
 
 Example implementation:
 
+<!--pytest-codeblocks:cont-->
+
 ```python
 import numpy as np
+import torch
+
+from pytriton.decorators import batch
+
 
 @batch
-def infer_func(**inputs: np.ndarray):
+def infer_fn(**inputs: np.ndarray):
     (input1_batch,) = inputs.values()
     input1_batch_tensor = torch.from_numpy(input1_batch).to("cuda")
     output1_batch_tensor = model(input1_batch_tensor) # Calling the Python model inference
@@ -59,7 +68,9 @@ def infer_func(**inputs: np.ndarray):
     return [output1_batch]
 ```
 
-The last step is creating the connection between the model and Triton Inference Server:
+In the next step, create the connection between the model and Triton Inference Server using the bind method:
+
+<!--pytest-codeblocks:cont-->
 
 ```python
 from pytriton.model_config import ModelConfig, Tensor
@@ -67,10 +78,9 @@ from pytriton.triton import Triton
 
 # Connecting inference callback with Triton Inference Server
 with Triton() as triton:
-    # Load model into Triton Inference Server
     triton.bind(
         model_name="Linear",
-        infer_func=infer_func,
+        infer_func=infer_fn,
         inputs=[
             Tensor(dtype=np.float32, shape=(-1,)),
         ],
@@ -79,32 +89,50 @@ with Triton() as triton:
         ],
         config=ModelConfig(max_batch_size=128)
     )
-    # Serve model through Triton Inference Server
+    ...
+```
+
+Finally, serve the model with Triton Inference Server:
+
+<!--pytest.mark.skip-->
+
+```python
+from pytriton.triton import Triton
+
+with Triton() as triton:
+    ...  # Load models here
     triton.serve()
 ```
 
-The `bind` method is creating a connection between Triton Inference Server and the `infer_func` which handle
+The `bind` method is creating a connection between Triton Inference Server and the `infer_fn` which handle
 the inference queries. The `inputs` and `outputs` describe the model inputs and outputs that are exposed in
 Triton. The config field allow to provide more parameters for model deployment.
 
 The `serve` method is blocking and at this point the application will wait for incoming HTTP/gRPC request. From that
 point the model is available under name `Linear` in Triton server.  The inference queries can be sent to
-`localhost:8000/v2/models/Linear/infer` which are passed to the `infer_func` function.
+`localhost:8000/v2/models/Linear/infer` which are passed to the `infer_fn` function.
 
 If you would like to use the Triton in background mode use `run`. More about that you can find
 in [deploying models](deploying_models.md) section.
 
 Once the `server` or `run` method is called on `Triton` object the server status can be obtained using:
+
+<!--pytest.mark.skip-->
+
 ```shell
 curl -v localhost:8000/v2/health/live
 ```
 
 The model is loaded right after the server start and status can be queried using:
+
+<!--pytest.mark.skip-->
 ```shell
 curl -v localhost:8000/v2/models/Linear/ready
 ```
 
 Finally, you can send an inference query to the model:
+<!--pytest.mark.skip-->
+
 ```shell
 curl -X POST \
   -H "Content-Type: application/json"  \
@@ -134,6 +162,8 @@ Server [documentation](https://github.com/triton-inference-server/server/blob/ma
 .
 
 You can also validate the deployed model a simple client can be used to perform inference requests:
+
+<!--pytest.mark.skip-->
 
 ```python
 import torch

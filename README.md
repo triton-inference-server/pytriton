@@ -132,8 +132,11 @@ request data in form of numpy array. The expected return object is also numpy ar
 
 Example implementation:
 
+<!--pytest-codeblocks:cont-->
+
 ```python
 import numpy as np
+from pytriton.decorators import batch
 
 @batch
 def infer_func(**inputs: np.ndarray):
@@ -144,7 +147,9 @@ def infer_func(**inputs: np.ndarray):
     return [output1_batch]
 ```
 
-The last step is creating the connection between the model and Triton Inference Server:
+In the next step, create the connection between the model and Triton Inference Server using the bind method:
+
+<!--pytest-codeblocks:cont-->
 
 ```python
 from pytriton.model_config import ModelConfig, Tensor
@@ -164,7 +169,17 @@ with Triton() as triton:
         ],
         config=ModelConfig(max_batch_size=128)
     )
-    # Serve model through Triton Inference Server
+```
+
+Finally, serve the model with Triton Inference Server:
+
+<!--pytest.mark.skip-->
+
+```python
+from pytriton.triton import Triton
+
+with Triton() as triton:
+    ...  # Load models here
     triton.serve()
 ```
 
@@ -231,6 +246,8 @@ Server [documentation](https://github.com/triton-inference-server/server/blob/ma
 .
 
 You can also validate the deployed model a simple client can be used to perform inference requests:
+
+<!--pytest.mark.skip-->
 
 ```python
 import torch

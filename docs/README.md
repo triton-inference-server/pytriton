@@ -79,27 +79,36 @@ Before you run the model for serving the inference callback function has to be d
 inputs and should return the model outputs:
 
 ```python
+import numpy as np
+from pytriton.decorators import batch
+
+
 @batch
-def infer_func(**inputs: np.ndarray):
+def infer_fn(**inputs: np.ndarray):
     input1, input2 = inputs.values()
     outputs = model(input1, input2)
     return [outputs]
 ```
 
-The `infer_func` receive the batched input data for the model and should return the batched outputs.
+The `infer_fn` receive the batched input data for the model and should return the batched outputs.
 
 In the next step you need to create a connection between Triton and the model. On that purpose the `Triton` class has to
 be used and the `bind` method is required to be called to create a dedicated connection between Triton Inference
-Server the defined `infer_func`.
+Server the defined `infer_fn`.
 
 In the blocking mode we suggest to use the `Triton` object as a context manager where multiple model can be loaded in
 the way presented below:
 
+<!--pytest-codeblocks:cont-->
+
 ```python
+from pytriton.triton import Triton
+from pytriton.model_config import ModelConfig, Tensor
+
 with Triton() as triton:
     triton.bind(
         model_name="MyModel",
-        infer_func=infer_func,
+        infer_func=infer_fn,
         inputs=[
             Tensor(dtype=bytes, shape=(1,)),  # sample containing single bytes value
             Tensor(dtype=bytes, shape=(-1,)),  # sample containing vector of bytes
@@ -114,6 +123,8 @@ with Triton() as triton:
 At this point you have defined how the model has to be handled by Triton and where the HTTP/gRPC requests for model have
 to be directed. The last part for serving the model is call the `serve` method on Triton object:
 
+<!--pytest.mark.skip-->
+
 ```python
 with Triton() as triton:
     # ...
@@ -121,7 +132,7 @@ with Triton() as triton:
 ```
 
 When `.sever()`  method is called on `Triton` object, the inference queries can be sent to
-`localhost:8000/v2/models/MyModel` and the `infer_func` is called to handle the inference query.
+`localhost:8000/v2/models/MyModel` and the `infer_fn` is called to handle the inference query.
 
 ## Working in the Jupyter Notebook
 
@@ -130,41 +141,56 @@ background mode where
 the model is deployed on Triton Inference Server for handling HTTP/gRPC request but there are other actions that you
 want to perform after loading and starting serving the model.
 
-Having the `infer_func` defined in the same way as described in [serving the models](#serving-the-models) section you
+Having the `infer_fn` defined in the same way as described in [serving the models](#serving-the-models) section you
 can use the `Triton` object without a context:
 
 ```python
+from pytriton.triton import Triton
 triton = Triton()
 ```
 
 In the next step the model has to be loaded for serving in Triton Inference Server (which is also the same
 as in serving example):
 
+<!--pytest-codeblocks:cont-->
+
 ```python
+import numpy as np
+from pytriton.decorators import batch
+from pytriton.model_config import ModelConfig, Tensor
+
+@batch
+def infer_fn(**inputs: np.ndarray):
+    input1, input2 = inputs.values()
+    outputs = input1 + input2
+    return [outputs]
+
 triton.bind(
     model_name="MyModel",
-    infer_func=infer_func,
+    infer_func=infer_fn,
     inputs=[
-        Tensor(dtype=bytes, shape=(1,)),
-        Tensor(dtype=bytes, shape=(-1,)),
+        Tensor(shape=(1,), dtype=np.float32),
+        Tensor(shape=(-1,), dtype=np.float32),
     ],
-    outputs=[
-        Tensor(dtype=np.float32, shape=(-1,)),
-    ],
+    outputs=[Tensor(shape=(-1,), dtype=np.float32)],
     config=ModelConfig(max_batch_size=16),
 )
 ```
 
 Finally, to run the model in background mode use the `run` method:
 
+<!--pytest.mark.skip-->
+
 ```python
 triton.run()
 ```
 
 When `.run()`  method is called on `Triton` object, the inference queries can be sent to
-`localhost:8000/v2/models/MyModel` and the `infer_func` is called to handle the inference query.
+`localhost:8000/v2/models/MyModel` and the `infer_fn` is called to handle the inference query.
 
 The Triton server can be stopped at any time using the `stop` method:
+
+<!--pytest.mark.skip-->
 
 ```python
 triton.stop()
