@@ -15,4 +15,4 @@
 echo "Installing libb64-dev required by Perf Analyzer"
 apt-get update
 apt-get install -y libb64-dev
-pip install transformers
+pip install transformers tritonclient[all]==2.28.0
