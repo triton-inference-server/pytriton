@@ -22,7 +22,7 @@ TEST_MODULE="$(echo "${THIS_SCRIPT_DIR}"|sed 's/\//./g').test"
 echo "Installing libb64-dev required by Perf Analyzer"
 apt-get update
 apt-get install -y libb64-dev
-pip install transformers
+pip install transformers tritonclient[all]==2.28.0
 
 python -m"${TEST_MODULE}" \
     --init-timeout-s 300 \
