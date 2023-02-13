@@ -36,7 +36,8 @@ export PRINT_HELP_PYSCRIPT
 
 BROWSER := python -c "$$BROWSER_PYSCRIPT"
 PIP_INSTALL := pip install --extra-index-url https://pypi.ngc.nvidia.com
-TRITONSERVER_CONTAINER_VERSION = 22.11
+TRITONSERVER_IMAGE_VERSION = 22.11
+TRITONSERVER_IMAGE_NAME = nvcr.io/nvidia/tritonserver:$(TRITONSERVER_IMAGE_VERSION)-pyt-python-py3
 TRITONSERVER_OUTPUT_DIR = pytriton/tritonserver
 
 help:
@@ -94,12 +95,13 @@ coverage: ## check code coverage quickly with the default Python
 
 dist: clean extract-triton ## builds source and wheel package
 	python3 -m build .
-	find ./dist -iname *.whl -type f -exec bash ./scripts/add_libs_to_wheel.sh $(TRITONSERVER_CONTAINER_VERSION) $(TRITONSERVER_OUTPUT_DIR) {} \;
+	find ./dist -iname *-linux*.whl -type f -exec bash ./scripts/add_libs_to_wheel.sh $(TRITONSERVER_IMAGE_NAME) $(TRITONSERVER_OUTPUT_DIR) {} \;
+	find ./dist -iname *-linux*.whl -type f -delete
 	ls -lh dist
 
 extract-triton:
 	# changing dst path, change also in clean-build and pyproject.toml
-	bash ./scripts/extract_triton.sh $(TRITONSERVER_CONTAINER_VERSION) $(TRITONSERVER_OUTPUT_DIR)
+	bash ./scripts/extract_triton.sh $(TRITONSERVER_IMAGE_NAME) $(TRITONSERVER_OUTPUT_DIR)
 
 install: clean extract-triton ## install the package to the active Python's site-packages
 	$(PIP_INSTALL) --upgrade pip

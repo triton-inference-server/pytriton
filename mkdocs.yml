@@ -67,7 +67,9 @@ markdown_extensions:
   - pymdownx.superfences
 nav:
   - Home: README.md
-  - installation.md
+  - Installation and Packaging:
+    - Installation: installation.md
+    - Building binary package: building.md
   - Quick Start: quick_start.md
   - Deploying Models: deploying_models.md
   - Inference Functions Design: inference_functions.md

@@ -26,6 +26,8 @@ NVIDIA [Triton Inference Server](https://github.com/triton-inference-server).
 
 - [How it works?](#how-it-works)
 - [Installation](#installation)
+  - [Installing using pip](#installing-using-pip)
+  - [Building binaries from source](#building-binaries-from-source)
 - [Quick Start](#quick-start)
 - [Architecture](#architecture)
 - [Examples](#examples)
@@ -49,8 +51,10 @@ framework-agnostic and can be used along with frameworks like PyTorch, TensorFlo
 
 The following prerequisites must be matched to perform an installation of library:
 
-- Ubuntu 20.04 - required for Triton Inference Server binary compatibility
-- Python version >= 3.8
+- Operating system with glibc >= 2.31. Triton Inference Server and PyTriton has only been rigorously tested on Ubuntu 20.04.
+  Other supported operating systems include Ubuntu 20.04+, Debian 11+, Rocky Linux 9+, Red Hat Universal Base Image 9+.
+- Python version >= 3.8. If you are using Python 3.9+, see the section "[Installation on Python 3.9+](docs/installation.md#installation-on-python-39)" for additional steps.
+- pip >= 20.3
 
 We assume you are comfortable with Python programming language
 and familiar with Machine Learning models. Using [Docker](https://www.docker.com/) is an option, but not mandatory.
@@ -59,7 +63,7 @@ The library can be installed in:
 
 - system environment
 - virtualenv
-- [Docker](https://www.docker.com/) image based on `ubuntu:20.04`
+- [Docker](https://www.docker.com/) image
 
 The NVIDIA optimized Docker images for Python frameworks could be obtained
 from [NVIDIA NGC Catalog](https://catalog.ngc.nvidia.com/containers).
@@ -68,7 +72,7 @@ For using NVIDIA optimized Docker images we recommend to
 install [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/overview.html) to
 run model inference on NVIDIA GPU.
 
-**Installing using PIP**
+### Installing using pip
 
 The package can be installed from `pypi.org` using:
 
@@ -76,30 +80,11 @@ The package can be installed from `pypi.org` using:
 pip install -U pytriton
 ```
 
-**Building from source**
+### Building binaries from source
 
-The package can be also build from the source using `Make` commands run from the main project directory. The
-prerequisites for building wheel:
-- installed Docker in your system - more in [Docker documentation](https://docs.docker.com/engine/install/ubuntu/)
-- access to Docker daemon from system or container
-
-To prepare the wheel you need first install additional packages using:
-
-```shell
-make install-dev
-```
-
-Next run the build process:
-
-```
-make dist
-```
-
-The wheel would be located in `dist` catalog. Use pip command to install the library:
-
-```shell
-pip install dist/pytriton-*-py3-none-linux_x86_64.whl
-```
+The binary package can be built from the source, which enables flexibility to modify the PyTriton code
+and integrate it with various versions of the Triton Inference Server, including custom builds.
+For further information on building the PyTriton binary, refer to the [Building page](docs/building.md)
 
 ## Quick Start
 

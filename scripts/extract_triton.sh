@@ -15,8 +15,7 @@
 
 set -x
 
-export TRITON_VERSION=$1
-export TRITON_CONTAINER="nvcr.io/nvidia/tritonserver:${TRITON_VERSION}-pyt-python-py3"
+export TRITON_CONTAINER=$1
 
 export TARGET_DIR=$2
 rm -rf "${TARGET_DIR}"
@@ -26,32 +25,29 @@ docker start "${TRITON_CONTAINER_ID}"
 
 mkdir -p "${TARGET_DIR}"/backends
 docker cp "${TRITON_CONTAINER_ID}":/opt/tritonserver/bin "${TARGET_DIR}"
-docker cp "${TRITON_CONTAINER_ID}":/opt/tritonserver/lib "${TARGET_DIR}"
+docker cp "${TRITON_CONTAINER_ID}":/opt/tritonserver/lib "${TARGET_DIR}/external_libs"
 docker cp "${TRITON_CONTAINER_ID}":/opt/tritonserver/backends/python "${TARGET_DIR}"/backends
 
 mkdir -p "${TARGET_DIR}"/external_libs
-TRITONSERVER_DEPS_SYMLINKS=$(docker exec  "${TRITON_CONTAINER_ID}" bash -c 'ldd /opt/tritonserver/bin/tritonserver | awk "/=>/ {print \$3}" | sort -u | xargs realpath -s | sed "s/,\$/\n/"')
-for TRITONSERVER_DEP in ${TRITONSERVER_DEPS_SYMLINKS}
-do
-    docker cp "${TRITON_CONTAINER_ID}:${TRITONSERVER_DEP}" "${TARGET_DIR}/external_libs"
-done
+function extract_binary_dependencies() {
+  BINARY_PATH="${1}"
+  export BINARY_PATH
+  echo "==== Extracting dependencies of ${BINARY_PATH}"
+  DEPS_SYMLINKS=$(docker exec -e BINARY_PATH  "${TRITON_CONTAINER_ID}" bash -c 'ldd ${BINARY_PATH} | awk "/=>/ {print \$3}" | sort -u | xargs realpath -s | sed "s/,\$/\n/"')
+  for DEP in ${DEPS_SYMLINKS}
+  do
+      docker cp "${TRITON_CONTAINER_ID}:${DEP}" "${TARGET_DIR}/external_libs"
+  done
+  DEPS_REALPATH=$(docker exec -e BINARY_PATH "${TRITON_CONTAINER_ID}" bash -c 'ldd ${BINARY_PATH} | awk "/=>/ {print \$3}" | sort -u | xargs realpath | sed "s/,\$/\n/"')
+  for DEP in ${DEPS_REALPATH}
+  do
+      docker cp "${TRITON_CONTAINER_ID}:${DEP}" "${TARGET_DIR}/external_libs"
+  done
+}
 
-TRITONSERVER_DEPS=$(docker exec "${TRITON_CONTAINER_ID}" bash -c 'ldd /opt/tritonserver/bin/tritonserver | awk "/=>/ {print \$3}" | sort -u | xargs realpath | sed "s/,\$/\n/"')
-for TRITONSERVER_DEP in ${TRITONSERVER_DEPS}
-do
-    docker cp "${TRITON_CONTAINER_ID}:${TRITONSERVER_DEP}" "${TARGET_DIR}/external_libs"
-done
-
-PYTHONBACKEND_DEPS_SYMLINKS=$(docker exec  "${TRITON_CONTAINER_ID}" bash -c 'ldd /opt/tritonserver/backends/python/libtriton_python.so | awk "/=>/ {print \$3}" | sort -u | xargs realpath -s | sed "s/,\$/\n/"')
-for PYTHONBACKEND_DEP in ${PYTHONBACKEND_DEPS_SYMLINKS}
-do
-    docker cp "${TRITON_CONTAINER_ID}:${PYTHONBACKEND_DEP}" "${TARGET_DIR}/external_libs"
-done
-
-PYTHONBACKEND_DEPS=$(docker exec "${TRITON_CONTAINER_ID}" bash -c 'ldd /opt/tritonserver/backends/python/libtriton_python.so | awk "/=>/ {print \$3}" | sort -u | xargs realpath | sed "s/,\$/\n/"')
-for PYTHONBACKEND_DEP in ${PYTHONBACKEND_DEPS}
-do
-    docker cp "${TRITON_CONTAINER_ID}:${PYTHONBACKEND_DEP}" "${TARGET_DIR}/external_libs"
-done
+extract_binary_dependencies /opt/tritonserver/bin/tritonserver
+extract_binary_dependencies /opt/tritonserver/external_libs/libtritonserver.so
+extract_binary_dependencies /opt/tritonserver/backends/python/libtriton_python.so
+extract_binary_dependencies /opt/tritonserver/backends/python/triton_python_backend_stub
 
 docker stop "${TRITON_CONTAINER_ID}"

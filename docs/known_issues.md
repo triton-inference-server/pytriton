@@ -16,5 +16,4 @@ limitations under the License.
 # Known Issues and Limitations
 
 - There is no 1 to 1 match between solution and [Triton Inference Server](https://github.com/triton-inference-server/server) features, especially supporting user model-store,
-- Only Ubuntu 20.04 OS is currently supported
-- Only amd64 architecture is currently supported
+- Only x86-64 instruction set architecture is currently supported

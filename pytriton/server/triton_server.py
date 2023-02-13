@@ -29,20 +29,67 @@ import ctypes.util
 import logging
 import os
 import pathlib
+import pkgutil
 import signal
+import site
+import sys
 import threading
 import traceback
 from typing import Callable, Dict, Optional, Sequence, Union
 
-from pytriton.constants import DEFAULT_GRPC_PORT, DEFAULT_HTTP_PORT, DEFAULT_METRICS_PORT
+from pytriton.constants import (
+    DEFAULT_GRPC_PORT,
+    DEFAULT_HTTP_PORT,
+    DEFAULT_METRICS_PORT,
+    PYTRITON_CACHE_DIR,
+    TRITON_PYTHON_BACKEND_INTERPRETER_DIRNAME,
+)
 from pytriton.utils.logging import silence_3rd_party_loggers
 
 from .triton_server_config import TritonServerConfig
 
 LOGGER = logging.getLogger(__name__)
 SERVER_OUTPUT_TIMEOUT_SECS = 30
+_PROXY_REQUIRED_MODULES = ["numpy", "zmq"]
 
 silence_3rd_party_loggers()
+
+
+def get_triton_python_backend_python_env() -> pathlib.Path:
+    """Get the path to the python environment for the triton python backend.
+
+    Officially built python backend is built with python 3.8 so need to
+    use the same python version to run the python backend.
+
+    Also, python environment should contain packages required by the proxy.
+
+    Returns:
+        Path to the python environment with python 3.8
+    """
+    pytriton_started_in_python38 = (3, 8) <= sys.version_info < (3, 9)
+    env_path = pathlib.Path(sys.exec_prefix)
+    env_site_dirs = site.getsitepackages()
+    if not pytriton_started_in_python38:
+        venv_path = PYTRITON_CACHE_DIR / TRITON_PYTHON_BACKEND_INTERPRETER_DIRNAME
+        if not venv_path.exists():
+            raise RuntimeError(
+                f"venv for python backend not found at {venv_path}. "
+                f"Please run pytriton in python 3.8 environment to create the venv. "
+                f"Refer to https://github.com/triton-inference-server/pytriton/blob/main/docs/installation.md for more details."
+            )
+        env_path = venv_path
+        env_site_dirs = [(env_path / "lib" / "python3.8" / "site-packages").as_posix()]
+
+    installed_modules = [module_info.name for module_info in pkgutil.iter_modules(env_site_dirs)]
+    missing_modules = list(set(_PROXY_REQUIRED_MODULES) - set(installed_modules))
+    if missing_modules:
+        raise RuntimeError(
+            "Python environment for python backend is missing required packages. "
+            f"Ensure that you have {', '.join(_PROXY_REQUIRED_MODULES)} installed in the {env_path} environment. "
+            f"Installed modules {', '.join(installed_modules)}. Missing modules {', '.join(missing_modules)}."
+        )
+
+    return env_path
 
 
 class TritonServer:
@@ -216,6 +263,9 @@ class TritonServer:
             env["LD_LIBRARY_PATH"] += ":" + self._server_libs_path.as_posix()
         else:
             env["LD_LIBRARY_PATH"] = self._server_libs_path.as_posix()
+        env.pop("PYTHONPATH", None)
+        python_bin_directory = get_triton_python_backend_python_env() / "bin"
+        env["PATH"] = f"{python_bin_directory.as_posix()}:{env['PATH']}"
 
         return env
 

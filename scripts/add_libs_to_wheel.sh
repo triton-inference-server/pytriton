@@ -16,25 +16,29 @@
 set -x
 set -e
 
-export TRITON_VERSION="${1}"
-export TRITON_CONTAINER="nvcr.io/nvidia/tritonserver:${TRITON_VERSION}-pyt-python-py3"
+TARGET_PLATFORM=manylinux_2_31_x86_64
+SCRIPTS_DIR=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 
-export TRITONSERVER_LOCAL_DIR=$(realpath "${2}")
-export WHEEL_PATH=$(realpath "${3}")
-export DIST_DIR="$(dirname "${WHEEL_PATH}")"
-export WHEELHOUSE_DIR="$(dirname "${DIST_DIR}")/wheelhouse"
+TRITON_DOCKER_IMAGE="${1}"
+TRITON_LOCAL_DIR=$(realpath "${2}")
+WHEEL_PATH=$(realpath "${3}")
+DIST_DIR="$(dirname "${WHEEL_PATH}")"
 
-TRITON_CONTAINER_ID=$(docker create --rm -w "${PWD}" "${TRITON_CONTAINER}" bash -c "sleep 1h")
-docker start "${TRITON_CONTAINER_ID}"
+DOCKER_CONTAINER_ID=$(docker create --rm -w "${PWD}" "${TRITON_DOCKER_IMAGE}" bash -c "sleep 1h")
+docker start "${DOCKER_CONTAINER_ID}"
 
-docker exec "${TRITON_CONTAINER_ID}" mkdir -p "${DIST_DIR}"
-docker cp "${WHEEL_PATH}" "${TRITON_CONTAINER_ID}:${WHEEL_PATH}"
-docker exec "${TRITON_CONTAINER_ID}" mkdir -p "$(dirname "${TRITONSERVER_LOCAL_DIR}")"
-docker cp "${TRITONSERVER_LOCAL_DIR}" "${TRITON_CONTAINER_ID}:${TRITONSERVER_LOCAL_DIR}"
+docker exec "${DOCKER_CONTAINER_ID}" mkdir -p "${DIST_DIR}"
+docker exec "${DOCKER_CONTAINER_ID}" mkdir -p "$(dirname "${TRITON_LOCAL_DIR}")"
 
-docker exec "${TRITON_CONTAINER_ID}" pip install auditwheel patchelf
-docker exec "${TRITON_CONTAINER_ID}" bash -c "LD_LIBRARY_PATH=${TRITONSERVER_LOCAL_DIR}/lib auditwheel repair --plat linux_x86_64 ${WHEEL_PATH}"
-RESULT_WHEEL_PATH=$(docker exec "${TRITON_CONTAINER_ID}" bash -c "find ${WHEELHOUSE_DIR} -type f -name *.whl")
-docker cp "${TRITON_CONTAINER_ID}:${RESULT_WHEEL_PATH}" "${DIST_DIR}"
+docker cp "${WHEEL_PATH}" "${DOCKER_CONTAINER_ID}:${WHEEL_PATH}"
+docker cp "${TRITON_LOCAL_DIR}" "${DOCKER_CONTAINER_ID}:${TRITON_LOCAL_DIR}"
 
-docker stop "${TRITON_CONTAINER_ID}"
+docker exec "${DOCKER_CONTAINER_ID}" pip install auditwheel patchelf
+docker cp "${SCRIPTS_DIR}/auditwheel_patched.py" "${DOCKER_CONTAINER_ID}:/tmp/"
+docker exec "${DOCKER_CONTAINER_ID}" bash -c "LD_LIBRARY_PATH=${TRITON_LOCAL_DIR}/external_libs /tmp/auditwheel_patched.py -vvvv repair --plat ${TARGET_PLATFORM} ${WHEEL_PATH}"
+
+WHEELHOUSE_DIR="$(dirname "${DIST_DIR}")/wheelhouse"
+RESULT_WHEEL_PATH=$(docker exec "${DOCKER_CONTAINER_ID}" bash -c "find ${WHEELHOUSE_DIR} -type f -name *.whl")
+docker cp "${DOCKER_CONTAINER_ID}:${RESULT_WHEEL_PATH}" "${DIST_DIR}"
+
+docker stop "${DOCKER_CONTAINER_ID}"

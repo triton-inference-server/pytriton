@@ -16,6 +16,18 @@ limitations under the License.
 
 # Changelog
 
+## 0.1.2 (2023-02-14)
+- Fixed wheel build to support installations on operating systems with glibc version 2.31 or higher.
+- Updated the documentation on custom builds of the package.
+
+[//]: <> (put here on external component update with short summary what change or link to changelog)
+- Version of external components used during testing:
+    - [Triton Inference Server](https://github.com/triton-inference-server/): 2.29.0
+    - Other component versions depend on the used framework and Triton Inference Server containers versions.
+    Refer to its [support matrix](https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html)
+    for a detailed summary.
+
+
 ## 0.1.1 (2023-01-31)
 - Change: The `@first_value` decorator has been updated with new features:
   - Renamed from `@first_values` to `@first_value`

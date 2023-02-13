@@ -11,14 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# noqa: D104
-"""Constants for pytriton."""
-import pathlib
-
-DEFAULT_HTTP_PORT = 8000
-DEFAULT_GRPC_PORT = 8001
-DEFAULT_METRICS_PORT = 8002
-TRITON_LOCAL_URL = "127.0.0.1"
-TRITON_CONTEXT_FIELD_NAME = "triton_context"
-PYTRITON_CACHE_DIR = pathlib.Path.home() / ".cache" / "pytriton"
-TRITON_PYTHON_BACKEND_INTERPRETER_DIRNAME = "python_backend_interpreter"

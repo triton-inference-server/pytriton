@@ -18,8 +18,9 @@ import shutil
 import tempfile
 from typing import Optional, Union
 
+from pytriton.constants import PYTRITON_CACHE_DIR
+
 LOGGER = logging.getLogger(__name__)
-DEFAULT_WORKSPACE_PATH = pathlib.Path.home() / ".cache" / "pytriton"
 
 
 class Workspace:
@@ -36,8 +37,8 @@ class Workspace:
             FileExistsError: in case workspace already exists.
         """
         if workspace_path is None:
-            DEFAULT_WORKSPACE_PATH.mkdir(parents=True, exist_ok=True)
-            workspace_path = tempfile.TemporaryDirectory(dir=DEFAULT_WORKSPACE_PATH, prefix="workspace_").name
+            PYTRITON_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            workspace_path = tempfile.TemporaryDirectory(dir=PYTRITON_CACHE_DIR, prefix="workspace_").name
             self._workspace_path = pathlib.Path(workspace_path).resolve()
             LOGGER.debug(f"Workspace path {self._workspace_path}")
         else:

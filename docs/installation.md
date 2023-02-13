@@ -16,59 +16,88 @@ limitations under the License.
 
 # Installation
 
-This section describe how to install the library. We assume you are comfortable with Python programming language
-and familiar with Machine Learning models. Using [Docker](https://www.docker.com/) is an option, but not mandatory.
+This section describes how to install the library. We assume you have a basic understanding of the Python programming language
+and are familiar with Machine Learning models. Using [Docker](https://www.docker.com/) is optional, but not required.
 
 ## Prerequisites
 
-The following prerequisites must be matched to perform an installation of library:
+Before installing the library, make sure you meet the following requirements:
 
-- Ubuntu 20.04 - required for Triton Inference Server binary compatibility
-- Python version >= 3.8
+- Operating system with glibc >= 2.31. Triton Inference Server and PyTriton has only been rigorously tested on Ubuntu 20.04.
+  Other supported operating systems include Ubuntu 20.04+, Debian 11+, Rocky Linux 9+, Red Hat Universal Base Image 9+.
+- Python version >= 3.8. If you are using Python 3.9+, see the section "[Installation on Python 3.9+](#installation-on-python-39)" for additional steps.
 - pip >= 20.3
 
-The library can be installed in:
+The library can be installed in the system environment, a virtual environment, or a [Docker](https://www.docker.com) image.
+NVIDIA optimized Docker images for Python frameworks can be obtained from the [NVIDIA NGC Catalog](https://catalog.ngc.nvidia.com/containers).
+If you want to use these images, it is recommended to install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/overview.html) to run model inference on an NVIDIA GPU.
 
-- system environment
-- virtualenv
-- [Docker](https://www.docker.com/) image based on `ubuntu:20.04`
+## Installing using pip
 
-The NVIDIA optimized Docker images for Python frameworks could be obtained
-from [NVIDIA NGC Catalog](https://catalog.ngc.nvidia.com/containers).
-
-For using NVIDIA optimized Docker images we recommend to
-install [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/overview.html) to
-run model inference on NVIDIA GPU.
-
-## Installing using PIP
-
-The package can be installed from `pypi.org` using:
+The package can be installed from [pypi.org](https://pypi.org/project/pytriton) by running the following command:
 
 ```shell
 pip install -U pytriton
 ```
 
-## Building from source
+## Installation on Python 3.9+
 
-The package can be also build from the source using `Make` commands run from the main project directory. The
-prerequisites for building wheel:
-- installed Docker in your system - more in [Docker documentation](https://docs.docker.com/engine/install/ubuntu/)
-- access to Docker daemon from system or container
 
-To prepare the wheel you need first install additional packages using:
+The Triton Inference Server python backend is linked to a fixed Python 3.8,
+so if you want to install PyTriton on a different version of Python,
+you need to prepare the environment for the Triton Inference Server python backend.
+The environment should be located in the `~/.cache/pytriton/python_backend_interpreter`
+directory and contain the packages `numpy~=1.21` and `pyzmq~=23.0`.
 
-```shell
-make install-dev
-```
-
-Next run the build process:
-
-```
-make dist
-```
-
-The wheel would be located in `dist` catalog. Use pip command to install the library:
+### Using pyenv
 
 ```shell
-pip install dist/pytriton-*-py3-none-linux_x86_64.whl
+apt update
+# need git and build dependencies https://github.com/pyenv/pyenv/wiki\#suggested-build-environment
+DEBIAN_FRONTEND=noninteractive apt install -y python3 python3-distutils python-is-python3 git \
+    build-essential libssl-dev zlib1g-dev \
+    libbz2-dev libreadline-dev libsqlite3-dev curl \
+    libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
+
+# install pyenv
+curl https://pyenv.run | bash
+export PYENV_ROOT="$HOME/.pyenv"
+command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init -)"
+
+# compile python 3.8
+pyenv install 3.8
+
+# prepare venv
+pyenv global 3.8
+pip3 install virtualenv
+mkdir -p ~/.cache/pytriton/
+python -mvenv ~/.cache/pytriton/python_backend_interpreter --copies --clear
+source ~/.cache/pytriton/python_backend_interpreter/bin/activate
+pip3 install numpy~=1.21 pyzmq~=23.0
+
+# recover system python
+deactivate
+pyenv global system
 ```
+
+### Using miniconda
+
+```shell
+apt update
+apt install -y python3 python3-distutils python-is-python3 curl
+
+CONDA_VERSION=latest
+TARGET_MACHINE=x86_64
+curl "https://repo.anaconda.com/miniconda/Miniconda3-${CONDA_VERSION}-Linux-${TARGET_MACHINE}.sh" --output miniconda.sh
+
+sh miniconda.sh -b -p ~/.cache/conda
+rm miniconda.sh
+~/.cache/conda/bin/conda create -y -p ~/.cache/pytriton/python_backend_interpreter python=3.8 numpy~=1.21 pyzmq~=23.0
+```
+
+## Building binaries from source
+
+The binary package can be built from the source, which enables not only modifications to the PyTriton code,
+but also the integration of other versions of the Triton Inference Server, including custom-builds.
+For further information on building the PyTriton binary, refer to the [Building page](building.md)
