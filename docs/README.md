@@ -66,8 +66,6 @@ The `Proxy Model` receive data in form of `numpy` array and send it to the `Infe
 the `Callback Handler`. Once the `Inference Callback` finished execution of model prediction the result is returned
 through the same route and response is created on by Triton.
 
-![High Level Design](assets/hld.svg)
-
 ## Serving the models
 
 The NVIDIA PyTriton provide an option to serve your Python model using Triton Inference Server to

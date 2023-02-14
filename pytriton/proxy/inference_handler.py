@@ -27,7 +27,6 @@ python model deployed on Triton and model in current environment.
         handler.run()
 
 """
-import copy
 import enum
 import logging
 import threading as th
@@ -36,10 +35,8 @@ import typing
 from typing import Callable
 
 import numpy as np
-import wrapt
 import zmq  # pytype: disable=import-error
 
-from pytriton.decorators import TritonContext
 from pytriton.exceptions import PyTritonUnrecoverableError
 from pytriton.model_config.triton_model_config import TritonModelConfig
 from pytriton.proxy.communication import Request, Response, ShmManager
@@ -56,20 +53,6 @@ class InferenceHandlerEvent(enum.Enum):
 
 
 InferenceEventsHandler = typing.Callable[["InferenceHandler", InferenceHandlerEvent, typing.Optional[typing.Any]], None]
-
-
-def triton_context_inject(triton_context):
-    """Decorator that injects triton context into callable."""
-
-    @wrapt.decorator()
-    def wrapper(wrapped, instance, args, kwargs):
-        if instance is None:
-            wrapped.__triton_context__ = triton_context
-        else:
-            instance.__triton_context__ = triton_context
-        return wrapped(*args, **kwargs)
-
-    return wrapper
 
 
 class InferenceHandler(th.Thread):
@@ -92,7 +75,7 @@ class InferenceHandler(th.Thread):
         """
         super().__init__()
         self._model_config = model_config
-        self._model_callable = triton_context_inject(TritonContext(copy.deepcopy(model_config)))(model_callable)
+        self._model_callable = model_callable
         self.stopped = False
 
         self.shm_request_manager = ShmManager()

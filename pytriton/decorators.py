@@ -13,6 +13,7 @@
 # limitations under the License.
 """Inference function decorators."""
 import dataclasses
+import inspect
 import itertools
 import operator
 import typing
@@ -65,7 +66,7 @@ def _get_wrapt_stack(wrapped) -> List[_WrappedWithWrapper]:
 class TritonContext:
     """Triton context definition class."""
 
-    model_config: TritonModelConfig
+    model_configs: Dict[str, TritonModelConfig] = dataclasses.field(default_factory=dict)
 
 
 def get_triton_context(wrapped, instance) -> TritonContext:
@@ -87,7 +88,11 @@ def get_model_config(wrapped, instance) -> TritonModelConfig:
     You can use this in custom decorators if you need access to model_config information.
     If you use @triton_context decorator you do not need this function (you can get model_config from triton_context).
     """
-    return get_triton_context(wrapped, instance).model_config
+    dict_key = wrapped
+    if inspect.ismethod(dict_key) and dict_key.__name__ == "__call__":
+        dict_key = dict_key.__self__
+    dict_key = str(dict_key)
+    return get_triton_context(wrapped, instance).model_configs[dict_key]
 
 
 def convert_output(
@@ -274,8 +279,8 @@ def fill_optionals(**defaults):
     so the other decorators (e.g. @group_by_keys) can make bigger consistent groups.
     """
 
-    def _verify_defaults(_triton_context: TritonContext):
-        inputs = {spec.name: spec for spec in _triton_context.model_config.inputs}
+    def _verify_defaults(_triton_context: TritonContext, model_callable: Callable):
+        inputs = {spec.name: spec for spec in _triton_context.model_configs[str(model_callable)].inputs}
         not_matching_default_names = sorted(set(defaults) - set(inputs))
         if not_matching_default_names:
             raise PyTritonBadParameterError(f"Could not found {', '.join(not_matching_default_names)} inputs")
@@ -320,12 +325,12 @@ def fill_optionals(**defaults):
     def _wrapper(wrapped, instance, args, kwargs):
         _triton_context = get_triton_context(wrapped, instance)
 
-        _verify_defaults(_triton_context)
+        _verify_defaults(_triton_context, wrapped)
         # verification if not after group wrappers is in group wrappers
 
         (requests,) = args
 
-        model_supports_batching = _triton_context.model_config.batching
+        model_supports_batching = get_model_config(wrapped, instance).batching
         for request in requests:
             batch_size = get_inference_request_batch_size(request) if model_supports_batching else None
             for default_key, default_value in defaults.items():

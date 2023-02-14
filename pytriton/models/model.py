@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Model base class."""
+import copy
 import enum
+import inspect
 import logging
 import pathlib
 import shutil
@@ -22,6 +24,7 @@ from typing import Callable, Optional, Sequence, Union
 
 import zmq
 
+from pytriton.decorators import TritonContext
 from pytriton.exceptions import PyTritonValidationError
 from pytriton.model_config.generator import ModelConfigGenerator
 from pytriton.model_config.model_config import ModelConfig
@@ -43,6 +46,23 @@ class ModelEvent(enum.Enum):
 ModelEventsHandler = typing.Callable[["Model", ModelEvent, typing.Optional[typing.Any]], None]
 
 
+def _inject_triton_context(triton_context: TritonContext, model_callable: Callable) -> Callable:
+    """Inject triton context into callable.
+
+    Args:
+        triton_context: Triton context
+        model_callable: Callable to inject triton context
+
+    Returns:
+        Callable with injected triton context
+    """
+    if hasattr(model_callable, "__self__"):
+        model_callable.__self__.__triton_context__ = triton_context
+    else:
+        model_callable.__triton_context__ = triton_context
+    return model_callable
+
+
 class Model:
     """Model definition."""
 
@@ -55,6 +75,7 @@ class Model:
         outputs: Sequence[Tensor],
         config: ModelConfig,
         workspace: Workspace,
+        triton_context: TritonContext,
     ):
         """Create Python model with required data.
 
@@ -70,6 +91,7 @@ class Model:
         Raises:
             PyTritonValidationError if one or more of provided values are incorrect.
         """
+        self.triton_context = triton_context
         self.model_name = model_name
         self.model_version = model_version
         self._inference_handlers = []
@@ -133,6 +155,12 @@ class Model:
         if not self._inference_handlers:
             triton_model_config = self._get_triton_model_config()
             for i, infer_function in enumerate(self.infer_functions):
+                dict_key = infer_function
+                if inspect.ismethod(dict_key) and dict_key.__name__ == "__call__":
+                    dict_key = dict_key.__self__
+                dict_key = str(dict_key)
+                self.triton_context.model_configs[dict_key] = copy.deepcopy(triton_model_config)
+                _inject_triton_context(self.triton_context, infer_function)
                 inference_handler = InferenceHandler(
                     model_callable=infer_function,
                     model_config=triton_model_config,

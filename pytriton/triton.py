@@ -45,6 +45,7 @@ import typing_inspect
 
 from pytriton.client import ModelClient
 from pytriton.constants import DEFAULT_GRPC_PORT, DEFAULT_HTTP_PORT, TRITON_LOCAL_URL
+from pytriton.decorators import TritonContext
 from pytriton.exceptions import PyTritonValidationError
 from pytriton.model_config.tensor import Tensor
 from pytriton.models.manager import ModelManager
@@ -288,6 +289,8 @@ class Triton:
         with self._cv:
             self._stopped = True
 
+        self.triton_context = TritonContext()
+
     def __enter__(self) -> "Triton":
         """Enter the context.
 
@@ -391,6 +394,7 @@ class Triton:
             outputs=outputs,
             config=config if config else ModelConfig(),
             workspace=self._workspace,
+            triton_context=self.triton_context,
         )
         model.on_model_event(self._on_model_event)
 

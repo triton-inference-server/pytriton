@@ -27,7 +27,7 @@ from pytriton.decorators import (
     batch,
     fill_optionals,
     first_value,
-    get_triton_context,
+    get_model_config,
     group_by_keys,
     group_by_values,
     pad_batch,
@@ -37,7 +37,7 @@ from pytriton.decorators import (
 from pytriton.exceptions import PyTritonBadParameterError, PyTritonRuntimeError, PyTritonValidationError
 from pytriton.model_config import DynamicBatcher
 from pytriton.model_config.triton_model_config import TensorSpec, TritonModelConfig
-from pytriton.proxy.inference_handler import triton_context_inject
+from pytriton.models.model import _inject_triton_context
 from tests.unit.utils import verify_equalness_of_dicts_with_ndarray
 
 input_requests = [
@@ -60,7 +60,14 @@ input_requests_for_batching = [
 input_batch_with_params = {"b": np.array([[1, 2], [1, 2], [9, 9]]), "a": np.array([[1], [1], [1]])}
 
 
-def _prepare_context_for_input(inputs):
+def _prepare_and_inject_context_with_config(config, fun):
+    context = TritonContext()
+    context.model_configs[str(fun)] = config
+    _inject_triton_context(context, fun)
+    return context
+
+
+def _prepare_context_for_input(inputs, fun):
     a_input = inputs[0]["a"]
     b_input = inputs[0]["b"]
 
@@ -68,7 +75,9 @@ def _prepare_context_for_input(inputs):
     b_spec = TensorSpec("b", b_input.shape, b_input.dtype)
 
     config = TritonModelConfig("a", inputs=[a_spec, b_spec], outputs=[a_spec, b_spec])
-    context = TritonContext(config)
+    context = TritonContext()
+    context.model_configs[str(fun)] = config
+
     return context
 
 
@@ -88,8 +97,6 @@ def test_batch():
 
 
 def test_batch_output_list():
-    context = _prepare_context_for_input(input_requests_for_batching)
-
     @batch
     def batched_fun(**inputs):
         assert isinstance(inputs, dict) and "a" in inputs and "b" in inputs
@@ -97,6 +104,8 @@ def test_batch_output_list():
         assert inputs["b"].shape == (6, 2)
 
         return [inputs["a"] * 2, inputs["b"] * 3]
+
+    context = _prepare_context_for_input(input_requests_for_batching, batched_fun)
 
     batched_fun.__triton_context__ = context
     results = batched_fun(input_requests_for_batching)
@@ -118,13 +127,12 @@ def test_sample():
 
 
 def test_sample_output_list():
-    context = _prepare_context_for_input(input_requests_for_sample)
-
     @sample
     def sample1(**inputs):
         assert isinstance(inputs, dict) and "a" in inputs and "b" in inputs
         return [inputs["a"] * 2, inputs["b"] * 3]
 
+    context = _prepare_context_for_input(input_requests_for_sample, sample1)
     sample1.__triton_context__ = context
     results = sample1(input_requests_for_sample)
 
@@ -144,7 +152,7 @@ def test_pad_batch():
 
     config = TritonModelConfig("MyModel", max_batch_size=8, batcher=DynamicBatcher(preferred_batch_size=[2, 4, 6]))
     config.batcher.preferred_batch_size = [2, 4, 6]
-    padded_fun.__triton_context__ = TritonContext(config)
+    _prepare_and_inject_context_with_config(config, padded_fun)
     results = padded_fun(**(input_batch_with_params.copy()))
     assert results["a"].shape[0] == 4 and results["b"].shape[0] == 4
 
@@ -161,12 +169,12 @@ def test_pad_batch_no_preffered_batch_size():
         return inputs
 
     config = TritonModelConfig("MyModel", max_batch_size=8)
-    padded_fun.__triton_context__ = TritonContext(config)
+    _prepare_and_inject_context_with_config(config, padded_fun)
     results = padded_fun(**(input_batch_with_params.copy()))
     assert results["a"].shape[0] == config.max_batch_size and results["b"].shape[0] == config.max_batch_size
 
 
-_FIRST_VALUE_TRITON_CONTEXT = TritonContext(model_config=TritonModelConfig(model_name="foo", inputs=[], outputs=[]))
+_FIRST_VALUE_MODEL_CONFIG = TritonModelConfig(model_name="foo", inputs=[], outputs=[])
 
 
 @pytest.mark.parametrize(
@@ -228,7 +236,7 @@ def test_first_value_with_single_request(mocker, inputs, keys, expected):
     def _fn(**_inputs):
         return spy_passtrough(**_inputs)
 
-    _fn.__triton_context__ = _FIRST_VALUE_TRITON_CONTEXT
+    _prepare_and_inject_context_with_config(_FIRST_VALUE_MODEL_CONFIG, _fn)
 
     result = _fn(**inputs)
     verify_equalness_of_dicts_with_ndarray(result, expected)
@@ -272,7 +280,7 @@ def test_first_value_with_requests(mocker, requests, keys, expected):
     def _fn(_requests):
         return spy_passtrough(_requests)
 
-    _fn.__triton_context__ = _FIRST_VALUE_TRITON_CONTEXT
+    _prepare_and_inject_context_with_config(_FIRST_VALUE_MODEL_CONFIG, _fn)
 
     results = _fn(requests)
     assert len(results) == len(expected)
@@ -299,7 +307,7 @@ def test_first_value_raises_on_not_equal_values():
     def _fn(**inputs):
         pass
 
-    _fn.__triton_context__ = _FIRST_VALUE_TRITON_CONTEXT
+    _prepare_and_inject_context_with_config(_FIRST_VALUE_MODEL_CONFIG, _fn)
 
     with pytest.raises(PyTritonRuntimeError, match="The values on the .* input are not equal"):
         _fn(a=np.array([[1], [2], [2]]))
@@ -309,7 +317,7 @@ def test_first_value_raises_on_not_equal_values():
     def _fn(**inputs):
         pass
 
-    _fn.__triton_context__ = _FIRST_VALUE_TRITON_CONTEXT
+    _prepare_and_inject_context_with_config(_FIRST_VALUE_MODEL_CONFIG, _fn)
     _fn(a=np.array([[1], [2], [2]]))
 
 
@@ -318,8 +326,8 @@ def test_first_value_raises_on_models_not_supporting_batching():
     def _fn(**inputs):
         pass
 
-    _fn.__triton_context__ = TritonContext(
-        model_config=TritonModelConfig(model_name="foo", inputs=[], outputs=[], batching=False)
+    _prepare_and_inject_context_with_config(
+        TritonModelConfig(model_name="foo", inputs=[], outputs=[], batching=False), _fn
     )
 
     with pytest.raises(
@@ -499,13 +507,15 @@ def test_fill_optionals():
         assert np.all(inputs[-1]["b"] == np.array([[-5, -6], [-5, -6], [-5, -6]]))
         return inputs
 
-    fill_fun.__triton_context__ = TritonContext(
-        model_config=TritonModelConfig(
+    _prepare_and_inject_context_with_config(
+        TritonModelConfig(
             model_name="foo",
             inputs=[TensorSpec("a", shape=(2,), dtype=np.int64), TensorSpec("b", shape=(2,), dtype=np.int64)],
             outputs=[TensorSpec("a", shape=(2,), dtype=np.int64), TensorSpec("b", shape=(2,), dtype=np.int64)],
-        )
+        ),
+        fill_fun,
     )
+
     results = fill_fun(input_requests)
     assert len(results) == len(input_requests)
 
@@ -515,13 +525,14 @@ def test_fill_optionals_for_not_batching_models():
     def infer_fn(inputs):
         return inputs
 
-    infer_fn.__triton_context__ = TritonContext(
-        model_config=TritonModelConfig(
+    _prepare_and_inject_context_with_config(
+        TritonModelConfig(
             model_name="foo",
             batching=False,
             inputs=[TensorSpec("a", shape=(2,), dtype=np.int64), TensorSpec("b", shape=(2,), dtype=np.int64)],
             outputs=[TensorSpec("a", shape=(2,), dtype=np.int64), TensorSpec("b", shape=(2,), dtype=np.int64)],
-        )
+        ),
+        infer_fn,
     )
 
     inputs = [
@@ -545,12 +556,13 @@ def test_fill_optionals_raise_on_non_numpy_defaults():
     def infer_fn(inputs):
         return inputs
 
-    infer_fn.__triton_context__ = TritonContext(
-        model_config=TritonModelConfig(
+    _prepare_and_inject_context_with_config(
+        TritonModelConfig(
             model_name="foo",
             inputs=[TensorSpec("a", shape=(2,), dtype=np.int64), TensorSpec("b", shape=(2,), dtype=np.int64)],
             outputs=[TensorSpec("a", shape=(2,), dtype=np.int64), TensorSpec("b", shape=(2,), dtype=np.int64)],
-        )
+        ),
+        infer_fn,
     )
 
     with pytest.raises(PyTritonBadParameterError, match="Could not use a=.* they are not NumPy arrays"):
@@ -562,12 +574,13 @@ def test_fill_optionals_raise_error_on_dtype_mismatch():
     def infer_fn(inputs):
         return inputs
 
-    infer_fn.__triton_context__ = TritonContext(
-        model_config=TritonModelConfig(
+    _prepare_and_inject_context_with_config(
+        TritonModelConfig(
             model_name="foo",
             inputs=[TensorSpec("a", shape=(2,), dtype=np.int32), TensorSpec("b", shape=(2,), dtype=np.int64)],
             outputs=[TensorSpec("a", shape=(2,), dtype=np.int64), TensorSpec("b", shape=(2,), dtype=np.int64)],
-        )
+        ),
+        infer_fn,
     )
 
     with pytest.raises(
@@ -581,12 +594,13 @@ def test_fill_optionals_raise_error_on_shape_mismatch():
     def infer_fn(inputs):
         return inputs
 
-    infer_fn.__triton_context__ = TritonContext(
-        model_config=TritonModelConfig(
+    _prepare_and_inject_context_with_config(
+        TritonModelConfig(
             model_name="foo",
             inputs=[TensorSpec("a", shape=(2,), dtype=np.int64), TensorSpec("b", shape=(2,), dtype=np.int64)],
             outputs=[TensorSpec("a", shape=(2,), dtype=np.int64), TensorSpec("b", shape=(2,), dtype=np.int64)],
-        )
+        ),
+        infer_fn,
     )
 
     with pytest.raises(
@@ -636,29 +650,35 @@ def test_triton_context_not_set():
 
 
 def test_inject_and_acquire_triton_context():
+    context = TritonContext()
+
     @triton_context
     class A:
         def __init__(self, **kwargs):
-            assert kwargs.get(TRITON_CONTEXT_FIELD_NAME) == "Context"
+            assert kwargs.get(TRITON_CONTEXT_FIELD_NAME) == context
+
+        @classmethod
+        def __call__(cls, *args, **kwargs):
+            assert kwargs.get(TRITON_CONTEXT_FIELD_NAME) == context
 
     class B:
         @triton_context
         def fun(self, **kwargs):
-            assert kwargs.get(TRITON_CONTEXT_FIELD_NAME) == "Context"
+            assert kwargs.get(TRITON_CONTEXT_FIELD_NAME) == context
 
     class C:
         @triton_context
         def __call__(self, *args, **kwargs):
-            assert kwargs.get(TRITON_CONTEXT_FIELD_NAME) == "Context"
+            assert kwargs.get(TRITON_CONTEXT_FIELD_NAME) == context
 
     @triton_context
     def fun(**kwargs):
-        assert kwargs.get(TRITON_CONTEXT_FIELD_NAME) == "Context"
+        assert kwargs.get(TRITON_CONTEXT_FIELD_NAME) == context
 
-    caller1 = triton_context_inject("Context")(A)
-    caller2 = triton_context_inject("Context")(B().fun)
-    caller3 = triton_context_inject("Context")(C())
-    caller4 = triton_context_inject("Context")(fun)
+    caller1 = _inject_triton_context(context, A)
+    caller2 = _inject_triton_context(context, B().fun)
+    caller3 = _inject_triton_context(context, C())
+    caller4 = _inject_triton_context(context, fun)
 
     caller1()
     caller2()
@@ -668,17 +688,18 @@ def test_inject_and_acquire_triton_context():
 
 def test_get_triton_context_with_decorators_stack():
     """There should be possible to obtain TritonContext from any decorator in wrappers stack"""
-    dummy_triton_context = TritonContext(model_config=TritonModelConfig("foo"))
+
+    dummy_config = TritonModelConfig("foo")
 
     @wrapt.decorator
     def my_decorator(wrapped, instance, args, kwargs):
-        _triton_context = get_triton_context(wrapped, instance)
-        assert _triton_context == dummy_triton_context
+        _config = get_model_config(wrapped, instance)
+        assert _config == dummy_config
 
     @my_decorator
     @batch
     def infer_fn(**kwargs):
         return kwargs
 
-    infer_fn.__triton_context__ = dummy_triton_context
+    _prepare_and_inject_context_with_config(dummy_config, infer_fn)
     infer_fn()

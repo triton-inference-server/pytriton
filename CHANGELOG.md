@@ -19,6 +19,8 @@ limitations under the License.
 ## 0.1.2 (2023-02-14)
 - Fixed wheel build to support installations on operating systems with glibc version 2.31 or higher.
 - Updated the documentation on custom builds of the package.
+- Change: TritonContext instance is shared across bound models and contains model_configs dictionary.
+- Fixed support of binding multiple models that uses methods of the same class.
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 - Version of external components used during testing:
@@ -26,7 +28,6 @@ limitations under the License.
     - Other component versions depend on the used framework and Triton Inference Server containers versions.
     Refer to its [support matrix](https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html)
     for a detailed summary.
-
 
 ## 0.1.1 (2023-01-31)
 - Change: The `@first_value` decorator has been updated with new features:

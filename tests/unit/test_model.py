@@ -16,9 +16,12 @@ import tempfile
 
 import numpy as np
 
+from pytriton.decorators import TritonContext, batch
 from pytriton.model_config.tensor import Tensor
 from pytriton.model_config.triton_model_config import TensorSpec
+from pytriton.models.manager import ModelManager
 from pytriton.models.model import Model, ModelConfig
+from pytriton.server.model_repository import TritonModelRepository
 from pytriton.utils.workspace import Workspace
 
 
@@ -26,6 +29,7 @@ def test_get_model_config_return_model_config_when_minimal_required_data():
     def infer_func(inputs):
         return inputs
 
+    triton_context = TritonContext()
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = pathlib.Path(tempdir)
         workspace = Workspace(tempdir / "workspace")
@@ -42,6 +46,7 @@ def test_get_model_config_return_model_config_when_minimal_required_data():
             ],
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
+            triton_context=triton_context,
         )
 
         model_config = model._get_triton_model_config()
@@ -69,6 +74,7 @@ def test_get_model_config_return_model_config_when_custom_names():
     def infer_func(inputs):
         return inputs
 
+    triton_context = TritonContext()
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = pathlib.Path(tempdir)
         workspace = Workspace(tempdir / "workspace")
@@ -85,6 +91,7 @@ def test_get_model_config_return_model_config_when_custom_names():
             ],
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
+            triton_context=triton_context,
         )
 
         model_config = model._get_triton_model_config()
@@ -109,6 +116,7 @@ def test_generate_model_create_model_store():
     def infer_func(inputs):
         return inputs
 
+    triton_context = TritonContext()
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = pathlib.Path(tempdir)
         workspace = Workspace(tempdir / "workspace")
@@ -125,6 +133,7 @@ def test_generate_model_create_model_store():
             ],
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
+            triton_context=triton_context,
         )
 
         with tempfile.TemporaryDirectory() as tempdir:
@@ -144,6 +153,7 @@ def test_generate_models_with_same_names_and_different_versions_create_model_sto
     def infer_func(inputs):
         return inputs
 
+    triton_context = TritonContext()
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = pathlib.Path(tempdir)
         workspace = Workspace(tempdir / "workspace")
@@ -160,6 +170,7 @@ def test_generate_models_with_same_names_and_different_versions_create_model_sto
             ],
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
+            triton_context=triton_context,
         )
         model2 = Model(
             model_name="simple",
@@ -174,6 +185,7 @@ def test_generate_models_with_same_names_and_different_versions_create_model_sto
             ],
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
+            triton_context=triton_context,
         )
 
         with tempfile.TemporaryDirectory() as tempdir:
@@ -197,6 +209,7 @@ def test_setup_create_proxy_backend_connection():
     def infer_func(inputs):
         return inputs
 
+    triton_context = TritonContext()
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = pathlib.Path(tempdir)
         workspace = Workspace(tempdir / "workspace")
@@ -213,6 +226,7 @@ def test_setup_create_proxy_backend_connection():
             ],
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
+            triton_context=triton_context,
         )
 
         model.setup()
@@ -226,6 +240,7 @@ def test_setup_can_be_called_multiple_times():
     def infer_func(inputs):
         return inputs
 
+    triton_context = TritonContext()
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = pathlib.Path(tempdir)
         workspace = Workspace(tempdir / "workspace")
@@ -242,6 +257,7 @@ def test_setup_can_be_called_multiple_times():
             ],
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
+            triton_context=triton_context,
         )
 
         try:
@@ -266,6 +282,7 @@ def test_clean_remove_proxy_backend_connection():
     def infer_func(inputs):
         return inputs
 
+    triton_context = TritonContext()
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = pathlib.Path(tempdir)
         workspace = Workspace(tempdir / "workspace")
@@ -282,6 +299,7 @@ def test_clean_remove_proxy_backend_connection():
             ],
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
+            triton_context=triton_context,
         )
 
         model.setup()
@@ -293,6 +311,7 @@ def test_clean_can_be_called_multiple_times():
     def infer_func(inputs):
         return inputs
 
+    triton_context = TritonContext()
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = pathlib.Path(tempdir)
         workspace = Workspace(tempdir / "workspace")
@@ -309,6 +328,7 @@ def test_clean_can_be_called_multiple_times():
             ],
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
+            triton_context=triton_context,
         )
 
         model.setup()
@@ -321,6 +341,7 @@ def test_is_alive_return_false_when_model_not_setup():
     def infer_func(inputs):
         return inputs
 
+    triton_context = TritonContext()
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = pathlib.Path(tempdir)
         workspace = Workspace(tempdir / "workspace")
@@ -337,6 +358,7 @@ def test_is_alive_return_false_when_model_not_setup():
             ],
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
+            triton_context=triton_context,
         )
 
         assert model.is_alive() is False
@@ -346,6 +368,7 @@ def test_is_alive_return_true_when_model_is_setup():
     def infer_func(inputs):
         return inputs
 
+    triton_context = TritonContext()
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = pathlib.Path(tempdir)
         workspace = Workspace(tempdir / "workspace")
@@ -362,6 +385,7 @@ def test_is_alive_return_true_when_model_is_setup():
             ],
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
+            triton_context=triton_context,
         )
 
         model.setup()
@@ -371,3 +395,102 @@ def test_is_alive_return_true_when_model_is_setup():
 
         finally:
             model.clean()
+
+
+def test_triton_context_injection():
+    class Multimodel:
+        @batch
+        def infer1(self, variable1):
+            return [variable1]
+
+        @batch
+        def infer2(self, variable2):
+            return [variable2]
+
+    m = Multimodel()
+
+    @batch
+    def infer_func(variable3):
+        return [variable3]
+
+    triton_context = TritonContext()
+    with tempfile.TemporaryDirectory() as tempdir:
+        tempdir = pathlib.Path(tempdir)
+        workspace = Workspace(tempdir / "workspace")
+        model1 = Model(
+            model_name="simple1",
+            model_version=1,
+            inference_fn=m.infer1,
+            inputs=[
+                Tensor(name="variable1", dtype=np.int32, shape=(2, 1)),
+            ],
+            outputs=[
+                Tensor(name="out1", dtype=np.int32, shape=(2, 1)),
+            ],
+            config=ModelConfig(max_batch_size=128, batching=True),
+            workspace=workspace,
+            triton_context=triton_context,
+        )
+        model2 = Model(
+            model_name="simple2",
+            model_version=1,
+            inference_fn=m.infer2,
+            inputs=[
+                Tensor(name="variable2", dtype=np.int32, shape=(2, 1)),
+            ],
+            outputs=[
+                Tensor(name="out2", dtype=np.int32, shape=(2, 1)),
+            ],
+            config=ModelConfig(max_batch_size=128, batching=True),
+            workspace=workspace,
+            triton_context=triton_context,
+        )
+        model3 = Model(
+            model_name="simple3",
+            model_version=1,
+            inference_fn=infer_func,
+            inputs=[
+                Tensor(name="variable3", dtype=np.int32, shape=(2, 1)),
+            ],
+            outputs=[
+                Tensor(name="out3", dtype=np.int32, shape=(2, 1)),
+            ],
+            config=ModelConfig(max_batch_size=128, batching=True),
+            workspace=workspace,
+            triton_context=triton_context,
+        )
+
+        tr = TritonModelRepository(path=None, workspace=workspace)
+        manager = ModelManager(tr)
+        try:
+            manager.add_model(model1)
+            manager.add_model(model2)
+            manager.add_model(model3)
+            manager.create_models()
+
+            input_requests1 = [{"variable1": np.array([[7, 5], [8, 6]])}]
+            input_requests2 = [{"variable2": np.array([[1, 2], [1, 2], [11, 12]])}]
+            input_requests3 = [{"variable3": np.array([[1, 2]])}]
+
+            def assert_inputs_properly_mapped_to_outputs(expected_out_name, outputs, input_request_arr):
+                assert len(outputs) == 1
+                assert expected_out_name in outputs[0]
+                assert outputs[0][expected_out_name].shape == input_request_arr.shape
+                assert np.array_equal(outputs[0][expected_out_name], input_request_arr)
+
+            outputs1 = m.infer1(input_requests1)
+            assert_inputs_properly_mapped_to_outputs("out1", outputs1, input_requests1[0]["variable1"])
+
+            outputs2 = m.infer2(input_requests2)
+            assert_inputs_properly_mapped_to_outputs("out2", outputs2, input_requests2[0]["variable2"])
+
+            outputs3 = infer_func(input_requests3)
+            assert_inputs_properly_mapped_to_outputs("out3", outputs3, input_requests3[0]["variable3"])
+
+            outputs1 = m.infer1(input_requests1)
+            assert_inputs_properly_mapped_to_outputs("out1", outputs1, input_requests1[0]["variable1"])
+
+            outputs3 = infer_func(input_requests3)
+            assert_inputs_properly_mapped_to_outputs("out3", outputs3, input_requests3[0]["variable3"])
+        finally:
+            manager.clean()
