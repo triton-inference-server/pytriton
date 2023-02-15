@@ -14,16 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# NVIDIA PyTriton
+# PyTriton
 
 
-The NVIDIA PyTriton is Flask/FastAPI-like interface to simplify Triton's deployment in Python environments.
+The PyTriton is Flask/FastAPI-like interface to simplify Triton's deployment in Python environments.
 The library allows to serve Machine Learning models directly from Python through
 NVIDIA [Triton Inference Server](https://github.com/triton-inference-server).
 
 ## How it works?
 
-In NVIDIA PyTriton, same as in Flask or FastAPI, you can define any Python function that execute a Machine Learning model prediction and expose
+In PyTriton, same as in Flask or FastAPI, you can define any Python function that execute a Machine Learning model prediction and expose
 it through HTTP/gRPC API. The library installs Triton Inference Server in your environment and use it for handling the
 HTTP/gRPC requests and responses. Our library provides a Python API that allow to attach a Python function to the Triton
 and a communication layer to send/receive data between Triton and the function. The solution helps use of the
@@ -68,7 +68,7 @@ through the same route and response is created on by Triton.
 
 ## Serving the models
 
-The NVIDIA PyTriton provide an option to serve your Python model using Triton Inference Server to
+The PyTriton provide an option to serve your Python model using Triton Inference Server to
 handle HTTP/gRPC
 requests and pass the input/output tensors to and from the model. We it a blocking mode where the application is a
 long-lived process deployed in your cluster to serve the requests from clients.
@@ -196,7 +196,7 @@ triton.stop()
 
 ## What next?
 
-Read more about using the NVIDIA PyTriton in [quick start](quick_start.md), [examples](examples.md) and
+Read more about using the PyTriton in [quick start](quick_start.md), [examples](examples.md) and
 find more options how to configure Triton, models and deployment on cluster in [deploying models](deploying_models.md)
 section.
 

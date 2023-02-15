@@ -60,7 +60,7 @@ Alternatively, you can set up your environment manually as in [model instruction
 
     For more information on docker/cluster deployments, see [documentation](../../docs/deploying_models.md#deploying-in-cluster).
 
-2. Install requirements required by example and [NVIDIA PyTriton](../../docs/installation.md):
+2. Install requirements required by example and [PyTriton](../../docs/installation.md):
     ```bash
     docker exec ft_on_pytriton bash -c "./examples/fastertransformer_gpt_multinode/install.sh && pip install -U pytriton"
     ```

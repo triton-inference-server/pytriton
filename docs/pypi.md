@@ -17,11 +17,11 @@ limitations under the License.
 # Project description
 
 
-The NVIDIA PyTriton is Flask/FastAPI-like interface to simplify Triton's deployment in Python environments.
+The PyTriton is Flask/FastAPI-like interface to simplify Triton's deployment in Python environments.
 The library allows to serve Machine Learning models directly from Python through
 NVIDIA [Triton Inference Server](https://github.com/triton-inference-server).
 
-In NVIDIA PyTriton, same as in Flask or FastAPI, you can define any Python function that execute a Machine Learning model prediction and expose
+In PyTriton, same as in Flask or FastAPI, you can define any Python function that execute a Machine Learning model prediction and expose
 it through HTTP/gRPC API. The library installs Triton Inference Server in your environment and use it for handling the
 HTTP/gRPC requests and responses. Our library provides a Python API that allow to attach a Python function to the Triton
 and a communication layer to send/receive data between Triton and the function. The solution helps use of the

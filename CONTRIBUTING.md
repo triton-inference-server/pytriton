@@ -103,9 +103,9 @@ By making a contribution to this project, I certify that:
 
 ## Get Started!
 
-Ready to contribute? Here's how to set up the `NVIDIA PyTriton` for local development.
+Ready to contribute? Here's how to set up the `PyTriton` for local development.
 
-1. Fork the `NVIDIA PyTriton` repo on GitHub.
+1. Fork the `PyTriton` repo on GitHub.
 2. Clone your fork locally:
 
 ```shell
