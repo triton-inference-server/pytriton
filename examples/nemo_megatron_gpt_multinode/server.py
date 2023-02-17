@@ -14,71 +14,22 @@
 # limitations under the License.
 """Text generation server with NeMo Megatron GPT model."""
 
-# pytype: disable=import-error
-import pathlib
-import socket
+import torch  # pytype: disable=import-error
+from nemo.collections.nlp.modules.common.text_generation_utils import generate  # pytype: disable=import-error
+from nemo.collections.nlp.parts.nlp_overrides import NLPDDPPlugin  # pytype: disable=import-error
+from pytorch_lightning.trainer.trainer import Trainer  # pytype: disable=import-error
 
-import filelock
-import huggingface_hub
-import torch
-from nemo.collections.nlp.models.language_modeling.megatron_gpt_model import MegatronGPTModel
-from nemo.collections.nlp.modules.common.text_generation_utils import generate
-from nemo.collections.nlp.parts.nlp_overrides import NLPDDPPlugin
-from nemo.utils.app_state import AppState
-from pytorch_lightning.trainer.trainer import Trainer
-from server_impl import MegatronTritonServer
+from pytriton.model_config import ModelConfig
+from pytriton.triton import Triton, TritonConfig
 
-# pytype: enable=import-error
-
+from gpt import NemoGptCallable  # pytype: disable=import-error # isort:skip
+from helpers import download_and_load_model, setup_distributed_environment  # pytype: disable=import-error # isort:skip
 
 if not torch.cuda.is_available():
     raise OSError("GPU is needed for the inference")
 
-
+ENDPOINT_BIND_ADDRESS = "0.0.0.0"
 HTTP_PORT = 8000
-
-
-def _setup_distributed_environment(trainer):
-    def dummy():
-        return
-
-    if trainer.strategy.launcher is not None:
-        trainer.strategy.launcher.launch(dummy, trainer=trainer)
-    trainer.strategy.setup_environment()
-
-    app_state = AppState()
-
-    hostname = socket.gethostname()
-    print(  # noqa
-        f"global={app_state.global_rank}/{app_state.world_size} "
-        f"local={app_state.local_rank} @ {hostname}:{app_state.device_id} / "
-        f"dp={app_state.data_parallel_rank}/{app_state.data_parallel_size} "
-        f"tp={app_state.tensor_model_parallel_rank}/{app_state.tensor_model_parallel_size} "
-        f"pp={app_state.pipeline_model_parallel_rank}/{app_state.pipeline_model_parallel_size} "
-        "vpp="
-        f"{getattr(app_state, 'virtual_pipeline_model_parallel_rank', None)}/"
-        f"{getattr(app_state, 'virtual_pipeline_model_parallel_size', None)}"
-    )
-    return app_state
-
-
-def _bind(repo_id, trainer):
-    lock = filelock.FileLock("/tmp/nemo_megatron_gpt.lock")
-    with lock:
-        repo_dir_path = huggingface_hub.snapshot_download(repo_id)
-        model_path = list(pathlib.Path(repo_dir_path).rglob("*.nemo"))[0]
-        # although putting model load in filelock section might significantly increase load time
-        # especially while loading large models in slurm multi-node scenario
-        # but there might be tokenizer files download which is not distributed jobs safe
-        model = MegatronGPTModel.restore_from(restore_path=model_path.as_posix(), trainer=trainer)
-
-    model.freeze()
-    # Have to turn off activations_checkpoint_method for inference
-    try:
-        model.model.language_model.encoder.activations_checkpoint_method = None
-    except AttributeError:
-        pass
-    return model
 
 
 def main():
@@ -100,15 +51,28 @@ def main():
     args = parser.parse_args()
 
     trainer = Trainer(
-        plugins=NLPDDPPlugin(), devices=args.gpus, num_nodes=args.nodes, accelerator="gpu", logger=False, precision=16
+        plugins=NLPDDPPlugin(),
+        devices=args.gpus,
+        num_nodes=args.nodes,
+        accelerator="gpu",
+        logger=False,
+        precision=16,
     )
 
-    model = _bind(args.model_repo_id, trainer)
-    app_state = _setup_distributed_environment(trainer)
+    model = download_and_load_model(args.model_repo_id, trainer)
+    app_state = setup_distributed_environment(trainer)
     if app_state.global_rank == 0:
-        print(f"Server http url: http://{socket.gethostname()}:{HTTP_PORT}")  # noqa
-        megatron_server = MegatronTritonServer(model.cuda())
-        megatron_server.serve("0.0.0.0", http_port=HTTP_PORT)
+        infer_callable = NemoGptCallable(model_name="GPT", model=model)
+        triton_config = TritonConfig(http_address=ENDPOINT_BIND_ADDRESS, http_port=HTTP_PORT, log_verbose=4)
+        with Triton(config=triton_config) as triton:
+            triton.bind(
+                model_name=infer_callable.model_name,
+                infer_func=infer_callable.infer,
+                inputs=infer_callable.inputs,
+                outputs=infer_callable.outputs,
+                config=ModelConfig(max_batch_size=128),
+            )
+            triton.serve()
     else:
         while True:
             choice = torch.cuda.LongTensor(1)

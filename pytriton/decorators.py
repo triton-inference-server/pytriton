@@ -215,12 +215,37 @@ def batch(wrapped, instance, args, kwargs):
 
 
 def group_by_values(*keys):
-    """Group by values.
+    """Decorator for grouping requests by values of selected keys.
 
-    Decorator prepares groups of requests with the same request value (for selected keys) and calls wrapped function
-    for each group separately (it is especially convenient to use with models that requires dynamic parameters
-    sent by the user e.g. temperature - in this case we would like to run model only for requests with the same
-    temperature value)
+    Splits a batch into multiple sub-batches with the same values of selected keys and
+    calls the decorated function with each of them.
+    This is especially convenient when working with models that require dynamic parameters
+    sent by the user. For example, given an input of the form:
+
+        {"sentences": [b"Sentence1", b"Sentence2", b"Sentence3"], "param1": [1, 1, 2], "param2": [1, 1, 1]}
+
+    Using @group_by_values("param1", "param2") will split the batch into two sub-batches:
+
+        [
+            {"sentences": [b"Sentence1", b"Sentence2"], "param1": [1, 1], "param2": [1, 1]},
+            {"sentences": [b"Sentence3"], "param1": [2], "param2": [1]}
+        ]
+
+    This decorator should be used after the @batch decorator.
+
+    Typical use:
+
+        @batch
+        @group_by_values("param1", "param2")
+        def infer_fun(**inputs):
+            ...
+            return outputs
+
+    Args:
+        *keys: List of keys to group by.
+
+    Returns:
+        The decorator function.
     """
 
     def _value2key(_v):
