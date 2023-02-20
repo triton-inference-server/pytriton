@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Inference function decorators."""
+"""Inference callable decorators."""
 import dataclasses
 import inspect
 import itertools
@@ -135,7 +135,7 @@ def batch(wrapped, instance, args, kwargs):
     """Decorator for converting list of request dicts to dict of input batches.
 
     Converts list of request dicts to dict of input batches.
-    It passes **kwargs to inference function where each named input contains numpy array with batch of requests
+    It passes **kwargs to inference callable where each named input contains numpy array with batch of requests
     received by Triton server.
     We assume that each request has the same set of keys (you can use group_by_keys decorator before
     using @batch decorator if your requests may have different set of keys).
@@ -400,14 +400,14 @@ def first_value(*keys: str, squeeze_single_values=True, strict: bool = True):
 
     It can be used in two ways:
 
-    1. Wrapping a single request inference function by chaining with @batch decorator:
+    1. Wrapping a single request inference callable by chaining with @batch decorator:
         @batch
         @first_value("temperature")
         def infer_fn(**inputs):
             ...
             return result
 
-    2. Wrapping a multiple requests inference function:
+    2. Wrapping a multiple requests inference callable:
         @first_value("temperature")
         def infer_fn(requests):
             ...

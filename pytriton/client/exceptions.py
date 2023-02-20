@@ -75,6 +75,6 @@ class PyTritonClientModelDoesntSupportBatchingError(PyTritonClientError):
 
 
 class PyTritonClientInferenceServerError(PyTritonClientError):
-    """Error raised in case of error on inference function or Triton Inference Server side."""
+    """Error raised in case of error on inference callable or Triton Inference Server side."""
 
     pass

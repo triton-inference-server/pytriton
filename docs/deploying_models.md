@@ -155,13 +155,13 @@ The `bind` method mandatory arguments:
 Once the `bind` method is called, the model is created in Triton Inference Server model store under
 provided `model_name`.
 
-### Inference Function
+### Inference Callable
 
-The inference function is an entrypoint for inference. This can be any callable that receive the data for
+The inference callable is an entrypoint for inference. This can be any callable that receive the data for
 model inputs in form list of request dictionaries where input names are mapped into ndarrays.
 Input can be also adapted to different more convenient form using set of decorators.
-**More details about designing inference function and using of decorators can be found
-in separate section - [Inference Functions Design](inference_functions.md)**
+**More details about designing inference callable and using of decorators can be found
+in separate section - [Inference Callable Design](inference_callable.md)**
 
 In simplest implementation for functionality that pass input data on output the lambda can be used:
 
@@ -185,7 +185,7 @@ with Triton() as triton:
 Multi-instance model inference is a mechanism for loading multiple instances of the same model and call
 them alternately (to hide transfer overhead).
 
-With `Triton` class it can be realised by providing the list of multiple inference functions to `Triton.bind`
+With `Triton` class it can be realised by providing the list of multiple inference callables to `Triton.bind`
 in `infer_func` parameter.
 
 The example present multiple instances of Linear PyTorch model loaded on separate device.
@@ -331,7 +331,7 @@ tensor3 = Tensor(name="tensor3", shape=(-1,), dtype="float32"),
 
 When the model gets into a state where further inference is impossible,
 you can throw [PyTritonUnrecoverableError][pytriton.exceptions.PyTritonUnrecoverableError]
-from the inference function. This will cause NVIDIA Triton Inference Server to shut down.
+from the inference callable. This will cause NVIDIA Triton Inference Server to shut down.
 This might be useful when the model is deployed on a cluster in a multi-node setup. In that case
 to recover the model you need to restart all "workers" on the cluster.
 

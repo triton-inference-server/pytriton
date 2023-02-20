@@ -80,6 +80,8 @@ The package can be installed from `pypi.org` using:
 pip install -U pytriton
 ```
 
+**Important**: The Triton Inference Server binary is installed as part of PyTriton package.
+
 ### Building binaries from source
 
 The binary package can be built from the source, which enables flexibility to modify the PyTriton code
@@ -254,37 +256,30 @@ in [documentation](https://triton-inference-server.github.io/pytriton).
 ## Architecture
 
 The diagram below presents the schema how the Python models are served through Triton Inference Server using the
-library. The solutions consist of two main components:
+PyTriton. The solutions consist of two main components:
 
 - Triton Inference Server - for exposing the HTTP/gRPC API, and benefits from performance features like dynamic batching
   or response cache
-- Python Model Environment - your environment where Python model is implemented
+- Python Model Environment - your environment where Python model is executed
 
-The Triton Inference Server binaries are provided as part of the Python package installation. The Triton Server is
-installed in your current environment (system or container). The Python library controls the Triton Server process
+The Triton Inference Server binaries are provided as part of the PyTriton installation. The Triton Server is
+installed in your current environment (system or container). The PyTriton controls the Triton Server process
 through `Triton Controller`.
 
-Exposing the model through Triton requires definition of `Inference Callback` - a Python function that is
-connected to Triton Inference Server and execute model predictions. The integration layer bind `Inference Callback` and
-expose it through Triton HTTP/gRPC API under a provided `<model name>`. Once the integration is done, the defined
-`Inference Callback` receive data send to HTTP/gRPC API endpoint `v2/models/<model name>/infer`. Read more
-about HTTP/gRPC interface in Triton Inference
-Server [documentation](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#httprest-and-grpc-protocols)
+Exposing the model through PyTriton requires definition of `Inference Callable` - a Python function that is
+connected to Triton Inference Server and execute model or ensemble for predictions. The integration layer bind
+`Inference Callable` to Triton Server and expose it through Triton HTTP/gRPC API under a provided `<model name>`. Once
+the integration is done, the defined `Inference Callable` receive data send to HTTP/gRPC API endpoint
+`v2/models/<model name>/infer`. Read more about HTTP/gRPC interface in Triton Inference Server
+[documentation](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#httprest-and-grpc-protocols)
 .
 
-The `Proxy Model` and `Callback Handler` are responsible for communication between `Inference Callback`
-and Triton Inference Server:
+The HTTP/gRPC requests send to `v2/models/<model name>/infer` are handled by Triton
+Inference Server. The server batch requests and pass to the `Proxy Backend` which send the batched requests to appropriate
+`Inference Callable`. The data is sent as `numpy` array. Once the `Inference Callable` finish execution of
+model prediction the result is returned to `Proxy Backend` and response is created by Triton Server.
 
-- The `Proxy Model` is a binding created on Triton Server side
-- The `Callback Handler` is Python thread responsible for send/receive data to/from Inference Callback
-
-A unique `Proxy Model` and `Callback Handler` is created per `Inference Callback`.
-
-When the integration is done the HTTP/gRPC requests send to `v2/models/<model name>/infer` are handled by Triton
-Inference Server. The server batch requests for processing and redirect them to appropriate `Proxy Model`.
-The `Proxy Model` receive data in form of `numpy` array and send it to the `Inference Callback` through
-the `Callback Handler`. Once the `Inference Callback` finished execution of model prediction the result is returned
-through the same route and response is created on by Triton.
+![High Level Design](docs/assets/hld.svg)
 
 ## Examples
 

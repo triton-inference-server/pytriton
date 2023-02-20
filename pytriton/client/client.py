@@ -194,7 +194,7 @@ class ModelClient:
                 and wait time for server and model being ready exceeds `init_timeout_s`
                 or inference time exceeds `timeout_s`.
             PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
-            PyTritonClientInferenceServerError: If error occurred on inference function or Triton Inference Server side.
+            PyTritonClientInferenceServerError: If error occurred on inference callable or Triton Inference Server side.
         """
         _verify_inputs_args(inputs, named_inputs)
 
@@ -241,7 +241,7 @@ class ModelClient:
                 or inference time exceeds `timeout_s`.
             PyTritonClientModelDoesntSupportBatchingError: if model doesn't support batching.
             PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
-            PyTritonClientInferenceServerError: If error occurred on inference function or Triton Inference Server side.
+            PyTritonClientInferenceServerError: If error occurred on inference callable or Triton Inference Server side.
         """
         _verify_inputs_args(inputs, named_inputs)
 

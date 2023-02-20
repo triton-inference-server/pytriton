@@ -69,7 +69,7 @@ class PyTritonModelConfigError(PyTritonError):
 
 
 class PyTritonUnrecoverableError(PyTritonError):
-    """Unrecoverable error occurred in inference function, thus no further inferences possible."""
+    """Unrecoverable error occurred in inference callable, thus no further inferences possible."""
 
     pass
 

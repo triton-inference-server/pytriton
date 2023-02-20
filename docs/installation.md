@@ -40,6 +40,8 @@ The package can be installed from [pypi.org](https://pypi.org/project/pytriton) 
 pip install -U pytriton
 ```
 
+**Important**: The Triton Inference Server binary is installed as part of PyTriton package.
+
 ## Installation on Python 3.9+
 
 

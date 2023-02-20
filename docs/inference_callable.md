@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# Inference Functions Design
+# Inference Callable Design
 
-The following section provide more details about writing inference function for Triton.
+The following section provide more details about writing inference callable for PyTriton.
 
 
-### Inference Function
+### Inference Callable
 
-The inference function is an entrypoint for inference. The interface of inference function (or callable) assumes
+The inference callable is an entrypoint for handling inference requests. The interface of inference callable assumes
 that it receives list of requests as dictionaries (each dictionary represents one request mapping model input names
 into numpy ndarrays).
 
@@ -42,8 +42,31 @@ with Triton() as triton:
   )
 ```
 
-For more complex cases, we suggest creating a separate inference function that can implement more logic of processing
-the input data and create output response.
+For more complex cases, we suggest creating a separate inference callable that can implement more logic of processing
+the input data and create output response. The two most popular implementations of inference callables are:
+1. Functions:
+
+```python
+import numpy as np
+from typing import Dict, List
+
+
+def infer_fn(requests: List[Dict[str, np.ndarray]]) -> List[Dict[str, np.ndarray]]:
+    ...
+```
+
+2. Class:
+
+```python
+import numpy as np
+from typing import Dict, List
+
+
+class InferCallable:
+
+    def __call__(self, requests: List[Dict[str, np.ndarray]]) -> List[Dict[str, np.ndarray]]:
+       ...
+```
 
 ### Batching decorator
 
@@ -203,7 +226,7 @@ def infer(mandatory_input, temperature):
 ```
 - `@fill_optionals(**defaults)` - fills missing inputs in requests with default values provided by user (if model owner
 have default values for some optional parameter it is good idea to provide them at the very beginning, so
-the other decorators can make bigger consistent groups and send them to the inference function)
+the other decorators can make bigger consistent groups and send them to the inference callable)
 ```python
 import numpy as np
 from pytriton.decorators import batch, fill_optionals, group_by_values

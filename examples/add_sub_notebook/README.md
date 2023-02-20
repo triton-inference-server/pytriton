@@ -19,7 +19,7 @@ limitations under the License.
 ## Overview
 
 The example presents a simple Add-Sub model which perform an addition and subtraction operations
-on passed input data and it also shows how to redefine inference function and reload the model.
+on passed input data and it also shows how to redefine inference callable and reload the model.
 
 Example consists of following scripts:
 

@@ -372,14 +372,14 @@ class Triton:
         model_version: int = 1,
         config: Optional[ModelConfig] = None,
     ) -> None:
-        """Create a model with given name and inference function binding into Triton Inference Server.
+        """Create a model with given name and inference callable binding into Triton Inference Server.
 
         More information about model configuration:
         https://github.com/triton-inference-server/server/blob/main/docs/user_guide/model_configuration.md
 
         Args:
-            infer_func: Inference function to handle request/response from Triton Inference Server
-            (or list of inference functions for multi instance model)
+            infer_func: Inference callable to handle request/response from Triton Inference Server
+            (or list of inference callable for multi instance model)
             inputs: Definition of model inputs
             outputs: Definition of model outputs
             model_name: Name under which model is available in Triton Inference Server
