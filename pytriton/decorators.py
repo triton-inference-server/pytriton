@@ -18,6 +18,7 @@ import itertools
 import operator
 import typing
 from bisect import bisect_left
+from collections.abc import MutableMapping
 from typing import Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
@@ -62,11 +63,52 @@ def _get_wrapt_stack(wrapped) -> List[_WrappedWithWrapper]:
     return stack
 
 
+class ModelConfigDict(MutableMapping):
+    """Dictionary for storing model configs for inference callable."""
+
+    def __init__(self):
+        """Create ModelConfigDict object."""
+        self._data: Dict[str, TritonModelConfig] = {}
+        self._keys: List[Callable] = []
+
+    def __getitem__(self, infer_callable: Callable) -> TritonModelConfig:
+        """Get model config for inference callable."""
+        key = self._get_model_config_key(infer_callable)
+        return self._data[key]
+
+    def __setitem__(self, infer_callable: Callable, item: TritonModelConfig):
+        """Set model config for inference callable."""
+        self._keys.append(infer_callable)
+        key = self._get_model_config_key(infer_callable)
+        self._data[key] = item
+
+    def __delitem__(self, infer_callable: Callable):
+        """Delete model config for inference callable."""
+        key = self._get_model_config_key(infer_callable)
+        del self._data[key]
+
+    def __len__(self):
+        """Get number of inference callable keys."""
+        return len(self._data)
+
+    def __iter__(self):
+        """Iterate over inference callable keys."""
+        return iter(self._keys)
+
+    @staticmethod
+    def _get_model_config_key(infer_callable: Callable) -> str:
+        """Prepares TritonModelConfig dictionary key for function/callable."""
+        dict_key = infer_callable
+        if inspect.ismethod(dict_key) and dict_key.__name__ == "__call__":
+            dict_key = dict_key.__self__
+        return str(dict_key)
+
+
 @dataclasses.dataclass
 class TritonContext:
     """Triton context definition class."""
 
-    model_configs: Dict[str, TritonModelConfig] = dataclasses.field(default_factory=dict)
+    model_configs: ModelConfigDict = dataclasses.field(default_factory=ModelConfigDict)
 
 
 def get_triton_context(wrapped, instance) -> TritonContext:
@@ -82,17 +124,14 @@ def get_triton_context(wrapped, instance) -> TritonContext:
 
 
 def get_model_config(wrapped, instance) -> TritonModelConfig:
-    """Retrieves triton model config from callable.
+    """Retrieves instance of TritonModelConfig from callable.
 
     It is internally used in convert_output function to get output list from model.
     You can use this in custom decorators if you need access to model_config information.
-    If you use @triton_context decorator you do not need this function (you can get model_config from triton_context).
+    If you use @triton_context decorator you do not need this function (you can get model_config directly
+    from triton_context passing function/callable to dictionary getter).
     """
-    dict_key = wrapped
-    if inspect.ismethod(dict_key) and dict_key.__name__ == "__call__":
-        dict_key = dict_key.__self__
-    dict_key = str(dict_key)
-    return get_triton_context(wrapped, instance).model_configs[dict_key]
+    return get_triton_context(wrapped, instance).model_configs[wrapped]
 
 
 def convert_output(
@@ -279,8 +318,8 @@ def fill_optionals(**defaults):
     so the other decorators (e.g. @group_by_keys) can make bigger consistent groups.
     """
 
-    def _verify_defaults(_triton_context: TritonContext, model_callable: Callable):
-        inputs = {spec.name: spec for spec in _triton_context.model_configs[str(model_callable)].inputs}
+    def _verify_defaults(model_config: TritonModelConfig):
+        inputs = {spec.name: spec for spec in model_config.inputs}
         not_matching_default_names = sorted(set(defaults) - set(inputs))
         if not_matching_default_names:
             raise PyTritonBadParameterError(f"Could not found {', '.join(not_matching_default_names)} inputs")
@@ -323,14 +362,13 @@ def fill_optionals(**defaults):
 
     @wrapt.decorator
     def _wrapper(wrapped, instance, args, kwargs):
-        _triton_context = get_triton_context(wrapped, instance)
-
-        _verify_defaults(_triton_context, wrapped)
+        model_config = get_model_config(wrapped, instance)
+        _verify_defaults(model_config)
         # verification if not after group wrappers is in group wrappers
 
         (requests,) = args
 
-        model_supports_batching = get_model_config(wrapped, instance).batching
+        model_supports_batching = model_config.batching
         for request in requests:
             batch_size = get_inference_request_batch_size(request) if model_supports_batching else None
             for default_key, default_value in defaults.items():

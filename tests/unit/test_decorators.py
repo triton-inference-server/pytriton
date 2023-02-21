@@ -23,6 +23,7 @@ from pytriton.decorators import (
     InferenceRequest,
     InferenceRequests,
     InputNames,
+    ModelConfigDict,
     TritonContext,
     batch,
     fill_optionals,
@@ -62,9 +63,49 @@ input_batch_with_params = {"b": np.array([[1, 2], [1, 2], [9, 9]]), "a": np.arra
 
 def _prepare_and_inject_context_with_config(config, fun):
     context = TritonContext()
-    context.model_configs[str(fun)] = config
+    context.model_configs[fun] = config
     _inject_triton_context(context, fun)
     return context
+
+
+def test_get_model_config_key():
+    def fn():
+        pass
+
+    def fn2():
+        pass
+
+    class CallableClass:
+        def __call__(self):
+            pass
+
+        def method(self):
+            pass
+
+    inst = CallableClass()
+    inst2 = CallableClass()
+
+    assert ModelConfigDict._get_model_config_key(fn) == str(fn)
+    assert ModelConfigDict._get_model_config_key(inst) == str(inst)
+    assert ModelConfigDict._get_model_config_key(inst.method) == str(inst.method)
+    assert ModelConfigDict._get_model_config_key(inst.__call__) == str(inst)
+
+    config_dict = ModelConfigDict()
+    config_dict[fn] = TritonModelConfig(model_name="fn")
+    config_dict[fn2] = TritonModelConfig(model_name="fn2")
+    assert config_dict[fn] == TritonModelConfig(model_name="fn")
+    assert config_dict[fn] != config_dict[fn2]
+
+    config_dict[inst] = TritonModelConfig(model_name="inst")
+    config_dict[inst2] = TritonModelConfig(model_name="inst2")
+    assert config_dict[inst] == TritonModelConfig(model_name="inst")
+    assert config_dict[inst] != config_dict[inst2]
+
+    keys = {fn, fn2, inst, inst2}
+    keys1 = set(config_dict.keys())
+    keys2 = set(iter(config_dict))
+    assert keys == keys1
+    assert keys == keys2
 
 
 def _prepare_context_for_input(inputs, fun):
@@ -76,7 +117,7 @@ def _prepare_context_for_input(inputs, fun):
 
     config = TritonModelConfig("a", inputs=[a_spec, b_spec], outputs=[a_spec, b_spec])
     context = TritonContext()
-    context.model_configs[str(fun)] = config
+    context.model_configs[fun] = config
 
     return context
 
@@ -495,6 +536,32 @@ def test_group_by_values_raise_error_if_placed_before_batch():
             return _requests
 
         _fn([{"a": np.zeros((1,))}, {"a": np.zeros((1,))}])
+
+
+def test_fill_optionals_in_instance_callable():
+    class MyModel:
+        @fill_optionals(a=np.array([-1, -2]), b=np.array([-5, -6]))
+        def __call__(self, inputs):
+            for req in inputs:
+                assert "a" in req and "b" in req
+                assert req["a"].shape[0] == req["b"].shape[0]
+            assert np.all(inputs[1]["a"] == np.array([[-1, -2], [-1, -2]]))
+            assert np.all(inputs[-1]["b"] == np.array([[-5, -6], [-5, -6], [-5, -6]]))
+            return inputs
+
+    model = MyModel()
+
+    _prepare_and_inject_context_with_config(
+        TritonModelConfig(
+            model_name="foo",
+            inputs=[TensorSpec("a", shape=(2,), dtype=np.int64), TensorSpec("b", shape=(2,), dtype=np.int64)],
+            outputs=[TensorSpec("a", shape=(2,), dtype=np.int64), TensorSpec("b", shape=(2,), dtype=np.int64)],
+        ),
+        model.__call__,
+    )
+
+    results = model(input_requests)
+    assert len(results) == len(input_requests)
 
 
 def test_fill_optionals():

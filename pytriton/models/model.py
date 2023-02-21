@@ -14,7 +14,6 @@
 """Model base class."""
 import copy
 import enum
-import inspect
 import logging
 import pathlib
 import shutil
@@ -155,11 +154,7 @@ class Model:
         if not self._inference_handlers:
             triton_model_config = self._get_triton_model_config()
             for i, infer_function in enumerate(self.infer_functions):
-                dict_key = infer_function
-                if inspect.ismethod(dict_key) and dict_key.__name__ == "__call__":
-                    dict_key = dict_key.__self__
-                dict_key = str(dict_key)
-                self.triton_context.model_configs[dict_key] = copy.deepcopy(triton_model_config)
+                self.triton_context.model_configs[infer_function] = copy.deepcopy(triton_model_config)
                 _inject_triton_context(self.triton_context, infer_function)
                 inference_handler = InferenceHandler(
                     model_callable=infer_function,
