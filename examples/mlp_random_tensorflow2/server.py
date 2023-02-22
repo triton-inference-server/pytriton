@@ -30,10 +30,6 @@ def _get_model():  # Load model into Triton Inference Server
 
     input_layer = tf.keras.layers.Input((224, 224, 3))
     layer_output = tf.keras.layers.Lambda(lambda x: x)(input_layer)
-    layer_output = tf.keras.layers.Lambda(lambda x: x)(layer_output)
-    layer_output = tf.keras.layers.Lambda(lambda x: x)(layer_output)
-    layer_output = tf.keras.layers.Lambda(lambda x: x)(layer_output)
-    layer_output = tf.keras.layers.Lambda(lambda x: x)(layer_output)
     model_output = tf.keras.layers.Lambda(lambda x: x)(layer_output)
     model = tf.keras.Model(input_layer, model_output)
     return model
@@ -58,7 +54,7 @@ with Triton() as triton:
             Tensor(name="image", dtype=np.float32, shape=(224, 224, 3)),
         ],
         outputs=[
-            Tensor(name="classes", dtype=np.float32, shape=(224, 224, 3)),
+            Tensor(name="output", dtype=np.float32, shape=(224, 224, 3)),
         ],
         config=ModelConfig(max_batch_size=16),
     )

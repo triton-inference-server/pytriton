@@ -15,7 +15,7 @@
 """Client for mlp_random example."""
 import logging
 
-import tensorflow as tf  # pytype: disable=import-error
+import numpy as np
 
 from pytriton.client import ModelClient
 
@@ -24,7 +24,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 batch_size = 16
 image_size = (224, 224, 3)
-images_batch = tf.random.uniform(shape=(batch_size,) + image_size, minval=0, maxval=1, dtype=tf.dtypes.float32).numpy()
+images_batch = np.random.uniform(size=(batch_size,) + image_size).astype(np.float32)
 
 logger.info(f"Input: {images_batch}")
 
