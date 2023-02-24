@@ -17,31 +17,17 @@ import argparse
 import logging
 import random
 
-from pytriton.decorators import batch
-
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 METADATA = {
-    "image_name": "nvcr.io/nvidia/pytorch:{version}-py3",
+    "image_name": "nvcr.io/nvidia/pytorch:{TEST_CONTAINER_VERSION}-py3",
 }
-
-
-class _InferFuncWrapper:
-    def __init__(self):
-        self.call_count = 0
-
-    @batch
-    def infer_func(self, **inputs):
-        a_batch, b_batch = inputs.values()
-        add_batch = a_batch + b_batch
-        sub_batch = a_batch - b_batch
-        self.call_count += 1
-        return {"add": add_batch, "sub": sub_batch}
 
 
 def main():
     import numpy as np
 
     from pytriton.client import ModelClient
+    from pytriton.decorators import batch
     from pytriton.model_config import ModelConfig, Tensor
     from pytriton.triton import Triton, TritonConfig
     from tests.utils import DEFAULT_LOG_FORMAT, find_free_port
@@ -64,6 +50,18 @@ def main():
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=log_level, format=DEFAULT_LOG_FORMAT)
     LOGGER.debug(f"CLI args: {args}")
+
+    class _InferFuncWrapper:
+        def __init__(self):
+            self.call_count = 0
+
+        @batch
+        def infer_func(self, **inputs):
+            a_batch, b_batch = inputs.values()
+            add_batch = a_batch + b_batch
+            sub_batch = a_batch - b_batch
+            self.call_count += 1
+            return {"add": add_batch, "sub": sub_batch}
 
     random.seed(args.seed)
     infer_func_wrapper = _InferFuncWrapper()

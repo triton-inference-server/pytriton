@@ -19,19 +19,12 @@ import os
 import random
 import time
 
-from pytriton.decorators import batch
-from pytriton.exceptions import PyTritonUnrecoverableError
 from tests.utils import ProcessMonitoring
 
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 METADATA = {
-    "image_name": "nvcr.io/nvidia/pytorch:{version}-py3",
+    "image_name": "nvcr.io/nvidia/pytorch:{TEST_CONTAINER_VERSION}-py3",
 }
-
-
-@batch
-def _throw_unrecoverable_error(**_):
-    raise PyTritonUnrecoverableError("Some unrecoverable error occurred thus no further inferences possible.")
 
 
 def main():
@@ -40,6 +33,8 @@ def main():
 
     from pytriton.client import ModelClient
     from pytriton.client.exceptions import PyTritonClientInferenceServerError
+    from pytriton.decorators import batch
+    from pytriton.exceptions import PyTritonUnrecoverableError
     from pytriton.model_config import ModelConfig, Tensor
     from pytriton.triton import Triton, TritonConfig
     from tests.utils import DEFAULT_LOG_FORMAT, find_free_port
@@ -67,6 +62,10 @@ def main():
 
     triton_config = TritonConfig(grpc_port=find_free_port(), http_port=find_free_port(), metrics_port=find_free_port())
     LOGGER.debug(f"Using {triton_config}")
+
+    @batch
+    def _throw_unrecoverable_error(**_):
+        raise PyTritonUnrecoverableError("Some unrecoverable error occurred thus no further inferences possible.")
 
     triton = Triton(config=triton_config)
     triton.bind(

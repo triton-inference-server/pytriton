@@ -20,7 +20,7 @@ import logging
 import random
 
 METADATA = {
-    "image_name": "nvcr.io/nvidia/tensorflow:{version}-tf2-py3",
+    "image_name": "nvcr.io/nvidia/tensorflow:{TEST_CONTAINER_VERSION}-tf2-py3",
 }
 
 

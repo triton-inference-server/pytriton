@@ -30,7 +30,7 @@ from tests.utils import (
 
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 METADATA = {
-    "image_name": "nvcr.io/nvidia/tensorflow:{version}-tf2-py3",
+    "image_name": "nvcr.io/nvidia/tensorflow:{TEST_CONTAINER_VERSION}-tf2-py3",
 }
 
 
@@ -51,7 +51,7 @@ def main():
 
     logging.basicConfig(level=logging.DEBUG, format=DEFAULT_LOG_FORMAT)
 
-    docker_image_with_name = METADATA["image_name"].format(version=get_current_container_version())
+    docker_image_with_name = METADATA["image_name"].format(TEST_CONTAINER_VERSION=get_current_container_version())
     verify_docker_image_in_readme_same_as_tested("examples/huggingface_bert_jax//README.md", docker_image_with_name)
 
     subprocess.run(["bash", "examples/huggingface_bert_jax/install.sh"])

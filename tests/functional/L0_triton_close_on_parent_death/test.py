@@ -24,7 +24,6 @@ import signal
 import sys
 import time
 
-from tests.functional.common.models import ADD_SUB_PYTHON_MODEL
 from tests.utils import (  # pytype: disable=import-error
     DEFAULT_LOG_FORMAT,
     ProcessMonitoring,
@@ -35,7 +34,7 @@ from tests.utils import (  # pytype: disable=import-error
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 
 METADATA = {
-    "image_name": "nvcr.io/nvidia/pytorch:{version}-py3",
+    "image_name": "nvcr.io/nvidia/pytorch:{TEST_CONTAINER_VERSION}-py3",
 }
 
 
@@ -45,6 +44,7 @@ def main():
     import tritonclient.http
 
     from pytriton.client import ModelClient
+    from tests.functional.common.models import ADD_SUB_PYTHON_MODEL
 
     parser = argparse.ArgumentParser(description="short_description")
     parser.add_argument("--timeout-s", required=False, default=300, type=float, help="Timeout for test")

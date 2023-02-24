@@ -20,7 +20,12 @@ import signal
 import sys
 import time
 
-from tests.utils import DEFAULT_LOG_FORMAT, ScriptThread
+from tests.utils import (
+    DEFAULT_LOG_FORMAT,
+    ScriptThread,
+    get_current_container_version,
+    verify_docker_image_in_readme_same_as_tested,
+)
 
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 METADATA = {
@@ -44,6 +49,11 @@ def main():
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG, format=DEFAULT_LOG_FORMAT)
+
+    docker_image_with_name = METADATA["image_name"].format(TEST_CONTAINER_VERSION=get_current_container_version())
+    verify_docker_image_in_readme_same_as_tested(
+        "examples/nemo_megatron_gpt_multinode/README.md", docker_image_with_name
+    )
 
     start_time = time.time()
     elapsed_s = 0

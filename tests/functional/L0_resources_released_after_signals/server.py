@@ -23,7 +23,7 @@ from tests.utils import find_free_port
 
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 METADATA = {
-    "image_name": "nvcr.io/nvidia/pytorch:{version}-py3",
+    "image_name": "nvcr.io/nvidia/pytorch:{TEST_CONTAINER_VERSION}-py3",
 }
 
 

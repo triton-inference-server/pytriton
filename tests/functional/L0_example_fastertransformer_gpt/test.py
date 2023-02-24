@@ -26,7 +26,7 @@ from tests.utils import DEFAULT_LOG_FORMAT, ScriptThread
 
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 METADATA = {
-    "image_name": "nvidia/fastertransformer:latest",
+    "image_name": "{LOCAL_CONTAINER_REGISTRY}/fastertransformer:base-latest",
 }
 
 

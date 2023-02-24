@@ -24,17 +24,13 @@ import signal
 import sys
 import time
 
-import numpy as np
-
-from pytriton.client import ModelClient
-from tests.functional.common.models import ADD_SUB_PYTHON_MODEL
 from tests.utils import ProcessMonitoring  # pytype: disable=import-error
 from tests.utils import DEFAULT_LOG_FORMAT, ScriptThread, find_free_port
 
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 
 METADATA = {
-    "image_name": "nvcr.io/nvidia/pytorch:{version}-py3",
+    "image_name": "nvcr.io/nvidia/pytorch:{TEST_CONTAINER_VERSION}-py3",
 }
 
 
@@ -47,6 +43,11 @@ def verify_client_output(client_output):
 
 
 def run_infer(batch_size, init_timeout_s, http_port):
+    import numpy as np
+
+    from pytriton.client import ModelClient
+    from tests.functional.common.models import ADD_SUB_PYTHON_MODEL
+
     model_spec = ADD_SUB_PYTHON_MODEL
     a_batch = np.ones((batch_size, 1), dtype=np.float32)
     b_batch = np.ones((batch_size, 1), dtype=np.float32)

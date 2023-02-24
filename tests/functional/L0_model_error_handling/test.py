@@ -17,17 +17,10 @@ import argparse
 import logging
 import random
 
-from pytriton.decorators import batch
-
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 METADATA = {
-    "image_name": "nvcr.io/nvidia/pytorch:{version}-py3",
+    "image_name": "nvcr.io/nvidia/pytorch:{TEST_CONTAINER_VERSION}-py3",
 }
-
-
-@batch
-def _throw_division_error(**_):
-    return 2 / 0
 
 
 def main():
@@ -36,6 +29,7 @@ def main():
 
     from pytriton.client import ModelClient
     from pytriton.client.exceptions import PyTritonClientInferenceServerError
+    from pytriton.decorators import batch
     from pytriton.model_config import ModelConfig, Tensor
     from pytriton.triton import Triton, TritonConfig
     from tests.utils import DEFAULT_LOG_FORMAT, find_free_port
@@ -56,6 +50,10 @@ def main():
 
     triton_config = TritonConfig(grpc_port=find_free_port(), http_port=find_free_port(), metrics_port=find_free_port())
     LOGGER.debug(f"Using {triton_config}")
+
+    @batch
+    def _throw_division_error(**_):
+        return 2 / 0
 
     with Triton(config=triton_config) as triton:
         triton.bind(
