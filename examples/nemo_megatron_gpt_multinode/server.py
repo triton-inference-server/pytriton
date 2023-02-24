@@ -13,17 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Text generation server with NeMo Megatron GPT model."""
+import argparse
 
 import torch  # pytype: disable=import-error
 from nemo.collections.nlp.modules.common.text_generation_utils import generate  # pytype: disable=import-error
-from nemo.collections.nlp.parts.nlp_overrides import NLPDDPPlugin  # pytype: disable=import-error
+from nemo.collections.nlp.parts.nlp_overrides import NLPDDPStrategy  # pytype: disable=import-error
 from pytorch_lightning.trainer.trainer import Trainer  # pytype: disable=import-error
 
 from pytriton.model_config import ModelConfig
 from pytriton.triton import Triton, TritonConfig
 
-from gpt import NemoGptCallable  # pytype: disable=import-error # isort:skip
-from helpers import download_and_load_model, setup_distributed_environment  # pytype: disable=import-error # isort:skip
+from examples.nemo_megatron_gpt_multinode.helpers import (  # pytype: disable=import-error # isort:skip
+    download_and_load_model,
+    setup_distributed_environment,
+)
+
+from examples.nemo_megatron_gpt_multinode.gpt import NemoGptCallable  # pytype: disable=import-error # isort:skip
 
 if not torch.cuda.is_available():
     raise OSError("GPU is needed for the inference")
@@ -33,8 +38,7 @@ HTTP_PORT = 8000
 
 
 def main():
-    import argparse
-
+    """Main function."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--gpus",
@@ -51,7 +55,7 @@ def main():
     args = parser.parse_args()
 
     trainer = Trainer(
-        plugins=NLPDDPPlugin(),
+        strategy=NLPDDPStrategy(),
         devices=args.gpus,
         num_nodes=args.nodes,
         accelerator="gpu",
