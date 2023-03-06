@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Test of huggingface_bart_pytorch example"""
+"""Test of huggingface_resnet_pytorch example"""
 import argparse
 import logging
 import re
@@ -35,9 +35,7 @@ METADATA = {
 
 
 def verify_client_output(client_output):
-    expected_pattern = (
-        r"Result: \{'labels': array\(\[b'travel', b'cooking', b'festival', b'literature'\], dtype=object\)\}"
-    )
+    expected_pattern = r"Last result: \{'label': b'tiger cat'\}"
     output_match = re.search(expected_pattern, client_output, re.MULTILINE)
     output_array = output_match.group(0) if output_match else None
     if not output_array:
@@ -54,16 +52,18 @@ def main():
     logging.basicConfig(level=logging.DEBUG, format=DEFAULT_LOG_FORMAT)
 
     docker_image_with_name = METADATA["image_name"].format(TEST_CONTAINER_VERSION=get_current_container_version())
-    verify_docker_image_in_readme_same_as_tested("examples/huggingface_bart_pytorch//README.md", docker_image_with_name)
+    verify_docker_image_in_readme_same_as_tested(
+        "examples/huggingface_resnet_pytorch//README.md", docker_image_with_name
+    )
 
-    subprocess.run(["bash", "examples/huggingface_bart_pytorch/install.sh"])
+    subprocess.run(["bash", "examples/huggingface_resnet_pytorch/install.sh"])
 
     start_time = time.time()
     elapsed_s = 0
     wait_time_s = min(args.timeout_s, 1)
 
-    server_cmd = ["python", "examples/huggingface_bart_pytorch/server.py", "--verbose"]
-    client_cmd = ["python", "examples/huggingface_bart_pytorch/client.py", "--verbose"]
+    server_cmd = ["python", "examples/huggingface_resnet_pytorch/server.py"]
+    client_cmd = ["python", "examples/huggingface_resnet_pytorch/client.py"]
 
     with ScriptThread(server_cmd, name="server") as server_thread:
         with ScriptThread(client_cmd, name="client") as client_thread:

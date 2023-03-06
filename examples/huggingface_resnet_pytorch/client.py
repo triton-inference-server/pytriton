@@ -12,15 +12,37 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Client for BART classifier sample server."""
+"""Client for ResNet50 classifier sample server."""
 import argparse
+import io
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
+from datasets import load_dataset  # pytype: disable=import-error
 
 from pytriton.client import ModelClient
 
 logger = logging.getLogger("examples.huggingface_bart_pytorch.client")
+
+
+def infer_model(thread_idx, args, dataset):
+    with ModelClient(args.url, "ResNet", init_timeout_s=args.init_timeout_s) as client:
+        image = dataset["image"][0]
+        logger.info(f"Image: {image}")
+
+        output = io.BytesIO()
+        image.save(output, format="JPEG")
+        image = np.frombuffer(output.getbuffer(), dtype=np.uint8)
+
+        logger.info(f"Running inference requests in thread {thread_idx}.")
+
+        for req_idx in range(1, args.iterations + 1):
+            logger.debug(f"Sending request ({req_idx}) in thread {thread_idx}.")
+            result_data = client.infer_sample(image)
+            logger.debug(f"Result: {result_data} for request ({req_idx}) in thread {thread_idx}.")
+
+        logger.info(f"Last result: {result_data} for request ({req_idx}) in thread {thread_idx}.")
 
 
 def main():
@@ -42,6 +64,13 @@ def main():
         required=False,
     )
     parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=32,
+        help="Number of concurrent requests.",
+        required=False,
+    )
+    parser.add_argument(
         "--iterations",
         type=int,
         default=1,
@@ -58,22 +87,14 @@ def main():
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(name)s: %(message)s")
 
-    sequence = np.array(
-        [
-            ["one day I will see the world"],
-            ["I would love to learn cook the Asian street food"],
-            ["Carnival in Rio de Janeiro"],
-            ["William Shakespeare was a great writer"],
+    dataset = load_dataset("huggingface/cats-image", split="test")
+    with ThreadPoolExecutor(max_workers=args.concurrency) as executor:
+        running_tasks = [
+            executor.submit(infer_task, idx, args, dataset)
+            for idx, infer_task in enumerate([infer_model] * args.concurrency)
         ]
-    )
-    sequence = np.char.encode(sequence, "utf-8")
-    logger.info(f"Sequence: {sequence}")
-
-    with ModelClient(args.url, "BART", init_timeout_s=args.init_timeout_s) as client:
-        for req_idx in range(1, args.iterations + 1):
-            logger.debug(f"Sending request ({req_idx}).")
-            result_dict = client.infer_batch(sequence)
-            logger.debug(f"Result: {result_dict} for request ({req_idx}).")
+        for running_task in running_tasks:
+            running_task.result()
 
 
 if __name__ == "__main__":

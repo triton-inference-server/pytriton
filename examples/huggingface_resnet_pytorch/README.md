@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# HuggingFace BART PyTorch Model
+# HuggingFace ResNet50 PyTorch Model
 
 ## Overview
 
-The example presents a HuggingFace BART PyTorch model inference.
+The example presents a HuggingFace ResNet50 PyTorch model inference.
 
 Example consists of following scripts:
 
@@ -39,6 +39,7 @@ pip install torch
 ```
 
 Or you can use NVIDIA PyTorch container:
+
 ```shell
 docker run -it --gpus 1 --shm-size 8gb -v {repository_path}:{repository_path} -w {repository_path} nvcr.io/nvidia/pytorch:22.11-py3 bash
 ```
@@ -88,32 +89,32 @@ Below, we present a step-by-step guide assuming that **all the commands are exec
 
 Follow these steps to run and test example in the cluster:
 1. [Optional] Build PyTriton wheel following the [build instruction](../../docs/building.md)
-2. Prepare the tag under which Docker image is going to be pushed to your Docker Containers Registry accessible from Kubernetes
+2. Prepare the tag under which image is going to be pushed to your Docker Containers Registry accessible from Kubernetes
 cluster. Example for local cluster (minikube, k3s) with registry hosted inside the cluster:
 ```shell
-export DOCKER_IMAGE_NAME_WITH_TAG=localhost:5000/bart-pytorch-example:latest
+export DOCKER_IMAGE_NAME_WITH_TAG=localhost:5000/resnet-pytorch-example:latest
 ```
-3. Build and push the Docker image to your registry:
+3. Build and push the Docker container image to your registry:
 
 ```shell
 # Export the base image used for build
 export FROM_IMAGE_NAME=nvcr.io/nvidia/pytorch:22.11-py3
-./examples/huggingface_bart_pytorch/kubernetes/build_and_push.sh
+./examples/huggingface_resnet_pytorch/kubernetes/build_and_push.sh
 ```
 4. Install the Helm Chart with deployment and service:
 
 ```shell
 helm upgrade -i --set deployment.image=${DOCKER_IMAGE_NAME_WITH_TAG} \
-bart-pytorch-example \
-./examples/huggingface_bart_pytorch/kubernetes/deployment
+resnet-pytorch-example \
+./examples/huggingface_resnet_pytorch/kubernetes/deployment
 ```
 
 5. Install the Helm Chart with client test
 
 ```shell
 helm install --set image=${DOCKER_IMAGE_NAME_WITH_TAG} \
-bart-pytorch-example-test \
-./examples/huggingface_bart_pytorch/kubernetes/test
+resnet-pytorch-example-test \
+./examples/huggingface_resnet_pytorch/kubernetes/test
 ```
 
 Now, you can review the logs from the running PODs to verify the inference is running. To show the logs from cluster
@@ -129,6 +130,6 @@ kubectl logs {NAME}
 
 To remove the installed charts simply run:
 ```shell
-helm uninstall bart-pytorch-example-test
-helm uninstall bart-pytorch-example
+helm uninstall resnet-pytorch-example-test
+helm uninstall resnet-pytorch-example
 ```
