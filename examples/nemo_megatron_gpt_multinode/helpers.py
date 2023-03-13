@@ -39,16 +39,31 @@ def cast_output(data, required_dtype):
     return data.astype(required_dtype)
 
 
-def download_and_load_model(repo_id, trainer):
-    lock = filelock.FileLock("/tmp/nemo_megatron_gpt.lock")
-    with lock:
-        repo_dir_path = huggingface_hub.snapshot_download(repo_id)
-        model_path = list(pathlib.Path(repo_dir_path).rglob("*.nemo"))[0]
-        # although putting model load in filelock section might significantly increase load time
-        # especially while loading large models in slurm multi-node scenario
-        # but there might be tokenizer files download which is not distributed jobs safe
-        model = MegatronGPTModel.restore_from(restore_path=model_path.as_posix(), trainer=trainer)
+def download_and_load_model(repo_id, trainer, lock_path, cache_dir):
 
+    lock_path = pathlib.Path(lock_path)
+    lock_path.mkdir(parents=True, exist_ok=True)
+
+    loc_file = lock_path / "nemo_megatron_gpt.lock"
+    print(f"Lock file {loc_file}")  # noqa
+    lock = filelock.FileLock(loc_file.as_posix())
+
+    with lock:
+        print(f"Downloading model to {repo_id}")  # noqa
+        repo_dir_path = huggingface_hub.snapshot_download(repo_id, cache_dir=cache_dir)
+        print(f"Model downloaded to {repo_dir_path}")  # noqa
+        model_path = list(pathlib.Path(repo_dir_path).rglob("*.nemo"))[0]
+
+    if torch.distributed.is_initialized():
+        torch.distributed.barrier()
+
+    # although putting model load in filelock section might significantly increase load time
+    # especially while loading large models in slurm multi-node scenario
+    # but there might be tokenizer files download which is not distributed jobs safe
+    print(f"Initializing model from {model_path}")  # noqa
+    model = MegatronGPTModel.restore_from(restore_path=model_path.as_posix(), trainer=trainer)
+
+    print("Freezing model")  # noqa
     model.freeze()
     # Have to turn off activations_checkpoint_method for inference
     try:

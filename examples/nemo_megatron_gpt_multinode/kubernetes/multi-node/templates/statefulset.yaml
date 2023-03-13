@@ -1,0 +1,104 @@
+# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ template "selector.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "selector.name" . }}
+    chart: {{ template "selector.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ template "selector.name" . }}
+      release: {{ .Release.Name }}
+  serviceName: "{{ template "selector.fullname" . }}"
+  replicas: {{ mul .Values.replicaCount .Values.statefulset.numOfNodes  }}
+  minReadySeconds: 5
+  template:
+    metadata:
+      labels:
+        app: {{ template "selector.name" . }}
+        release: {{.Release.Name}}
+      annotations:
+        date: "{{ now | unixEpoch }}"
+    spec:
+      terminationGracePeriodSeconds: 10
+      {{- if .Values.imagePullSecret }}
+      imagePullSecrets:
+      - name: {{.Values.imagePullSecret }}
+      {{ end }}
+      restartPolicy: {{ .Values.restartPolicy }}
+      containers:
+      - name: {{ .Chart.Name }}
+        image: {{ .Values.statefulset.image }}
+        imagePullPolicy: {{ .Values.pullPolicy }}
+        command: ["bash", "-c"]
+        args: ["/opt/app/run.sh"]
+        env:
+          - name: MODEL_ID
+            value: {{ .Values.statefulset.modelId }}
+          - name: PVC_CACHE
+            value: /mnt/data
+          - name: NUMBER_OF_NODES
+            value: "{{ .Values.statefulset.numOfNodes }}"
+          - name: NUMBER_OF_GPUS
+            value: "{{ .Values.statefulset.numOfGPUs }}"
+          - name: POD_NAME
+            value: {{ template "selector.name" . }}
+          - name: CLUSTER_NAME
+            value: {{ .Values.statefulset.clusterName }}
+          - name: DELAY
+            value: "15"
+          - name: PORT
+            value: "{{ .Values.communicationPort }}"
+          - name: RDZV_PORT
+            value: "{{ .Values.rdzvPort }}"
+        ports:
+        - containerPort: 8000
+          name: http
+        - containerPort: 8001
+          name: grpc
+        - containerPort: 8002
+          name: metrics
+        - containerPort: {{ .Values.communicationPort }}
+          name: communication
+        livenessProbe:
+          exec:
+            command:
+              - bash
+              - /opt/app/health.sh
+          initialDelaySeconds: 180
+          periodSeconds: 10
+        resources:
+          requests:
+            nvidia.com/gpu: {{ .Values.statefulset.numOfGPUs }}
+          limits:
+            nvidia.com/gpu: {{ .Values.statefulset.numOfGPUs }}
+        volumeMounts:
+          - name: pvc
+            mountPath: /mnt/data
+          - name: shared-memory
+            mountPath: /dev/shm
+      volumes:
+        - name: pvc
+          persistentVolumeClaim:
+            claimName: {{ .Values.statefulset.persistentVolumeClaim }}
+            readOnly: false
+        - name: shared-memory
+          emptyDir:
+            medium: Memory

@@ -14,6 +14,8 @@
 # limitations under the License.
 """Text generation server with NeMo Megatron GPT model."""
 import argparse
+import datetime
+import logging
 
 import torch  # pytype: disable=import-error
 from nemo.collections.nlp.modules.common.text_generation_utils import generate  # pytype: disable=import-error
@@ -35,6 +37,7 @@ if not torch.cuda.is_available():
 
 ENDPOINT_BIND_ADDRESS = "0.0.0.0"
 HTTP_PORT = 8000
+DEFAULT_LOG_FORMAT = "%(asctime)s - %(levelname)8s - %(process)8d - %(threadName)s - %(name)s: %(message)s"
 
 
 def main():
@@ -48,12 +51,74 @@ def main():
             "If set to -1 all available GPU will be used."
         ),
     )
-    parser.add_argument("--nodes", default=1, type=int, help="Number of nodes to load model on")
     parser.add_argument(
-        "--model-repo-id", default="nvidia/nemo-megatron-gpt-1.3B", help="Model repository id on HuggingFace Hub"
+        "--nodes",
+        default=1,
+        type=int,
+        help="Number of nodes to load model on",
     )
+    parser.add_argument(
+        "--model-repo-id",
+        default="nvidia/nemo-megatron-gpt-1.3B",
+        help="Model repository id on HuggingFace Hub",
+    )
+    parser.add_argument(
+        "--init-process-group",
+        default=False,
+        action="store_true",
+        help="Initialize custom process group for Torch distributed communication",
+    )
+    parser.add_argument(
+        "--backend",
+        default="nccl",
+        type=str,
+        required=False,
+        help="Torch distributed backend used for communication",
+    )
+    parser.add_argument(
+        "--timeout",
+        default=15,
+        type=int,
+        required=False,
+        help="Process group communication timeout",
+    )
+    parser.add_argument(
+        "--lock-path",
+        default="/tmp",
+        type=str,
+        required=False,
+        help="Place where file lock is created",
+    )
+    parser.add_argument(
+        "--cache-dir",
+        type=str,
+        required=False,
+        help="Cache dir for HuggingFace models",
+    )
+    parser.add_argument(
+        "--verbose",
+        default=False,
+        action="store_true",
+        help="Enable verbose logging",
+    )
+
     args = parser.parse_args()
 
+    log_level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(level=log_level, format=DEFAULT_LOG_FORMAT)
+
+    if args.init_process_group:
+        print(f"Initializing process group with backend: {args.backend}")  # noqa
+        timeout = datetime.timedelta(seconds=args.timeout)
+        torch.distributed.init_process_group(backend=args.backend, timeout=timeout)
+        print(f"Is initialized: {torch.distributed.is_initialized()}")  # noqa
+        print(f"  world size: {torch.distributed.get_world_size()}")  # noqa
+        print(f"  world rank: {torch.distributed.get_rank()}")  # noqa
+        torch.distributed.barrier()
+
+    print("Initialize trainer:")  # noqa
+    print(f" devices: {args.gpus}")  # noqa
+    print(f" nodes: {args.nodes}")  # noqa
     trainer = Trainer(
         strategy=NLPDDPStrategy(),
         devices=args.gpus,
@@ -63,7 +128,7 @@ def main():
         precision=16,
     )
 
-    model = download_and_load_model(args.model_repo_id, trainer)
+    model = download_and_load_model(args.model_repo_id, trainer, args.lock_path, args.cache_dir)
     app_state = setup_distributed_environment(trainer)
     if app_state.global_rank == 0:
         infer_callable = NemoGptCallable(model_name="GPT", model=model)
@@ -78,9 +143,11 @@ def main():
             )
             triton.serve()
     else:
+        print(f"Running worker with rank {torch.distributed.get_rank()}")  # noqa
         while True:
             choice = torch.cuda.LongTensor(1)
             torch.distributed.broadcast(choice, 0)
+            print(f"{choice}")  # noqa
             if choice[0].item() == 0:
                 generate(model.cuda())
 

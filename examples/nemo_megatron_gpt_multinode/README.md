@@ -92,7 +92,7 @@ Server script will:
    should be accessible outside of container.
 
 
-### Run server on multiple nodes with multiple GPUs
+## Slurm example of running server on multiple nodes with multiple GPUs
 
 This example supports also scenario where model inference is performed in a multiple nodes, multiple gpus scenario.
 For that we can use [Slurm](https://slurm.schedmd.com/) cluster management system.
@@ -237,4 +237,88 @@ Thank you for the book. I have a question about Sissie in particular because we 
 ================================
 Q: Are you going for a lunch?
 Lunch is typically served cold but I'm interested in ordering this dessert which, of course, doesn't come up as well on menus online.
+```
+
+## Kubernetes example of running server on single/multiple nodes with multiple GPUs
+
+The following prerequisites must be matched to run the example:
+
+- Kubernetes cluster with NVIDIA GPU node
+- [NVIDIA Device Plugin](https://github.com/NVIDIA/k8s-device-plugin) installed in Kubernetes cluster
+- Docker Containers Registry accessible from Kubernetes cluster
+- [Installed Helm](https://helm.sh/docs/intro/install/) for creating the deployment and test job
+
+Optionally you may install NVIDIA Container Toolkit and NVIDIA GPU Operator which enable more features
+like [MIG](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/gpu-operator-mig.html) or
+[Time Slicing](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/gpu-sharing.html) support in the cluster.
+To learn more how to set up Kubernetes cluster with NVIDIA GPU you can review [
+NVIDIA Cloud Native Documentation](https://docs.nvidia.com/datacenter/cloud-native/contents.html)
+
+Below, we present a step-by-step guide assuming that **all the commands are executed from the root of repository**.
+
+Follow these steps to run and test example in the cluster:
+1. [Optional] Build PyTriton wheel following the [build instruction](../../docs/building.md)
+2. Prepare the tag under which image is going to be pushed to your Docker Containers Registry accessible from Kubernetes
+cluster. Example for local cluster (minikube, k3s) with registry hosted inside the cluster:
+```shell
+export DOCKER_IMAGE_NAME_WITH_TAG=localhost:5000/nemo-example:latest
+```
+3. Build and push the Docker container image to your registry:
+
+```shell
+# Export the base image used for build
+export FROM_IMAGE_NAME=nvcr.io/nvidia/nemo:22.12
+./examples/nemo_megatron_gpt_multinode/kubernetes/build_and_push.sh
+```
+
+**Note**: By default the container is built using `pytriton` package from pypi.org. To build container with wheel built
+locally use `export BUILD_FROM=dist` before executing script.
+
+4. At this point there are 2 options to deploy the model depending on the size of the model:
+a) Install the Helm Chart with deployment and service for single-node:
+```shell
+helm upgrade -i --set deployment.image=${DOCKER_IMAGE_NAME_WITH_TAG} \
+--set deployment.numOfGPUs=1 \
+nemo-example \
+./examples/nemo_megatron_gpt_multinode/kubernetes/single-node
+```
+b) Install the Helm Chart with deployment and service for multi-node:
+
+**Important**: Running multi-node requires to create Persistent Volume Claim in the cluster shared between PODs. You can
+pass name as argument to Helm Chart during installation.
+
+**Please note**: The multi-node deployment for scaling requires improved configuration of services and load balancing.
+
+```shell
+helm upgrade -i --set statefulset.image=${DOCKER_IMAGE_NAME_WITH_TAG} \
+--set statefulset.persistentVolumeClaim=csi-pvc \
+--set statefulset.numOfNodes=3 \
+--set statefulset.numOfGPUs=1 \
+nemo-example \
+./examples/nemo_megatron_gpt_multinode/kubernetes/multi-node
+```
+
+5. Install the Helm Chart with client test
+
+```shell
+helm install --set image=${DOCKER_IMAGE_NAME_WITH_TAG} \
+nemo-example-test \
+./examples/nemo_megatron_gpt_multinode/kubernetes/test
+```
+
+Now, you can review the logs from the running PODs to verify the inference is running. To show the logs from cluster
+for given POD first list all running pods:
+```shell
+kubectl get pods
+```
+
+Next show logs from server or client:
+```shell
+kubectl logs {NAME}
+```
+
+To remove the installed charts simply run:
+```shell
+helm uninstall nemo-example-test
+helm uninstall nemo-example
 ```

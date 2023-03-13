@@ -63,9 +63,15 @@ def main():
         else:
             return np.zeros((batch_size, 1), dtype=dtype)
 
+    print("================================")  # noqa
+    print("Preparing the client")  # noqa
     with ModelClient(args.url, "GPT", init_timeout_s=args.init_timeout_s) as client:
         # parameters values taken from megatron_gpt_inference.yaml conf
         # here is another set of parameters https://github.com/NVIDIA/NeMo/blob/main/examples/nlp/language_modeling/megatron_gpt_eval.py#L119
+
+        print("================================")  # noqa
+        print("Infer batch")  # noqa
+
         result_dict = client.infer_batch(
             sentences=sequences,
             tokens_to_generate=_param(np.int32, args.output_len),
