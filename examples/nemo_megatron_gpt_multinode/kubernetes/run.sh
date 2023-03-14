@@ -52,12 +52,15 @@ echo "HEAD ADDRESS: ${ADDRESS}"
 if [ -n "${PVC_CACHE}" ];
 then
 echo "Initializing cache in shared volume ${PVC_CACHE}"
-export TORCH_HOME=/mnt/data/torch
-export CACHE_OPTIONS="--lock-path /mnt/data/lock --cache-dir /mnt/data/cache"
+export TORCH_HOME=${PVC_CACHE}/torch
+export HF_HOME=${PVC_CACHE}/hf
 fi
 
 # Use torchrun to initialize distributed computation
-torchrun --nproc_per_node=${NUMBER_OF_GPUS} --nnodes=${NUMBER_OF_NODES} --node_rank=${RANK} \
---max_restarts=0 --master_addr=${ADDRESS} --master_port=${PORT} \
-/opt/app/server.py --gpus ${NUMBER_OF_GPUS} \
---init-process-group --backend=nccl --nodes=${NUMBER_OF_NODES} --model-repo-id ${MODEL_ID} ${CACHE_OPTIONS} --verbose
+torchrun \
+    --nproc_per_node=${NUMBER_OF_GPUS} --nnodes=${NUMBER_OF_NODES} --node_rank=${RANK} \
+    --max_restarts=0 \
+    --master_addr=${ADDRESS} --master_port=${PORT} \
+     /opt/app/server.py \
+         --gpus ${NUMBER_OF_GPUS} --nodes=${NUMBER_OF_NODES} \
+         --model-repo-id ${MODEL_ID} --verbose

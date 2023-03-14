@@ -11,16 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import importlib
+import os
 import pathlib
 import socket
+import typing
+import warnings
 
 import filelock
 import huggingface_hub  # pytype: disable=import-error
 import numpy as np
+import omegaconf  # pytype: disable=import-error
 import torch  # pytype: disable=import-error
-from nemo.collections.nlp.models.language_modeling.megatron_gpt_model import (  # pytype: disable=import-error
-    MegatronGPTModel,
-)
+from nemo.collections.nlp.parts.nlp_overrides import NLPSaveRestoreConnector  # pytype: disable=import-error
 from nemo.utils.app_state import AppState  # pytype: disable=import-error
 
 
@@ -39,38 +42,95 @@ def cast_output(data, required_dtype):
     return data.astype(required_dtype)
 
 
-def download_and_load_model(repo_id, trainer, lock_path, cache_dir):
+def download_and_load_model(repo_id: str, trainer, *, filename: typing.Optional[str] = None):
 
-    lock_path = pathlib.Path(lock_path)
-    lock_path.mkdir(parents=True, exist_ok=True)
+    lock_dir = huggingface_hub.cached_assets_path("NeMo", repo_id)
+    filename = filename or _get_first_nemo_filename(repo_id)
 
-    loc_file = lock_path / "nemo_megatron_gpt.lock"
-    print(f"Lock file {loc_file}")  # noqa
-    lock = filelock.FileLock(loc_file.as_posix())
+    lock_path = pathlib.Path(lock_dir) / f"{filename}.lock"
+    lock_dir.parent.mkdir(parents=True, exist_ok=True)
+    print(f"Lock file {lock_path}")  # noqa: T201
+    lock = filelock.FileLock(lock_path)
 
     with lock:
-        print(f"Downloading model to {repo_id}")  # noqa
-        repo_dir_path = huggingface_hub.snapshot_download(repo_id, cache_dir=cache_dir)
-        print(f"Model downloaded to {repo_dir_path}")  # noqa
-        model_path = list(pathlib.Path(repo_dir_path).rglob("*.nemo"))[0]
+        print(f"Downloading model from https://huggingface.co/{repo_id} filename={filename}")  # noqa: T201
+        model_path = huggingface_hub.hf_hub_download(repo_id, filename=filename)  # set $HF_HOME to set cache dir
 
-    if torch.distributed.is_initialized():
-        torch.distributed.barrier()
+        model_path = pathlib.Path(model_path)
+        snapshot_name = model_path.parent.name
+        cache_subdir = f"extracted/{snapshot_name}/{model_path.name}"
 
-    # although putting model load in filelock section might significantly increase load time
-    # especially while loading large models in slurm multi-node scenario
-    # but there might be tokenizer files download which is not distributed jobs safe
-    print(f"Initializing model from {model_path}")  # noqa
-    model = MegatronGPTModel.restore_from(restore_path=model_path.as_posix(), trainer=trainer)
+        save_restore_connector = NLPSaveRestoreConnector()
+        save_restore_connector.model_extracted_dir = huggingface_hub.cached_assets_path("NeMo", repo_id, cache_subdir)
+        model_config_path = pathlib.Path(save_restore_connector.model_extracted_dir) / "model_config.yaml"
+        if not os.path.isdir(save_restore_connector.model_extracted_dir) or not model_config_path.is_file():
+            print(  # noqa: T201
+                f"Extracting nemo model from {model_path} to {save_restore_connector.model_extracted_dir}"
+            )
+            save_restore_connector._unpack_nemo_file(model_path, save_restore_connector.model_extracted_dir)
 
-    print("Freezing model")  # noqa
+    pretrained_cfg = save_restore_connector.restore_from(None, model_path, return_config=True, trainer=trainer)
+
+    omegaconf.OmegaConf.set_struct(pretrained_cfg, True)
+    with omegaconf.open_dict(pretrained_cfg):
+        attributes_to_update = {
+            "sequence_parallel": False,
+            "activations_checkpoint_granularity": None,
+            "activations_checkpoint_method": None,
+            "precision": trainer.precision,
+        }
+        for name, value in attributes_to_update.items():
+            if hasattr(pretrained_cfg, name):
+                pretrained_cfg[name] = value
+        attributes_to_set_if_missing = {
+            # observing that nemo MegatronGPTModel have no target attribute
+            "target": "nemo.collections.nlp.models.language_modeling.megatron_gpt_model.MegatronGPTModel",
+        }
+        for name, value in attributes_to_set_if_missing.items():
+            if not hasattr(pretrained_cfg, name):
+                pretrained_cfg[name] = value
+
+    module_name, class_name = pretrained_cfg.target.rsplit(".", 1)
+    model_class = getattr(importlib.import_module(module_name), class_name)
+
+    # monkeypatch _build_tokenizer method to be process-safe
+    def _synced_build_tokenizer(self):
+        with lock:
+            self._original_build_tokenizer()
+
+    model_class._original_build_tokenizer = model_class._build_tokenizer
+    model_class._build_tokenizer = _synced_build_tokenizer
+
+    model = model_class.restore_from(
+        restore_path=model_path,
+        trainer=trainer,
+        override_config_path=pretrained_cfg,
+        save_restore_connector=save_restore_connector,
+    )
+
     model.freeze()
-    # Have to turn off activations_checkpoint_method for inference
+    model.training = False
     try:
+        # Have to turn off activations_checkpoint_method for inference
         model.model.language_model.encoder.activations_checkpoint_method = None
     except AttributeError:
         pass
     return model
+
+
+def _get_first_nemo_filename(repo_id):
+    client = huggingface_hub.HfApi()
+    repo_files = client.list_repo_files(repo_id, revision="main")
+    nemo_files = [f for f in repo_files if f.endswith(".nemo")]
+    if len(nemo_files) == 0:
+        raise ValueError(f"Could not find .nemo file in {repo_id}")
+    filename = nemo_files[0]
+    if len(nemo_files) > 1:
+        warnings.warn(
+            f"Found more than one .nemo file in {repo_id}. Will be using {filename}. Use --repo-filename to specify the exact file name to use.",
+            stacklevel=1,
+        )
+    return filename
 
 
 def setup_distributed_environment(trainer):
@@ -84,7 +144,7 @@ def setup_distributed_environment(trainer):
     app_state = AppState()
 
     hostname = socket.gethostname()
-    print(  # noqa
+    print(  # noqa: T201
         f"global={app_state.global_rank}/{app_state.world_size} "
         f"local={app_state.local_rank} @ {hostname}:{app_state.device_id} / "
         f"dp={app_state.data_parallel_rank}/{app_state.data_parallel_size} "

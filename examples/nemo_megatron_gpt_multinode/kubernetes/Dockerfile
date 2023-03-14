@@ -36,7 +36,8 @@ RUN apt update -y && apt install -y dnsutils
 
 COPY examples/nemo_megatron_gpt_multinode/client.py /opt/app
 COPY examples/nemo_megatron_gpt_multinode/server.py /opt/app
-COPY examples/nemo_megatron_gpt_multinode/server_impl.py /opt/app
+COPY examples/nemo_megatron_gpt_multinode/helpers.py /opt/app
+COPY examples/nemo_megatron_gpt_multinode/gpt.py /opt/app
 COPY examples/nemo_megatron_gpt_multinode/kubernetes/run.sh /opt/app
 COPY examples/nemo_megatron_gpt_multinode/kubernetes/health.sh /opt/app
 

@@ -36,7 +36,7 @@ fi
 
 set -xe
 
-docker build -f examples/nemo_megatron_gpt_multinode/kubernetes/Dockerfile \
+DOCKER_BUILDKIT=1 docker build -f examples/nemo_megatron_gpt_multinode/kubernetes/Dockerfile \
  -t ${DOCKER_IMAGE_NAME_WITH_TAG} \
  --build-arg FROM_IMAGE_NAME=${FROM_IMAGE_NAME} \
  --build-arg BUILD_FROM=${BUILD_FROM} .

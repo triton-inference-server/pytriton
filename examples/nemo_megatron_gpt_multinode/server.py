@@ -25,12 +25,8 @@ from pytorch_lightning.trainer.trainer import Trainer  # pytype: disable=import-
 from pytriton.model_config import ModelConfig
 from pytriton.triton import Triton, TritonConfig
 
-from examples.nemo_megatron_gpt_multinode.helpers import (  # pytype: disable=import-error # isort:skip
-    download_and_load_model,
-    setup_distributed_environment,
-)
-
-from examples.nemo_megatron_gpt_multinode.gpt import NemoGptCallable  # pytype: disable=import-error # isort:skip
+from gpt import NemoGptCallable  # pytype: disable=import-error # isort:skip
+from helpers import download_and_load_model, setup_distributed_environment  # pytype: disable=import-error # isort:skip
 
 if not torch.cuda.is_available():
     raise OSError("GPU is needed for the inference")
@@ -63,37 +59,11 @@ def main():
         help="Model repository id on HuggingFace Hub",
     )
     parser.add_argument(
-        "--init-process-group",
-        default=False,
-        action="store_true",
-        help="Initialize custom process group for Torch distributed communication",
-    )
-    parser.add_argument(
-        "--backend",
-        default="nccl",
-        type=str,
-        required=False,
-        help="Torch distributed backend used for communication",
-    )
-    parser.add_argument(
         "--timeout",
         default=15,
         type=int,
         required=False,
         help="Process group communication timeout",
-    )
-    parser.add_argument(
-        "--lock-path",
-        default="/tmp",
-        type=str,
-        required=False,
-        help="Place where file lock is created",
-    )
-    parser.add_argument(
-        "--cache-dir",
-        type=str,
-        required=False,
-        help="Cache dir for HuggingFace models",
     )
     parser.add_argument(
         "--verbose",
@@ -107,20 +77,11 @@ def main():
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=log_level, format=DEFAULT_LOG_FORMAT)
 
-    if args.init_process_group:
-        print(f"Initializing process group with backend: {args.backend}")  # noqa
-        timeout = datetime.timedelta(seconds=args.timeout)
-        torch.distributed.init_process_group(backend=args.backend, timeout=timeout)
-        print(f"Is initialized: {torch.distributed.is_initialized()}")  # noqa
-        print(f"  world size: {torch.distributed.get_world_size()}")  # noqa
-        print(f"  world rank: {torch.distributed.get_rank()}")  # noqa
-        torch.distributed.barrier()
-
     print("Initialize trainer:")  # noqa
     print(f" devices: {args.gpus}")  # noqa
     print(f" nodes: {args.nodes}")  # noqa
     trainer = Trainer(
-        strategy=NLPDDPStrategy(),
+        strategy=NLPDDPStrategy(process_group_backend="nccl", timeout=datetime.timedelta(args.timeout)),
         devices=args.gpus,
         num_nodes=args.nodes,
         accelerator="gpu",
@@ -128,7 +89,7 @@ def main():
         precision=16,
     )
 
-    model = download_and_load_model(args.model_repo_id, trainer, args.lock_path, args.cache_dir)
+    model = download_and_load_model(args.model_repo_id, trainer)
     app_state = setup_distributed_environment(trainer)
     if app_state.global_rank == 0:
         infer_callable = NemoGptCallable(model_name="GPT", model=model)
