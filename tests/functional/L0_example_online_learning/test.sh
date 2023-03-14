@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,3 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+set -xe
+
+THIS_SCRIPT_DIR="$(realpath --relative-to="${PWD}" "$(dirname "$0")")"
+TEST_MODULE="${THIS_SCRIPT_DIR//\//.}.test"
+
+python -m"${TEST_MODULE}" \
+    --timeout-s 600
