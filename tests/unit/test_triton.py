@@ -14,6 +14,9 @@
 import pathlib
 from unittest.mock import PropertyMock
 
+import pytest
+
+from pytriton.exceptions import PyTritonValidationError
 from pytriton.triton import Triton, TritonConfig
 
 
@@ -51,3 +54,17 @@ def test_triton_server_created_with_custom_arguments_and_env_variables(mocker):
     assert triton._triton_server_config["grpc_port"] == 8080
     assert triton._triton_server_config["allow_metrics"] is False
     assert triton._triton_server_config["backend_directory"] is not None
+
+
+def test_triton_bind_model_name_verification():
+    triton = Triton()
+    triton.bind("AB-cd_90.1", lambda: None, [], [])
+
+    with pytest.raises(
+        PyTritonValidationError,
+        match="Model name can only contain alphanumeric characters, dots, underscores and dashes",
+    ):
+        triton.bind("AB#cd/90/1", lambda: None, [], [])
+
+    with pytest.raises(PyTritonValidationError, match="Model name cannot be empty"):
+        triton.bind("", lambda: None, [], [])

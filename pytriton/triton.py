@@ -36,6 +36,7 @@ import dataclasses
 import logging
 import os
 import pathlib
+import re
 import threading
 import threading as th
 import typing
@@ -382,10 +383,12 @@ class Triton:
             (or list of inference callable for multi instance model)
             inputs: Definition of model inputs
             outputs: Definition of model outputs
-            model_name: Name under which model is available in Triton Inference Server
+            model_name: Name under which model is available in Triton Inference Server. It can only contain
+            alphanumeric characters, dots, underscores and dashes.
             model_version: Version of model
             config: Model configuration for Triton Inference Server deployment
         """
+        self._validate_model_name(model_name)
         model = Model(
             model_name=model_name,
             model_version=model_version,
@@ -435,3 +438,18 @@ class Triton:
             LOGGER.info(f"  Status:         `GET  {MODEL_READY_URL.format(model_name=model.model_name)}`")
             LOGGER.info(f"  Model config:   `GET  {MODEL_CONFIG_URL.format(model_name=model.model_name)}`")
             LOGGER.info(f"  Inference:      `POST {MODEL_INFER_URL.format(model_name=model.model_name)}`")
+
+    @classmethod
+    def _validate_model_name(cls, model_name: str) -> None:
+        """Validate model name.
+
+        Args:
+            model_name: Model name
+        """
+        if not model_name:
+            raise PyTritonValidationError("Model name cannot be empty")
+
+        if not re.match(r"^[a-zA-Z0-9._-]+$", model_name):
+            raise PyTritonValidationError(
+                "Model name can only contain alphanumeric characters, dots, underscores and dashes"
+            )
