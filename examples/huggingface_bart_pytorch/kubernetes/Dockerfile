@@ -12,19 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ARG FROM_IMAGE_NAME=nvcr.io/nvidia/pytorch:22.11-py3
-FROM ${FROM_IMAGE_NAME}
+ARG BUILD_FROM
+
+FROM ${FROM_IMAGE_NAME} as base
+WORKDIR /opt/app
+
+# Use when build PyTriton from source
+FROM base as install-from-dist
+COPY dist/*.whl /opt/app
+RUN pip install /opt/app/*.whl
+
+# Install from pypi
+FROM base as install-from-pypi
+RUN pip install pytriton
+
+FROM install-from-${BUILD_FROM} AS image
+
+ENV PYTHONUNBUFFERED=1
 
 WORKDIR /opt/app
 
 COPY examples/huggingface_bart_pytorch/install.sh /opt/app
 RUN /opt/app/install.sh
-
-# Install from pypi
-RUN pip install pytriton
-
-# Use when build PyTriton from source
-#COPY dist/*.whl /opt/app
-#RUN pip install /opt/app/*.whl
 
 COPY examples/huggingface_bart_pytorch/client.py /opt/app
 COPY examples/huggingface_bart_pytorch/server.py /opt/app

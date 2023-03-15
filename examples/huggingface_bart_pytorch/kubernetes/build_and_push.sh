@@ -26,9 +26,18 @@ if [ -z ${FROM_IMAGE_NAME} ]; then
   exit 1
 fi
 
+BUILD_FROM="${BUILD_FROM:-pypi}"
+if [[ ${BUILD_FROM} != "pypi" ]] && [[ ${BUILD_FROM} != "dist" ]]; then
+  echo "The BUILD_FROM variable should be equal to 'pypi' or 'dist'"
+  echo "Example:"
+  echo "    export BUILD_FROM=dist"
+  exit 1
+fi
+
 set -xe
 
-docker build -f examples/huggingface_bart_pytorch/kubernetes/Dockerfile \
+DOCKER_BUILDKIT=1 docker build -f examples/huggingface_bart_pytorch/kubernetes/Dockerfile \
  -t ${DOCKER_IMAGE_NAME_WITH_TAG} \
- --build-arg FROM_IMAGE_NAME=${FROM_IMAGE_NAME} .
+ --build-arg FROM_IMAGE_NAME=${FROM_IMAGE_NAME} \
+ --build-arg BUILD_FROM=${BUILD_FROM} .
 docker push ${DOCKER_IMAGE_NAME_WITH_TAG}

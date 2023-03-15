@@ -101,6 +101,10 @@ export DOCKER_IMAGE_NAME_WITH_TAG=localhost:5000/resnet-pytorch-example:latest
 export FROM_IMAGE_NAME=nvcr.io/nvidia/pytorch:22.11-py3
 ./examples/huggingface_resnet_pytorch/kubernetes/build_and_push.sh
 ```
+
+**Note**: By default the container is built using `pytriton` package from `pypi.org`. To build container with wheel built
+locally use `export BUILD_FROM=dist` before executing script.
+
 4. Install the Helm Chart with deployment and service:
 
 ```shell
