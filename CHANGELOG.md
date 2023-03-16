@@ -16,6 +16,17 @@ limitations under the License.
 
 # Changelog
 
+## 0.1.4 (2023-03-16)
+- Add validation of the model name passed to Triton bind method.
+- Add monkey patching of `InferenceServerClient.__del__` method to prevent unhandled exceptions.
+
+[//]: <> (put here on external component update with short summary what change or link to changelog)
+- Version of external components used during testing:
+    - [Triton Inference Server](https://github.com/triton-inference-server/): 2.29.0
+    - Other component versions depend on the used framework and Triton Inference Server containers versions.
+    Refer to its [support matrix](https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html)
+    for a detailed summary.
+
 ## 0.1.3 (2023-02-20)
 - Fixed getting model config in `fill_optionals` decorator.
 
