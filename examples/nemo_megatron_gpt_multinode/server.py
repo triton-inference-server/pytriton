@@ -60,7 +60,7 @@ def main():
     )
     parser.add_argument(
         "--timeout",
-        default=15,
+        default=30,
         type=int,
         required=False,
         help="Process group communication timeout",

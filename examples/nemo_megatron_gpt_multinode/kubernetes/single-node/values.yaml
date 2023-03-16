@@ -20,5 +20,6 @@ deployment:
   image: null
   numOfGPUs: 1
   modelId: nvidia/nemo-megatron-gpt-1.3B
+  initialDelaySeconds: 180
 service:
-  type: ClusterIP
+  type: LoadBalancer

@@ -82,7 +82,7 @@ spec:
             command:
               - bash
               - /opt/app/health.sh
-          initialDelaySeconds: 180
+          initialDelaySeconds: {{ .Values.statefulset.initialDelaySeconds }}
           periodSeconds: 10
         resources:
           requests:

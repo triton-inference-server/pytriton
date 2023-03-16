@@ -254,6 +254,8 @@ like [MIG](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/gpu-oper
 To learn more how to set up Kubernetes cluster with NVIDIA GPU you can review [
 NVIDIA Cloud Native Documentation](https://docs.nvidia.com/datacenter/cloud-native/contents.html)
 
+### Deployment instruction
+
 Below, we present a step-by-step guide assuming that **all the commands are executed from the root of repository**.
 
 Follow these steps to run and test example in the cluster:
@@ -285,13 +287,14 @@ nemo-example \
 b) Install the Helm Chart with deployment and service for multi-node:
 
 **Important**: Running multi-node requires to create Persistent Volume Claim in the cluster shared between PODs. You can
-pass name as argument to Helm Chart during installation.
+pass name as argument to Helm Chart during installation. Read more how to create
+[Persistent Volume Claim](#creating-persistent-volume-claim).
 
 **Please note**: The multi-node deployment for scaling requires improved configuration of services and load balancing.
 
 ```shell
 helm upgrade -i --set statefulset.image=${DOCKER_IMAGE_NAME_WITH_TAG} \
---set statefulset.persistentVolumeClaim=csi-pvc \
+--set statefulset.persistentVolumeClaim=llm-cache-pvc \
 --set statefulset.numOfNodes=3 \
 --set statefulset.numOfGPUs=1 \
 nemo-example \
@@ -321,4 +324,36 @@ To remove the installed charts simply run:
 ```shell
 helm uninstall nemo-example-test
 helm uninstall nemo-example
+```
+
+### Creating Persistent Volume Claim
+
+This section describe how to create Persistent Volume Claim in Kuberenetes cluster using CSI or NFS drive.
+
+#### Using CSI host path
+
+When you are running on local machine (ex. Minikube or k3s) you can use CSI host path to create a persistent volume
+claim. Make sure that appropriate extension for your cluster has been installed and run:
+
+```shell
+kubectl apply -f ./examples/nemo_megatron_gpt_multinode/kubernetes/persistent-volume-claim-csi.yaml
+```
+
+#### Using NFS disk
+
+When you are running Kubernetes cluster in Cloud Service Provider you can create persistent volume claim using NFS disk.
+
+First, create the NFS disk and obtain its IP address. Make sure the disk is in the same network as Kubernetes cluster.
+The pre-defined file share name for the NFS storage is `llm`.
+
+Next modify the `./examples/nemo_megatron_gpt_multinode/kubernetes/persistent-volume-claim-nfs.yaml` file and update the
+`{IP}` value. Then run:
+
+```shell
+kubectl apply -f ./examples/nemo_megatron_gpt_multinode/kubernetes/persistent-volume-nfs.yaml
+```
+
+Once the persistent volume is ready the claim can be created using:
+```shell
+kubectl apply -f ./examples/nemo_megatron_gpt_multinode/kubernetes/persistent-volume-claim-nfs.yaml
 ```
