@@ -49,9 +49,18 @@ def main():
         nargs="+",
         help="Prompts to form request",
     )
+    parser.add_argument(
+        "--verbose",
+        default=False,
+        action="store_true",
+        help="Enable verbose logging",
+    )
 
     args = parser.parse_args()
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s: %(message)s")
+
+    log_level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(name)s: %(message)s")
+    logger = logging.getLogger("nemo.client")
 
     sequences = np.array(args.prompts)[..., np.newaxis]
     sequences = np.char.encode(sequences, "utf-8")
@@ -63,14 +72,14 @@ def main():
         else:
             return np.zeros((batch_size, 1), dtype=dtype)
 
-    print("================================")  # noqa
-    print("Preparing the client")  # noqa
+    logger.info("================================")
+    logger.info("Preparing the client")
     with ModelClient(args.url, "GPT", init_timeout_s=args.init_timeout_s) as client:
         # parameters values taken from megatron_gpt_inference.yaml conf
         # here is another set of parameters https://github.com/NVIDIA/NeMo/blob/main/examples/nlp/language_modeling/megatron_gpt_eval.py#L119
 
-        print("================================")  # noqa
-        print("Infer batch")  # noqa
+        logger.info("================================")
+        logger.info("Infer batch")
 
         result_dict = client.infer_batch(
             sentences=sequences,
@@ -88,8 +97,8 @@ def main():
     sentences = np.char.decode(result_dict["sentences"].astype("bytes"), "utf-8")
     sentences = np.squeeze(sentences, axis=-1)
     for sentence in sentences:
-        print("================================")  # noqa
-        print(sentence)  # noqa
+        logger.info("================================")
+        logger.info(sentence)
 
 
 if __name__ == "__main__":

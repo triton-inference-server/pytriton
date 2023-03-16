@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import importlib
+import logging
 import os
 import pathlib
 import socket
@@ -25,6 +26,8 @@ import omegaconf  # pytype: disable=import-error
 import torch  # pytype: disable=import-error
 from nemo.collections.nlp.parts.nlp_overrides import NLPSaveRestoreConnector  # pytype: disable=import-error
 from nemo.utils.app_state import AppState  # pytype: disable=import-error
+
+LOGGER = logging.getLogger("nemo.helpers")
 
 
 def cast_output(data, required_dtype):
@@ -43,17 +46,16 @@ def cast_output(data, required_dtype):
 
 
 def download_and_load_model(repo_id: str, trainer, *, filename: typing.Optional[str] = None):
-
     lock_dir = huggingface_hub.cached_assets_path("NeMo", repo_id)
     filename = filename or _get_first_nemo_filename(repo_id)
 
     lock_path = pathlib.Path(lock_dir) / f"{filename}.lock"
     lock_dir.parent.mkdir(parents=True, exist_ok=True)
-    print(f"Lock file {lock_path}")  # noqa: T201
+    LOGGER.info(f"Lock file {lock_path}")
     lock = filelock.FileLock(lock_path)
 
     with lock:
-        print(f"Downloading model from https://huggingface.co/{repo_id} filename={filename}")  # noqa: T201
+        LOGGER.info(f"Downloading model from https://huggingface.co/{repo_id} filename={filename}")
         model_path = huggingface_hub.hf_hub_download(repo_id, filename=filename)  # set $HF_HOME to set cache dir
 
         model_path = pathlib.Path(model_path)
@@ -64,9 +66,7 @@ def download_and_load_model(repo_id: str, trainer, *, filename: typing.Optional[
         save_restore_connector.model_extracted_dir = huggingface_hub.cached_assets_path("NeMo", repo_id, cache_subdir)
         model_config_path = pathlib.Path(save_restore_connector.model_extracted_dir) / "model_config.yaml"
         if not os.path.isdir(save_restore_connector.model_extracted_dir) or not model_config_path.is_file():
-            print(  # noqa: T201
-                f"Extracting nemo model from {model_path} to {save_restore_connector.model_extracted_dir}"
-            )
+            LOGGER.info(f"Extracting nemo model from {model_path} to {save_restore_connector.model_extracted_dir}")
             save_restore_connector._unpack_nemo_file(model_path, save_restore_connector.model_extracted_dir)
 
     pretrained_cfg = save_restore_connector.restore_from(None, model_path, return_config=True, trainer=trainer)
@@ -144,7 +144,7 @@ def setup_distributed_environment(trainer):
     app_state = AppState()
 
     hostname = socket.gethostname()
-    print(  # noqa: T201
+    LOGGER.info(
         f"global={app_state.global_rank}/{app_state.world_size} "
         f"local={app_state.local_rank} @ {hostname}:{app_state.device_id} / "
         f"dp={app_state.data_parallel_rank}/{app_state.data_parallel_size} "

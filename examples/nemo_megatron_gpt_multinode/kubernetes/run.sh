@@ -63,4 +63,4 @@ torchrun \
     --master_addr=${ADDRESS} --master_port=${PORT} \
      /opt/app/server.py \
          --gpus ${NUMBER_OF_GPUS} --nodes=${NUMBER_OF_NODES} \
-         --model-repo-id ${MODEL_ID} --verbose
+         --model-repo-id ${MODEL_ID}

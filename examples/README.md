@@ -37,6 +37,8 @@ The list of example models deployments:
 - [Multi Model deployment for Python models](../examples/multiple_models_python)
 - [OPT JAX from HuggingFace with multi-node support](../examples/huggingface_opt_multinode_jax)
 - [NeMo Megatron GPT model with multi-node support](../examples/nemo_megatron_gpt_multinode)
+- [Multi Model deployment for Python models](../examples/multiple_models_python)
+- [ResNet50 PyTorch from HuggingFace](../examples/huggingface_resnet_pytorch)
 
 ## Profiling models
 
@@ -44,3 +46,10 @@ The [Perf Analyzer](https://github.com/triton-inference-server/client/blob/main/
 used to profile the models served through PyTriton. We have prepared the example of
 using Perf Analyzer to profile BART PyTorch. See the example code in
 [GitHub repository](../examples/perf_analyzer).
+
+## Kubernetes Deployment
+
+The following examples contains guide how to deploy them on Kubernetes cluster:
+- [BART PyTorch from HuggingFace](../examples/huggingface_bart_pytorch)
+- [NeMo Megatron GPT model with multi-node support](../examples/nemo_megatron_gpt_multinode)
+- [ResNet50 PyTorch from HuggingFace](../examples/huggingface_resnet_pytorch)

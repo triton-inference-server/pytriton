@@ -75,11 +75,12 @@ def main():
     args = parser.parse_args()
 
     log_level = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(level=log_level, format=DEFAULT_LOG_FORMAT)
+    logging.basicConfig(level=log_level, format=DEFAULT_LOG_FORMAT, force=True)
+    logger = logging.getLogger("nemo.server")
 
-    print("Initialize trainer:")  # noqa
-    print(f" devices: {args.gpus}")  # noqa
-    print(f" nodes: {args.nodes}")  # noqa
+    logger.info("Initialize trainer:")
+    logger.info(f" devices: {args.gpus}")
+    logger.info(f" nodes: {args.nodes}")
     trainer = Trainer(
         strategy=NLPDDPStrategy(process_group_backend="nccl", timeout=datetime.timedelta(args.timeout)),
         devices=args.gpus,
@@ -92,6 +93,7 @@ def main():
     model = download_and_load_model(args.model_repo_id, trainer)
     app_state = setup_distributed_environment(trainer)
     if app_state.global_rank == 0:
+        logger.info(f"Running server with rank {torch.distributed.get_rank()}")
         infer_callable = NemoGptCallable(model_name="GPT", model=model)
         triton_config = TritonConfig(http_address=ENDPOINT_BIND_ADDRESS, http_port=HTTP_PORT, log_verbose=4)
         with Triton(config=triton_config) as triton:
@@ -104,11 +106,11 @@ def main():
             )
             triton.serve()
     else:
-        print(f"Running worker with rank {torch.distributed.get_rank()}")  # noqa
+        logger.info(f"Running worker with rank {torch.distributed.get_rank()}")
         while True:
             choice = torch.cuda.LongTensor(1)
             torch.distributed.broadcast(choice, 0)
-            print(f"{choice}")  # noqa
+            logger.info(f"{choice}")
             if choice[0].item() == 0:
                 generate(model.cuda())
 
