@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022 - 2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,16 +20,17 @@ from pytriton.client import ModelClient
 
 TRITON_MODEL_NAME = "OPT"
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s: %(message)s")
+LOGGER = logging.getLogger("jax.client")
+LOGGER.setLevel(level=logging.INFO)
+
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--server-addr", type=str, default="localhost", help="server address")
+    parser.add_argument("--server-url", type=str, default="http://localhost:8000", help="server address")
     parser.add_argument("--input", type=str, required=True, help="input text")
     parser.add_argument("--output-length", type=int, required=True, help="output length")
     args = parser.parse_args()
-
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s: %(message)s")
-    logger = logging.getLogger("examples.huggingface_opt_multinode_jax.client")
 
     np.random.seed(0)
 
@@ -37,13 +38,18 @@ def main():
     inputs = np.array([args.input])
     inputs = np.char.encode(inputs, "utf-8")
 
-    logger.info(f"output_len.shape={output_len.shape}, inputs.shape={inputs.shape}")
+    LOGGER.info(f"output_len.shape={output_len.shape}, inputs.shape={inputs.shape}")
 
-    with ModelClient(args.server_addr, model_name=TRITON_MODEL_NAME) as client:
+    LOGGER.info(f"Initializing client to address {args.server_url}")
+    with ModelClient(args.server_url, model_name=TRITON_MODEL_NAME) as client:
+        LOGGER.info("Sending request")
+        LOGGER.info(f" Inputs: {inputs}")
+        LOGGER.info(f" Output length: {output_len}")
         result_dict = client.infer_sample(inputs, output_len)
 
+    LOGGER.info("Received results:")
     for output_name, output_data in result_dict.items():
-        logger.info(f"{output_name}: {[b.decode() for b in output_data.tolist()]}")
+        LOGGER.info(f"{output_name}: {[b.decode() for b in output_data.tolist()]}")
 
 
 if __name__ == "__main__":

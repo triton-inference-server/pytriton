@@ -33,6 +33,7 @@ import time
 import urllib.parse
 from typing import Dict, Optional, Tuple, Union
 
+import gevent
 import numpy as np
 import tritonclient.grpc
 import tritonclient.http
@@ -116,6 +117,11 @@ class ModelClient:
 
         self._triton_client_lib = {"grpc": tritonclient.grpc, "http": tritonclient.http}[parsed_url.scheme.lower()]
         _LOGGER.debug(f"Creating InferenceServerClient for {parsed_url.scheme}://{self._url}")
+
+        # Monkey patch __del__ method from client to catch error in client when instance is garbage collected.
+        # This is needed because we are closing client in __exit__ method or in close method.
+        # (InferenceClient uses gevent library which does not support closing twice from different threads)
+        self._monkey_patch_client()
         self._client = self._triton_client_lib.InferenceServerClient(self._url)
 
         self._request_id_generator = itertools.count(0)
@@ -252,6 +258,24 @@ class ModelClient:
             )
 
         return self._infer(inputs or named_inputs)
+
+    def _monkey_patch_client(self):
+        """Monkey patch InferenceServerClient to catch error in __del__."""
+        if not hasattr(self._triton_client_lib.InferenceServerClient, "__del__"):
+            return
+
+        old_del = self._triton_client_lib.InferenceServerClient.__del__
+
+        def _monkey_patched_del(self):
+            """Monkey patched del."""
+            try:
+                old_del(self)
+            except gevent.exceptions.InvalidThreadUseError:
+                _LOGGER.warning("gevent.exceptions.InvalidThreadUseError in __del__ of InferenceServerClient")
+            except Exception as e:
+                _LOGGER.error("Exception in __del__ of InferenceServerClient: %s", e)
+
+        self._triton_client_lib.InferenceServerClient.__del__ = _monkey_patched_del
 
     def _wait_and_init_model_config(self, init_timeout_s: float):
         """Waits for model and obtain model configuration.

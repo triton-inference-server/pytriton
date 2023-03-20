@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ from pytriton.decorators import batch, fill_optionals, first_value
 from pytriton.model_config import ModelConfig, Tensor
 from pytriton.triton import Triton
 
-logger = logging.getLogger("examples.add_sub_python_with_optional.server")
+LOGGER = logging.getLogger("examples.add_sub_python_with_optional.server")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s: %(message)s")
 
 
@@ -35,22 +35,27 @@ def _add_sub(a, b, t, **inputs):
     return {"add": add_batch, "sub": sub_batch}
 
 
-with Triton() as triton:
-    logger.info("Loading AddSub model")
-    triton.bind(
-        model_name="AddSub",
-        infer_func=_add_sub,
-        inputs=[
-            Tensor(dtype=np.float32, shape=(-1,), name="a"),
-            Tensor(dtype=np.float32, shape=(-1,), name="b"),
-            Tensor(dtype=np.float32, shape=(-1,), name="t", optional=True),
-            Tensor(dtype=np.float32, shape=(-1,), name="w", optional=True),
-        ],
-        outputs=[
-            Tensor(name="add", dtype=np.float32, shape=(-1,)),
-            Tensor(name="sub", dtype=np.float32, shape=(-1,)),
-        ],
-        config=ModelConfig(max_batch_size=128),
-    )
-    logger.info("Serving model")
-    triton.serve()
+def main():
+    with Triton() as triton:
+        LOGGER.info("Loading AddSub model")
+        triton.bind(
+            model_name="AddSub",
+            infer_func=_add_sub,
+            inputs=[
+                Tensor(dtype=np.float32, shape=(-1,), name="a"),
+                Tensor(dtype=np.float32, shape=(-1,), name="b"),
+                Tensor(dtype=np.float32, shape=(-1,), name="t", optional=True),
+                Tensor(dtype=np.float32, shape=(-1,), name="w", optional=True),
+            ],
+            outputs=[
+                Tensor(name="add", dtype=np.float32, shape=(-1,)),
+                Tensor(name="sub", dtype=np.float32, shape=(-1,)),
+            ],
+            config=ModelConfig(max_batch_size=128),
+        )
+        LOGGER.info("Serving model")
+        triton.serve()
+
+
+if __name__ == "__main__":
+    main()

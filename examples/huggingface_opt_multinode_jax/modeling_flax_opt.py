@@ -1,5 +1,5 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
-# Copyright 2022 The Fairseq Authors and The Google Flax Team Authors And The HuggingFace Inc. team. All rights reserved.
+# Copyright (c) 2022 - 2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2022 - 2023 The Fairseq Authors and The Google Flax Team Authors And The HuggingFace Inc. team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 # pytype: disable=import-error,annotation-type-mismatch,bad-return-type
 
+import logging
 from functools import partial
 from typing import Optional, Tuple
 
@@ -31,9 +32,11 @@ from jax.random import PRNGKey
 from transformers.modeling_flax_outputs import FlaxBaseModelOutput, FlaxMaskedLMOutput
 from transformers.modeling_flax_utils import ACT2FN, FlaxPreTrainedModel, append_call_sample_docstring
 from transformers.models.opt.configuration_opt import OPTConfig
-from transformers.utils import add_start_docstrings, logging
+from transformers.utils import add_start_docstrings
 
-logger = logging.get_logger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s: %(message)s")
+LOGGER = logging.getLogger("jax.modeling_flax_opt")
+LOGGER.setLevel(level=logging.INFO)
 
 _CHECKPOINT_FOR_DOC = "facebook/opt-350m"
 _CONFIG_FOR_DOC = "OPTConfig"

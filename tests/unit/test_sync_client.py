@@ -11,8 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import gc
 import json
 import logging
+import threading
 
 import numpy as np
 import pytest
@@ -40,6 +42,7 @@ from .utils import (
 )
 
 logging.basicConfig(level=logging.DEBUG)
+LOGGER = logging.getLogger("test_sync_client")
 
 ADD_SUB_WITH_BATCHING_MODEL_CONFIG = TritonModelConfig(
     model_name="AddSub",
@@ -737,3 +740,17 @@ def test_sync_http_client_infer_raises_error_when_no_args_provided(mocker):
     with ModelClient(_HTTP_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
         with pytest.raises(PyTritonClientValueError, match="Provide input data"):
             client.infer_batch()
+
+
+@pytest.mark.filterwarnings("error::pytest.PytestUnraisableExceptionWarning")
+def test_del_of_inference_client_does_not_raise_error():
+    def _del(client):
+        del client._client
+
+    def _create_client_and_delete():
+        client = ModelClient(_HTTP_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name)
+        client.close()
+        threading.Thread(target=_del, args=(client,)).start()
+
+    _create_client_and_delete()
+    gc.collect()
