@@ -32,12 +32,12 @@ framework-agnostic and can be used along with frameworks like PyTorch, TensorFlo
 
 # Installing
 
-The package can be installed from `pypi.org` using:
+The package can be installed from `GitHub` using:
 
 <!--pytest.mark.skip-->
 
 ```shell
-pip install -U pytriton
+pip install -U https://github.com/triton-inference-server/pytriton/releases/download/v0.1.4/pytriton-0.1.4-py3-none-manylinux_2_31_x86_64.whl
 ```
 
 # Example

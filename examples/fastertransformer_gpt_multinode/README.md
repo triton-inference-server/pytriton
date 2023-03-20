@@ -62,7 +62,7 @@ Alternatively, you can set up your environment manually as in [model instruction
 
 2. Install requirements required by example and [PyTriton](../../docs/installation.md):
     ```bash
-    docker exec ft_on_pytriton bash -c "./examples/fastertransformer_gpt_multinode/install.sh && pip install -U pytriton"
+    docker exec ft_on_pytriton bash -c "./examples/fastertransformer_gpt_multinode/install.sh && pip install -U https://github.com/triton-inference-server/pytriton/releases/download/v0.1.4/pytriton-0.1.4-py3-none-manylinux_2_31_x86_64.whl"
     ```
 
 3. Start a server with the FasterTransformer GPT model:
@@ -137,7 +137,7 @@ For that, we can use [Slurm](https://slurm.schedmd.com/) cluster management syst
         --container-workdir "${PWD}" \
         --no-container-mount-home \
         --unbuffered \
-        bash -c '[[ ${LOCAL_RANK} -eq 0 ]] && (./examples/fastertransformer_gpt_multinode/install.sh && pip install -U pytriton) || true'
+        bash -c '[[ ${LOCAL_RANK} -eq 0 ]] && (./examples/fastertransformer_gpt_multinode/install.sh && pip install -U https://github.com/triton-inference-server/pytriton/releases/download/v0.1.4/pytriton-0.1.4-py3-none-manylinux_2_31_x86_64.whl) || true'
    # reuse of container prepared in above srun
    srun --output slurm_job-%x-%J.out \
         --container-name ft_on_pytriton \
@@ -179,7 +179,7 @@ Example client calls:
    cd <pytriton_repository_dir>
    docker run --rm -it -v $PWD:$PWD -w $PWD --link fastertransformer_with_ft python:3 bash
    # now inside the obtained container
-   pip install -U pytriton
+   pip install -U https://github.com/triton-inference-server/pytriton/releases/download/v0.1.4/pytriton-0.1.4-py3-none-manylinux_2_31_x86_64.whl
    ./examples/fastertransformer_gpt_multinode/client.py --url http://fastertransformer_with_ft:8000
    ```
 
@@ -191,7 +191,7 @@ Example client calls:
    virtualenv -p $(which python3.8) .venv
    source .venv/bin/activate
    # and install pytriton
-   pip install -U pytriton
+   pip install -U https://github.com/triton-inference-server/pytriton/releases/download/v0.1.4/pytriton-0.1.4-py3-none-manylinux_2_31_x86_64.whl
    # run client
    # thanks to docker port publishing it is available outside of the docker
    ./examples/fastertransformer_gpt_multinode/client.py --url http://localhost:8000
@@ -225,7 +225,7 @@ For multi-node scenarios you can run the client:
       --no-container-mount-home \
       bash
    # in the newly created container install pytriton and execute
-   pip install -U pytriton
+   pip install -U https://github.com/triton-inference-server/pytriton/releases/download/v0.1.4/pytriton-0.1.4-py3-none-manylinux_2_31_x86_64.whl
    ./examples/fastertransformer_gpt_multinode/client.py --url http://<pytriton_hostname>:8000
    ```
 

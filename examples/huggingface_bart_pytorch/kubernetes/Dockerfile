@@ -24,7 +24,7 @@ RUN pip install /opt/app/*.whl
 
 # Install from pypi
 FROM base as install-from-pypi
-RUN pip install pytriton
+RUN pip install -U https://github.com/triton-inference-server/pytriton/releases/download/v0.1.4/pytriton-0.1.4-py3-none-manylinux_2_31_x86_64.whl
 
 FROM install-from-${BUILD_FROM} AS image
 

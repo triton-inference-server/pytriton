@@ -74,10 +74,10 @@ run model inference on NVIDIA GPU.
 
 ### Installing using pip
 
-The package can be installed from `pypi.org` using:
+The package can be installed from `GitHub` using:
 
 ```shell
-pip install -U pytriton
+pip install -U https://github.com/triton-inference-server/pytriton/releases/download/v0.1.4/pytriton-0.1.4-py3-none-manylinux_2_31_x86_64.whl
 ```
 
 **Important**: The Triton Inference Server binary is installed as part of PyTriton package.
