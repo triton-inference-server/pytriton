@@ -22,7 +22,7 @@ fi
 if [ -z ${FROM_IMAGE_NAME} ]; then
   echo "Provide Docker image that would be used as base image"
   echo "Example:"
-  echo "    export FROM_IMAGE_NAME=nvcr.io/nvidia/nemo:22.12"
+  echo "    export FROM_IMAGE_NAME=nvcr.io/nvidia/nemo:22.07"
   exit 1
 fi
 

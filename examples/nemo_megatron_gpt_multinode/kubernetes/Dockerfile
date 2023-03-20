@@ -11,11 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-ARG FROM_IMAGE_NAME=nvcr.io/nvidia/nemo:22.12
+ARG FROM_IMAGE_NAME=nvcr.io/nvidia/nemo:22.07
 ARG BUILD_FROM
 
 FROM ${FROM_IMAGE_NAME} as base
 WORKDIR /opt/app
+
+COPY examples/nemo_megatron_gpt_multinode/install.sh /opt/app
+RUN /opt/app/install.sh
 
 # Use when build PyTriton from source
 FROM base as install-from-dist

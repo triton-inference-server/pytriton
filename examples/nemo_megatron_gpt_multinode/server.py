@@ -14,12 +14,11 @@
 # limitations under the License.
 """Text generation server with NeMo Megatron GPT model."""
 import argparse
-import datetime
 import logging
 
 import torch  # pytype: disable=import-error
 from nemo.collections.nlp.modules.common.text_generation_utils import generate  # pytype: disable=import-error
-from nemo.collections.nlp.parts.nlp_overrides import NLPDDPStrategy  # pytype: disable=import-error
+from nemo.collections.nlp.parts.nlp_overrides import NLPDDPPlugin  # pytype: disable=import-error
 from pytorch_lightning.trainer.trainer import Trainer  # pytype: disable=import-error
 
 from pytriton.model_config import ModelConfig
@@ -82,7 +81,7 @@ def main():
     logger.info(f" devices: {args.gpus}")
     logger.info(f" nodes: {args.nodes}")
     trainer = Trainer(
-        strategy=NLPDDPStrategy(process_group_backend="nccl", timeout=datetime.timedelta(args.timeout)),
+        plugins=[NLPDDPPlugin()],
         devices=args.gpus,
         num_nodes=args.nodes,
         accelerator="gpu",

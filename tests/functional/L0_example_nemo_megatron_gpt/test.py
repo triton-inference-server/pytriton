@@ -17,6 +17,7 @@ import argparse
 import logging
 import re
 import signal
+import subprocess
 import sys
 import time
 
@@ -29,7 +30,7 @@ from tests.utils import (
 
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 METADATA = {
-    "image_name": "nvcr.io/nvidia/nemo:22.12",
+    "image_name": "nvcr.io/nvidia/nemo:22.07",
 }
 
 
@@ -54,6 +55,8 @@ def main():
     verify_docker_image_in_readme_same_as_tested(
         "examples/nemo_megatron_gpt_multinode/README.md", docker_image_with_name
     )
+
+    subprocess.run(["bash", "examples/nemo_megatron_gpt_multinode/install.sh"])
 
     start_time = time.time()
     elapsed_s = 0

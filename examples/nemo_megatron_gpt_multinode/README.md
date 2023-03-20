@@ -47,7 +47,7 @@ If you select to use container we recommend to install
         -v $PWD:$PWD -w $PWD \
         -p 8000:8000 -p 8001:8001 -p 8002:8002 \
         --name nemo_megatron_gpt_server \
-    nvcr.io/nvidia/nemo:22.12 bash
+    nvcr.io/nvidia/nemo:22.07 bash
     ```
 
     For more information on docker/cluster deployments see [documentation](../../docs/deploying_models.md#deploying-in-cluster).
@@ -116,7 +116,7 @@ For that we can use [Slurm](https://slurm.schedmd.com/) cluster management syste
    # use github.com/nvidia/pyxis plugin
    srun --output slurm_job-%x-%J.out \
         --container-name nemo_megatron_gpt_container \
-        --container-image nvcr.io/nvidia/nemo:22.12 \
+        --container-image nvcr.io/nvidia/nemo:22.07 \
         --container-mounts "${PWD}":"${PWD}" \
         --container-workdir "${PWD}" \
         --no-container-mount-home \
@@ -166,7 +166,7 @@ Example client calls:
 
    ```bash
    cd <pytriton_repository_dir>
-   docker run --rm -it -v $PWD:$PWD -w $PWD --link nemo_megatron_gpt_server nvcr.io/nvidia/pytorch:22.12-py3 bash
+   docker run --rm -it -v $PWD:$PWD -w $PWD --link nemo_megatron_gpt_server nvcr.io/nvidia/pytorch:22.07-py3 bash
    # now inside obtained container
    pip install -U pytriton
    ./examples/nemo_megatron_gpt_multinode/client.py --url http://nemo_megatron_gpt_server:8000
@@ -208,7 +208,7 @@ For multi-node scenario you can run client:
   # start new container
    srun --pty \
       --partition <your_partiion> \
-      --container-image nvcr.io/nvidia/nemo:22.12 \
+      --container-image nvcr.io/nvidia/nemo:22.07 \
       --container-mounts "${PWD}:${PWD}" \
       --container-workdir "${PWD}" \
       --no-container-mount-home \
@@ -269,7 +269,7 @@ export DOCKER_IMAGE_NAME_WITH_TAG=localhost:5000/nemo-example:latest
 
 ```shell
 # Export the base image used for build
-export FROM_IMAGE_NAME=nvcr.io/nvidia/nemo:22.12
+export FROM_IMAGE_NAME=nvcr.io/nvidia/nemo:22.07
 ./examples/nemo_megatron_gpt_multinode/kubernetes/build_and_push.sh
 ```
 
