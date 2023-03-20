@@ -12,6 +12,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#!/bin/bash
+set -xe
 
-pip install --upgrade -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html jax[cuda]
-pip install --upgrade flax omegaconf sacrebleu SentencePiece tokenizers transformers>=4.26
+RANK=${HOSTNAME##*-}
+
+if [[ "${RANK}" == "0" ]];
+then
+  # For head node - validate if Triton Server is running
+  curl --fail localhost:8000/v2/health/live
+else
+  # For workers - validate the process is running
+  cat /tmp/health
+fi

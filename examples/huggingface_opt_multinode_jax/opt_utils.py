@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022 - 2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,9 +44,9 @@ from transformers.models.opt import OPTConfig
 
 MODEL_PARALLEL = "mp"
 
-
-logger = logging.getLogger("examples.huggingface_opt_multinode_jax.opt_utils")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s: %(message)s")
+LOGGER = logging.getLogger("jax.opt_utils")
+LOGGER.setLevel(level=logging.INFO)
 
 
 @dataclass
@@ -72,7 +72,6 @@ CONFIGS = {
     "310B": Config(96, 128, 128 * 128),
     "530B": Config(105, 128, 160 * 128),
 }
-
 
 TP_RULES = {
     ("model", "decoder", "embed_positions", "embedding"): PartitionSpec(None, None),
@@ -137,12 +136,11 @@ def get_config(name: str):
     return config
 
 
-def get_model(name: str, tempdir: pathlib.Path) -> Tuple:
+def get_model(name: str, cache_dir: pathlib.Path) -> Tuple:
     config = get_config(name)
     if name == "facebook/opt-13b":
         config._remove_final_layer_norm = True
     if name.split("/")[0] == "random":
-        name = name.split("/")[-1]
         hf_config = OPTConfig(
             hidden_size=config.d_model,
             num_attention_heads=config.n_heads,
@@ -155,12 +153,11 @@ def get_model(name: str, tempdir: pathlib.Path) -> Tuple:
             _do_init=False,
         )
     else:
-        checkpoint_path = tempdir / "checkpoints" / name
         model, params = FlaxOPTForCausalLM.from_pretrained(
             name,
             config=config,
             dtype=jnp.float16,
-            cache_dir=checkpoint_path.as_posix(),
+            cache_dir=cache_dir.as_posix(),
             _do_init=False,
         )
 
@@ -172,7 +169,7 @@ def get_tokenizer(name: str = "facebook/opt-30b"):
 
 
 def greedy_search(model, params, input_ids, requested_len):
-    logger.info("Compiling greedy search....")
+    LOGGER.info("Compiling greedy search....")
     pad_token_id = model.config.pad_token_id
     eos_token_id = model.config.eos_token_id
 
@@ -267,8 +264,6 @@ def shard_params(model, init_params, params_spec, mesh_devices):
             params_spec = flatten_dict(params_spec)
 
             for key in init_params.keys():
-                logger.debug(key)
-
                 init_param = init_params[key]
                 init_param = device_put(init_param, mesh_devices[0])
 
@@ -281,6 +276,6 @@ def shard_params(model, init_params, params_spec, mesh_devices):
             params_spec = freeze(unflatten_dict(params_spec))
         num_params_b = np.sum([v.size for v in flatten_dict(params).values()]) / 10**9
         num_params = f"{num_params_b:.2f}B" if num_params_b > 1 else f"{num_params_b * 1000:.2f}M"
-        logger.info(f"Number of params: {num_params}")
+        LOGGER.info(f"Number of params: {num_params}")
 
     return params

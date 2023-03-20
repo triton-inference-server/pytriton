@@ -50,4 +50,5 @@ using Perf Analyzer to profile BART PyTorch. See the example code in
 
 The following examples contains guide how to them on Kubernetes cluster:
 - [BART PyTorch from HuggingFace](../examples/huggingface_bart_pytorch)
+- [OPT JAX from HuggingFace with multi-node support](../examples/huggingface_opt_multinode_jax)
 - [ResNet50 PyTorch from HuggingFace](../examples/huggingface_resnet_pytorch)

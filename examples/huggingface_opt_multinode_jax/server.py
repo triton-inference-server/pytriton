@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022 - 2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,6 +22,8 @@ import socket
 import struct
 import tempfile
 
+import filelock
+
 # pytype: disable=import-error
 import jax
 import numpy as np
@@ -38,20 +40,22 @@ from pytriton.triton import Triton
 
 
 TRITON_MODEL_NAME = "OPT"
-MAX_BATCH_SIZE = 256
-PORT = 65432
 
-logger = logging.getLogger("examples.huggingface_opt_multinode_jax.server")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s: %(message)s")
+LOGGER = logging.getLogger("jax.server")
+LOGGER.setLevel(level=logging.INFO)
 
 
-def run(model, params, tp, server_ip, num_hosts, host_idx):
+def run(model, params, number_of_gpus, max_batch_size, server_ip, port, number_of_nodes, rank):
     params_spec = get_params_spec(model.config.num_hidden_layers, params)
-    mesh_devices = jax.devices()[:tp]
 
-    logger.info(f"Selected devices: {mesh_devices}.")
+    LOGGER.info(f"Available devices: {jax.local_devices()}.")
+    mesh_devices = jax.local_devices()[:number_of_gpus]
+
+    LOGGER.info(f"Selected devices: {mesh_devices}.")
     params = shard_params(model, params, params_spec, mesh_devices)
 
+    LOGGER.info("Initialize model")
     infer = pjit(
         functools.partial(greedy_search, model),
         in_axis_resources=(params_spec, PartitionSpec(None, None)),
@@ -60,7 +64,14 @@ def run(model, params, tp, server_ip, num_hosts, host_idx):
     )
 
     def _server():
+        LOGGER.info("Initialize tokenizer.")
         tokenizer = get_tokenizer()
+
+        LOGGER.info("Initialize socket for communication with worker.")
+        # open a socket to communicate with workers
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind((server_ip, port))
+        s.listen()
 
         def wrapper(params, **inputs):
             text, output_len = inputs.values()
@@ -70,31 +81,31 @@ def run(model, params, tp, server_ip, num_hosts, host_idx):
             max_len = input_ids.shape[1] + output_len[0].item()
             batch_size = input_ids.shape[0]
 
-            # open a socket to communicate with workers
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind((server_ip, PORT))
-                s.listen()
+            conn_count = 0
+            # wait until all the workers receive input data
+            while conn_count < number_of_nodes - 1:
+                LOGGER.debug("Broadcast to workers")
+                conn, _ = s.accept()
+                with conn:
+                    data = pickle.dumps({"max_len": max_len, "batch_size": batch_size, "input_ids": input_ids})
+                    conn.sendall(struct.pack(">I", len(data)))
+                    conn.sendall(data)
 
-                conn_count = 0
-                # wait until all the workers receive input data
-                while conn_count < num_hosts - 1:
-                    conn, _ = s.accept()
-                    with conn:
-                        data = pickle.dumps({"max_len": max_len, "batch_size": batch_size, "input_ids": input_ids})
-                        conn.sendall(struct.pack(">I", len(data)))
-                        conn.sendall(data)
+                conn_count += 1
 
-                    conn_count += 1
-
+            LOGGER.debug("Collecting outputs")
             with Mesh(np.array(mesh_devices), (MODEL_PARALLEL,)):
                 outputs = np.array(infer(params, input_ids, max_len))
 
+            LOGGER.debug(f"Result: {outputs}")
             decoded = tokenizer.batch_decode(outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+            LOGGER.debug(f"Decoded result: {decoded}")
+
             res = [np.array([decoded])]
             return res
 
         with Triton() as triton:
-            logger.info("Loading OPT model.")
+            LOGGER.info("Loading OPT model.")
             triton.bind(
                 model_name=TRITON_MODEL_NAME,
                 infer_func=batch(functools.partial(wrapper, params)),
@@ -105,10 +116,10 @@ def run(model, params, tp, server_ip, num_hosts, host_idx):
                 outputs=[
                     Tensor(name="output", dtype=np.bytes_, shape=(1,)),
                 ],
-                config=ModelConfig(max_batch_size=MAX_BATCH_SIZE),
+                config=ModelConfig(max_batch_size=max_batch_size),
             )
             # Serve model through Triton Inference Server
-            logger.info("Serving inference")
+            LOGGER.info("Serving inference")
             triton.serve()
 
     def _worker():
@@ -118,7 +129,7 @@ def run(model, params, tp, server_ip, num_hosts, host_idx):
                 # try to connect with the server until it send input data
                 while input_ids is None or max_len is None:
                     try:
-                        s.connect((server_ip, PORT))
+                        s.connect((server_ip, port))
                         data_size = struct.unpack(">I", s.recv(4))[0]
                         received_payload = b""
                         reamining_payload_size = data_size
@@ -131,46 +142,120 @@ def run(model, params, tp, server_ip, num_hosts, host_idx):
                     except ConnectionRefusedError:
                         pass
 
-            logger.info(input_ids, max_len)
+            LOGGER.debug(f"{input_ids}, {max_len}")
             with Mesh(np.array(mesh_devices), (MODEL_PARALLEL,)):
                 infer(params, input_ids, max_len)
 
-    if host_idx == 0:
+    if rank == 0:
+        LOGGER.info(f"Starting server at rank {rank}")
         _server()
     else:
+        LOGGER.info(f"Starting worker at rank {rank}")
         _worker()
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model-name", type=str, required=True, help="Name of the HF model")
     parser.add_argument(
-        "--server-addr", type=str, default="localhost:1234", help="Server IP and port pair in form of <ip>:<port>"
+        "--model-name",
+        type=str,
+        required=True,
+        help="Name of the HuggingFace model to serve.",
     )
-    parser.add_argument("--num-hosts", type=int, default=1, help="num of hosts")
-    parser.add_argument("--host-idx", type=int, default=0, help="index of current host")
-    parser.add_argument("--tp", type=int, default=1, help="tensor parallel size")
-
+    parser.add_argument(
+        "--head-url",
+        type=str,
+        default="localhost:12345",
+        help="Server IP and port pair in form of <ip>:<port> for head node.",
+    )
+    parser.add_argument(
+        "--socket-port",
+        type=int,
+        default="65432",
+        help="Port for socket communication to push array for compute to all workers.",
+    )
+    parser.add_argument(
+        "--number-of-nodes",
+        type=int,
+        default=1,
+        help="Number of nodes.",
+    )
+    parser.add_argument(
+        "--rank",
+        type=int,
+        default=0,
+        help="Rank of current host - 0 mean the head node.",
+    )
+    parser.add_argument(
+        "--number-of-gpus",
+        type=int,
+        default=1,
+        help="Number of gpus used for model.",
+    )
+    parser.add_argument(
+        "--max-batch-size",
+        type=int,
+        default=256,
+        help="The maximal batch size used for model.",
+    )
+    parser.add_argument(
+        "--cache-dir",
+        type=str,
+        default=None,
+        help="Location of cache to avoid download model for multiple nodes.",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose logging.",
+    )
     args = parser.parse_args()
+
+    log_level = logging.DEBUG if args.verbose else logging.INFO
+    LOGGER.setLevel(log_level)
 
     os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
     os.environ["NCCL_LAUNCH_MODE"] = "PARALLEL"
 
-    jax.distributed.initialize(args.server_addr, args.num_hosts, args.host_idx)
-    logger.info(f"{jax.devices()=}")
-    logger.info(f"{jax.local_devices()=}")
+    head_url = args.head_url
+    number_of_nodes = args.number_of_nodes
+    rank = args.rank
+
+    LOGGER.info(f"Head url: {head_url}")
+    LOGGER.info(f"Number of nodes: {number_of_nodes}")
+    LOGGER.info(f"Host rank: {rank}")
+
+    jax.distributed.initialize(head_url, number_of_nodes, rank)
+    LOGGER.info(f"{jax.devices()=}")
+    LOGGER.info(f"{jax.local_devices()=}")
 
     with tempfile.TemporaryDirectory() as tempdir:
-        tempdir = pathlib.Path(tempdir)
+        cache_dir = args.cache_dir
+        if not cache_dir:
+            cache_dir = tempdir
 
-        model, params = get_model(args.model_name, tempdir)
+        cache_dir = pathlib.Path(cache_dir)
+        LOGGER.info(f"Cache location: {cache_dir}")
+
+        lock_file = cache_dir / "lock" / "jax_opt.lock"
+        lock_file.parent.mkdir(parents=True, exist_ok=True)
+
+        lock = filelock.FileLock(lock_file.as_posix())
+        LOGGER.info(f"Lock in {lock_file}")
+        with lock:
+            model, params = get_model(args.model_name, cache_dir)
+
+        server_ip, port = args.head_url.split(":")
+
         run(
             model=model,
             params=params,
-            tp=args.tp,
-            server_ip=args.server_addr.split(":")[0],
-            num_hosts=args.num_hosts,
-            host_idx=args.host_idx,
+            max_batch_size=args.max_batch_size,
+            number_of_gpus=args.number_of_gpus,
+            server_ip=server_ip,
+            port=int(args.socket_port),
+            number_of_nodes=number_of_nodes,
+            rank=rank,
         )
 
 
