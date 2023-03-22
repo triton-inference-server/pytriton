@@ -16,7 +16,7 @@ limitations under the License.
 
 # Inference Callable Design
 
-The following section provide more details about writing inference callable for PyTriton.
+The following section provides more details about writing inference callable for PyTriton.
 
 
 ### Inference Callable
@@ -71,9 +71,9 @@ class InferCallable:
 ### Batching decorator
 
 In many cases it is much more convenient to get input already batched in form of numpy array
-(instead of list of separate requests).
+(instead of a list of separate requests).
 For such cases we prepared `@batch` decorator that adapts generic input into batched form (it passes kwargs to inference
-function where each named input contains numpy array with batch of requests received by Triton server).
+function where each named input contains a numpy array with a batch of requests received by the Triton server).
 
 Below we show difference between decorated and undecorated function bound with triton:
 
@@ -261,7 +261,7 @@ def infer(mandatory_input):
     pass
 ```
 
-- `@first_value` - This decorator takes first elements from batches for selected inputs by `keys` parameter.
+- `@first_value` - This decorator takes the first elements from batches for selected inputs by `keys` parameter.
 If the value is one element array, it is converted to scalar value.
 It is convenient to use with dynamic model parameters that are sent by the user in the requests.
 You can use `@group_by_values` before to have batches with the same values in each batch.
@@ -297,7 +297,7 @@ def infer(input_list, **kwargs):
 ***
 **At the end we show the example of stacking even more decorators together**
 As it is shown below, we have to start with a) type decorators then use b) and c)
-We recommend putting `@triton_context` as the last decorator in chain.
+We recommend putting `@triton_context` as the last decorator in the chain.
 
 ```python
 import numpy as np

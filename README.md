@@ -16,7 +16,7 @@ limitations under the License.
 
 # PyTriton
 
-The PyTriton is Flask/FastAPI-like interface to simplify Triton's deployment in Python environments.
+PyTriton is a Flask/FastAPI-like interface to simplify Triton's deployment in Python environments.
 The library allows to serve Machine Learning models directly from Python through
 NVIDIA [Triton Inference Server](https://github.com/triton-inference-server).
 
@@ -115,7 +115,7 @@ model = torch.nn.Linear(2, 3).to("cuda").eval()
 ```
 
 In the second step create an inference callback as a function. The function as an argument obtain the HTTP/gRPC
-request data in form of numpy array. The expected return object is also numpy array.
+request data in the form of a numpy. The expected return object is also a numpy array.
 
 Example implementation:
 
@@ -172,11 +172,11 @@ with Triton() as triton:
 
 The `bind` method is creating a connection between Triton Inference Server and the `infer_func` which handle
 the inference queries. The `inputs` and `outputs` describe the model inputs and outputs that are exposed in
-Triton. The config field allow to provide more parameters for model deployment.
+Triton. The config field allows more parameters for model deployment.
 
-The `serve` method is blocking and at this point the application will wait for incoming HTTP/gRPC request. From that
-point the model is available under name `Linear` in Triton server. The inference queries can be sent to
-`localhost:8000/v2/models/Linear/infer` which are passed to the `infer_func` function.
+The `serve` method is blocking and at this point the application will wait for incoming HTTP/gRPC requests. From that
+moment the model is available under the name `Linear` in the Triton server.  The inference queries can be sent to
+`localhost:8000/v2/models/Linear/infer` which are passed to the `infer_fn` function.
 
 If you would like to use the Triton in background mode use `run`. More about that you can find
 in [documentation](https://triton-inference-server.github.io/pytriton).
@@ -283,29 +283,15 @@ model prediction the result is returned to `Proxy Backend` and response is creat
 
 ## Examples
 
-We provide simple examples how to integrate the PyTorch, TensorFlow2, JAX and simple Python models with Triton Inference
-Server using PyTriton. Each example provide an instruction describing how
-
-The list of available model examples:
-
-- [Add-Sub Python model](examples/add_sub_python)
-- [Add-Sub Python model Jupyter Notebook](examples/add_sub_notebook)
-- [BART PyTorch from HuggingFace](examples/huggingface_bart_pytorch)
-- [BERT JAX from HuggingFace](examples/huggingface_bert_jax)
-- [Identity Python model](examples/identity_python)
-- [Linear RAPIDS/CuPy model](examples/linear_cupy)
-- [Linear RAPIDS/CuPy model Jupyter Notebook](examples/linear_cupy_notebook)
-- [Linear PyTorch model](examples/identity_python)
-- [Multi-Layer TensorFlow2](examples/mlp_random_tensorflow2)
-- [Multi Instance deployment for Linear PyTorch model](examples/multi_instance_linear_pytorch)
-- [Multi Model deployment for Python models](examples/multiple_models_python)
-- [OPT JAX MultiNode from HuggingFace](examples/huggingface_opt_multinode_jax)
-- [NeMo Megatron GPT model with multi-node support](examples/nemo_megatron_gpt_multinode)
+The [examples](examples) section presents various cases of serving the models using PyTriton. You can find simple examples of
+running PyTorch, TensorFlow2, JAX and simple Python models. Also, we have prepared more advanced scenarios like online
+learning, multi-node models or deployment on Kubernetes using PyTriton. Each example contains an instruction describing
+how to build and run the example. Learn more how to use PyTriton reviewing our [examples](examples) .
 
 ## Profiling model
 
 The [Perf Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md) can be
-used to profile the models served through pytriton. We have prepared the example of
+used to profile the models served through PyTriton. We have prepared the example of
 using Perf Analyzer to profile BART PyTorch model. The example code can be found
 in [examples/perf_analyzer](examples/perf_analyzer).
 

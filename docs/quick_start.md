@@ -46,7 +46,7 @@ model = torch.nn.Linear(2, 3).to("cuda").eval()
 ```
 
 In the second step create an inference callback as a function. The function as an argument obtain the HTTP/gRPC
-request data in form of numpy array. The expected return object is also numpy array.
+request data in the form of a numpy. The expected return object is also a numpy array.
 
 Example implementation:
 
@@ -106,10 +106,10 @@ with Triton() as triton:
 
 The `bind` method is creating a connection between Triton Inference Server and the `infer_fn` which handle
 the inference queries. The `inputs` and `outputs` describe the model inputs and outputs that are exposed in
-Triton. The config field allow to provide more parameters for model deployment.
+Triton. The config field allows more parameters for model deployment.
 
-The `serve` method is blocking and at this point the application will wait for incoming HTTP/gRPC request. From that
-point the model is available under name `Linear` in Triton server.  The inference queries can be sent to
+The `serve` method is blocking and at this point the application will wait for incoming HTTP/gRPC requests. From that
+moment the model is available under the name `Linear` in the Triton server.  The inference queries can be sent to
 `localhost:8000/v2/models/Linear/infer` which are passed to the `infer_fn` function.
 
 If you would like to use the Triton in background mode use `run`. More about that you can find

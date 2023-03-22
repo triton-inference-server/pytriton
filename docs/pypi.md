@@ -17,7 +17,7 @@ limitations under the License.
 # Project description
 
 
-The PyTriton is Flask/FastAPI-like interface to simplify Triton's deployment in Python environments.
+PyTriton is a Flask/FastAPI-like interface to simplify Triton's deployment in Python environments.
 The library allows to serve Machine Learning models directly from Python through
 NVIDIA [Triton Inference Server](https://github.com/triton-inference-server).
 
@@ -117,12 +117,11 @@ with Triton() as triton:
 
 The `bind` method is creating a connection between Triton Inference Server and the `infer_fn` which handle
 the inference queries. The `inputs` and `outputs` describe the model inputs and outputs that are exposed in
-Triton. The config field allow to provide more parameters for model deployment.
+Triton. The config field allows more parameters for model deployment.
 
-The `serve` method is blocking and at this point the application will wait for incoming HTTP/gRPC request. From that
-point the model is available under name `Linear` in Triton server. The inference queries can be sent to
+The `serve` method is blocking and at this point the application will wait for incoming HTTP/gRPC requests. From that
+moment the model is available under name `Linear` in Triton server. The inference queries can be sent to
 `localhost:8000/v2/models/Linear/infer` which are passed to the `infer_fn` function.
-
 
 # Links
 

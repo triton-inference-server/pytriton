@@ -17,7 +17,7 @@ limitations under the License.
 # PyTriton
 
 
-The PyTriton is Flask/FastAPI-like interface to simplify Triton's deployment in Python environments.
+PyTriton is a Flask/FastAPI-like interface to simplify Triton's deployment in Python environments.
 The library allows to serve Machine Learning models directly from Python through
 NVIDIA [Triton Inference Server](https://github.com/triton-inference-server).
 
@@ -81,7 +81,7 @@ def infer_fn(**inputs: np.ndarray):
     return [outputs]
 ```
 
-The `infer_fn` receive the batched input data for the model and should return the batched outputs.
+The `infer_fn` receives the batched input data for the model and should return the batched outputs.
 
 In the next step you need to create a connection between Triton and the model. On that purpose the `Triton` class has to
 be used and the `bind` method is required to be called to create a dedicated connection between Triton Inference

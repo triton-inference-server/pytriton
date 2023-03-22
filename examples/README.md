@@ -49,6 +49,7 @@ using Perf Analyzer to profile BART PyTorch. See the example code in
 ## Kubernetes Deployment
 
 The following examples contains guide how to deploy them on Kubernetes cluster:
+
 - [BART PyTorch from HuggingFace](../examples/huggingface_bart_pytorch)
 - [OPT JAX from HuggingFace with multi-node support](../examples/huggingface_opt_multinode_jax)
 - [NeMo Megatron GPT model with multi-node support](../examples/nemo_megatron_gpt_multinode)

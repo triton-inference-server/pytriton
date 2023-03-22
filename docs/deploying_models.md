@@ -18,7 +18,7 @@ limitations under the License.
 
 The following section provide more details about possible options of configuring the
 [Triton Inference Server](https://github.com/triton-inference-server/server),
-configuring model for loading in Triton and deploying the solution in Docker container or clusters.
+configuring the model for loading in Triton and deploying the solution in Docker containers or clusters.
 
 ## Examples
 
@@ -97,8 +97,8 @@ with Triton() as triton:
 
 ### Background mode
 
-The background mode run Triton as subprocess and does not block execution of current thread. In this mode you can run
-Triton Inference Server and interact with it from current context. The example of using background mode:
+The background mode runs Triton as a subprocess and does not block execution of the current thread. In this mode you can run
+Triton Inference Server and interact with it from the current context. The example of using background mode:
 
 <!--pytest.mark.skip-->
 
@@ -158,8 +158,8 @@ provided `model_name`.
 ### Inference Callable
 
 The inference callable is an entrypoint for inference. This can be any callable that receive the data for
-model inputs in form list of request dictionaries where input names are mapped into ndarrays.
-Input can be also adapted to different more convenient form using set of decorators.
+model inputs in the form list of request dictionaries where input names are mapped into ndarrays.
+Input can be also adapted to different more convenient forms using a set of decorators.
 **More details about designing inference callable and using of decorators can be found
 in separate section - [Inference Callable Design](inference_callable.md)**
 
@@ -185,12 +185,12 @@ with Triton() as triton:
 Multi-instance model inference is a mechanism for loading multiple instances of the same model and call
 them alternately (to hide transfer overhead).
 
-With `Triton` class it can be realised by providing the list of multiple inference callables to `Triton.bind`
-in `infer_func` parameter.
+With `Triton` class it can be realized by providing the list of multiple inference callables to `Triton.bind`
+in the `infer_func` parameter.
 
-The example present multiple instances of Linear PyTorch model loaded on separate device.
+The example presents multiple instances of the Linear PyTorch model loaded on separate devices.
 
-First, define the wrapper class for inference handler. The class initialization receive a model and device as the
+First, define the wrapper class for the inference handler. The class initialization receive a model and device as the
 arguments. The inference handling is done by method `__call__` where the `model` instance is called:
 
 ```python
@@ -252,11 +252,11 @@ with Triton() as triton:
 
 Once the multiple callable objects are passed to `infer_func` the Triton server get information that multiple instances
 of the same model has been created. The incoming requests are distributed among created instances. In our case executing
-a `Linear` model instances loaded on CPU and GPU device.
+two instances of a `Linear` model loaded on CPU and GPU devices.
 
 ### Inputs and Outputs
 
-The integration of Python model requires to provide the inputs and outputs types of the model. This is required to
+The integration of the Python model requires the inputs and outputs types of the model. This is required to
 correctly map the input and output data passed through Triton Inference Server.
 
 The simplest definition on model inputs and outputs expect to provide the type of data and the shape per input:
@@ -282,7 +282,7 @@ The provided configuration creates following tensors:
     - name: OUTPUT_1, data type: FLOAT32, shape = (-1)
     - name: OUTPUT_2, data type: INT32, shape = (-1)
 
-The `-1` mean a dynamic shape of the input or output.
+The `-1` means a dynamic shape of the input or output.
 
 In order to define the name of input and exact shapes the following definition can be used:
 
@@ -325,7 +325,7 @@ tensor3 = Tensor(name="tensor3", shape=(-1,), dtype="float32"),
         > np.array([b"\xff\x00"], dtype=object)
         array([b'\xff\x00'], dtype=object)
 
-    For ease of use, for encoded string values user might use `bytes` dtype.
+    For ease of use, for encoded string values users might use `bytes` dtype.
 
 ### Unrecoverable errors
 
@@ -359,8 +359,8 @@ def infer_fn(**inputs: np.ndarray) -> Dict[str, np.ndarray]:
 ## Model Configuration
 
 The additional model configuration for running model through Triton Inference Server can be provided in `config`
-argument in `bind` method. This section describe the possible configurations enhancements.
-The config of model can be adjusted through overriding the defaults for `ModelConfig` object.
+argument in `bind` method. This section describes the possible configurations enhancements.
+The config of the model can be adjusted through overriding the defaults for `ModelConfig` object.
 
 ```python
 from pytriton.model_config.common import DynamicBatcher
@@ -374,25 +374,25 @@ class ModelConfig:
 
 ### Batching
 
-The batching feature collect one or more samples and pass it to the model together. The model process
-multiple samples at the same time and return the output for all the samples process together.
+The batching feature collects one or more samples and passes it to the model together. The model process
+multiple samples at the same time and return the output for all the samples processed together.
 
 Batching can improve the throughput significantly. Processing multiple samples at the same time leverage benefits of
 utilizing GPU performance for inference.
 
 The Triton Inference Server is responsible to collect multiple incoming requests into a single batch. The batch is
-passed to the model what improve the inference performance (throughput and latency). This feature called
+passed to the model which improves the inference performance (throughput and latency). This feature called
 `dynamic batching`- collect samples from multiple clients into a single batch processed by model.
 
 On the PyTriton side, the `infer_fn` obtain the fully created batch by Triton Inference Server so the only
 responsibility is to perform computation and return the output.
 
 By default, batching is enabled for the model. The default behavior for Triton is to have dynamic batching enabled.
-If your model not support batching use `batching=False` to disable it in Triton.
+If your model does not support batching use `batching=False` to disable it in Triton.
 
 ### Maximal batch size
 
-The maximal batch size define the number of samples that can be processed at the same time by model. This configuration
+The maximal batch size defines the number of samples that can be processed at the same time by model. This configuration
 has impact not only on throughput, but also at memory usage as bigger batch means more data loaded to the memory
 at the same time.
 
@@ -423,7 +423,7 @@ and [API spec](api.md)
 
 ### Response cache
 
-The Triton Inference Server provide functionality to use a cached response for the model. To use response cache:
+The Triton Inference Server provides functionality to use a cached response for the model. To use response cache:
 
 - provide the `response_cache_byte_size` in `TritonConfig`
 - set the `response_cache=True` in `ModelConfig`
@@ -461,13 +461,13 @@ with Triton(config=triton_config) as triton:
 
 ## Deploying in Cluster
 
-The solution can be used inside containers and deployed on Kubernetes cluster. There are certain prerequisites and
-information that would help deploy solution in your cluster.
+The library can be used inside containers and deployed on Kubernetes cluster. There are certain prerequisites and
+information that would help deploy the library in your cluster.
 
 ### Health checks
 
-The solution use Triton Inference Server to handle HTTP/gRPC requests. Triton Server provide endpoints to validate if
-the server is ready and in healthy state. The following API endpoint can be used in your orchestrator solution to
+The library uses Triton Inference Server to handle HTTP/gRPC requests. Triton Server provide endpoints to validate if
+The server is ready and in a healthy state. The following API endpoint can be used in your orchestrator to
 control the application ready and live states:
 
 - Ready: `/v2/health/ready`
@@ -475,7 +475,7 @@ control the application ready and live states:
 
 ### Exposing ports
 
-The solution use Triton Inference Server that expose the HTTP, gRPC and metrics ports for communication. In default
+The library uses Triton Inference Server that exposes the HTTP, gRPC and metrics ports for communication. In default
 configuration the following ports has to be exposed:
 
 - 8000 for HTTP
@@ -510,7 +510,7 @@ containers:
 
 The connection between Python callbacks and Triton Inference Server is using the shared memory passing data between the
 processes. The Docker container the default amount of shared memory is 64MB which can be not enough to pass input and
-output data of model. In order to increase available shared memory size pass additional flag to `docker run` command.
+output data of model. In order to increase available shared memory size, pass an additional flag to `docker run` command.
 Example of increasing shared memory size to 8GB:
 
 <!--pytest.mark.skip-->
@@ -540,4 +540,4 @@ spec:
 You can use the [`--init` flag](https://docs.docker.com/engine/reference/run/#specify-an-init-process) of `docker run`
 command to indicate that an init process should be used as the PID 1 in the container.
 Specifying an init process ensures the reaping zombie processes are performed inside the container. The reaping zombie
-processes functionality is important in case of an unexpected errors occurrence in scripts hosting PyTriton.
+processes functionality is important in case of an unexpected error occurrence in scripts hosting PyTriton.
