@@ -472,7 +472,7 @@ limitations under the License.
 -->
 
 <h1 id="project-description">Project description</h1>
-<p>The PyTriton is Flask/FastAPI-like interface to simplify Triton's deployment in Python environments.
+<p>PyTriton is a Flask/FastAPI-like interface to simplify Triton's deployment in Python environments.
 The library allows to serve Machine Learning models directly from Python through
 NVIDIA <a href="https://github.com/triton-inference-server">Triton Inference Server</a>.</p>
 <p>In PyTriton, same as in Flask or FastAPI, you can define any Python function that execute a Machine Learning model prediction and expose
@@ -548,9 +548,9 @@ environment. In the example we are using a simple <code>Linear</code> PyTorch mo
 </code></pre></div>
 <p>The <code>bind</code> method is creating a connection between Triton Inference Server and the <code>infer_fn</code> which handle
 the inference queries. The <code>inputs</code> and <code>outputs</code> describe the model inputs and outputs that are exposed in
-Triton. The config field allow to provide more parameters for model deployment.</p>
-<p>The <code>serve</code> method is blocking and at this point the application will wait for incoming HTTP/gRPC request. From that
-point the model is available under name <code>Linear</code> in Triton server. The inference queries can be sent to
+Triton. The config field allows more parameters for model deployment.</p>
+<p>The <code>serve</code> method is blocking and at this point the application will wait for incoming HTTP/gRPC requests. From that
+moment the model is available under name <code>Linear</code> in Triton server. The inference queries can be sent to
 <code>localhost:8000/v2/models/Linear/infer</code> which are passed to the <code>infer_fn</code> function.</p>
 <h1 id="links">Links</h1>
 <ul>

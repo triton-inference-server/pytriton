@@ -586,7 +586,7 @@ limitations under the License.
 -->
 
 <h1 id="pytriton">PyTriton</h1>
-<p>The PyTriton is Flask/FastAPI-like interface to simplify Triton's deployment in Python environments.
+<p>PyTriton is a Flask/FastAPI-like interface to simplify Triton's deployment in Python environments.
 The library allows to serve Machine Learning models directly from Python through
 NVIDIA <a href="https://github.com/triton-inference-server">Triton Inference Server</a>.</p>
 <h2 id="how-it-works">How it works?</h2>
@@ -637,7 +637,7 @@ inputs and should return the model outputs:</p>
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">outputs</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">input1</span><span class="p">,</span> <span class="n">input2</span><span class="p">)</span>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="k">return</span> <span class="p">[</span><span class="n">outputs</span><span class="p">]</span>
 </code></pre></div>
-<p>The <code>infer_fn</code> receive the batched input data for the model and should return the batched outputs.</p>
+<p>The <code>infer_fn</code> receives the batched input data for the model and should return the batched outputs.</p>
 <p>In the next step you need to create a connection between Triton and the model. On that purpose the <code>Triton</code> class has to
 be used and the <code>bind</code> method is required to be called to create a dedicated connection between Triton Inference
 Server the defined <code>infer_fn</code>.</p>

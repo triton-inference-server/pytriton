@@ -848,7 +848,7 @@ limitations under the License.
 <h1 id="deploying-models">Deploying Models</h1>
 <p>The following section provide more details about possible options of configuring the
 <a href="https://github.com/triton-inference-server/server">Triton Inference Server</a>,
-configuring model for loading in Triton and deploying the solution in Docker container or clusters.</p>
+configuring the model for loading in Triton and deploying the solution in Docker containers or clusters.</p>
 <h2 id="examples">Examples</h2>
 <p>Before you move to more advanced topics you may want to review examples which provide an implementation of various
 models implementation (in JAX, Python, PyTorch and TensorFlow) deployed using the library.</p>
@@ -902,8 +902,8 @@ execution. This mode make you application behave as a pure server. The example o
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">triton</span><span class="o">.</span><span class="n">serve</span><span class="p">()</span>
 </code></pre></div>
 <h3 id="background-mode">Background mode</h3>
-<p>The background mode run Triton as subprocess and does not block execution of current thread. In this mode you can run
-Triton Inference Server and interact with it from current context. The example of using background mode:</p>
+<p>The background mode runs Triton as a subprocess and does not block execution of the current thread. In this mode you can run
+Triton Inference Server and interact with it from the current context. The example of using background mode:</p>
 <!--pytest.mark.skip-->
 
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span> <span class="nn">pytriton.triton</span> <span class="kn">import</span> <span class="n">Triton</span>
@@ -954,8 +954,8 @@ Triton Inference Server and interact with it from current context. The example o
 provided <code>model_name</code>.</p>
 <h3 id="inference-callable">Inference Callable</h3>
 <p>The inference callable is an entrypoint for inference. This can be any callable that receive the data for
-model inputs in form list of request dictionaries where input names are mapped into ndarrays.
-Input can be also adapted to different more convenient form using set of decorators.
+model inputs in the form list of request dictionaries where input names are mapped into ndarrays.
+Input can be also adapted to different more convenient forms using a set of decorators.
 <strong>More details about designing inference callable and using of decorators can be found
 in separate section - <a href="../inference_callable/">Inference Callable Design</a></strong></p>
 <p>In simplest implementation for functionality that pass input data on output the lambda can be used:</p>
@@ -975,10 +975,10 @@ in separate section - <a href="../inference_callable/">Inference Callable Design
 <h3 id="multi-instance-model-inference">Multi-instance model inference</h3>
 <p>Multi-instance model inference is a mechanism for loading multiple instances of the same model and call
 them alternately (to hide transfer overhead).</p>
-<p>With <code>Triton</code> class it can be realised by providing the list of multiple inference callables to <code>Triton.bind</code>
-in <code>infer_func</code> parameter.</p>
-<p>The example present multiple instances of Linear PyTorch model loaded on separate device.</p>
-<p>First, define the wrapper class for inference handler. The class initialization receive a model and device as the
+<p>With <code>Triton</code> class it can be realized by providing the list of multiple inference callables to <code>Triton.bind</code>
+in the <code>infer_func</code> parameter.</p>
+<p>The example presents multiple instances of the Linear PyTorch model loaded on separate devices.</p>
+<p>First, define the wrapper class for the inference handler. The class initialization receive a model and device as the
 arguments. The inference handling is done by method <code>__call__</code> where the <code>model</code> instance is called:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">import</span> <span class="nn">torch</span>
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="kn">from</span> <span class="nn">pytriton.decorators</span> <span class="kn">import</span> <span class="n">batch</span>
@@ -1031,9 +1031,9 @@ arguments. The inference handling is done by method <code>__call__</code> where 
 </code></pre></div>
 <p>Once the multiple callable objects are passed to <code>infer_func</code> the Triton server get information that multiple instances
 of the same model has been created. The incoming requests are distributed among created instances. In our case executing
-a <code>Linear</code> model instances loaded on CPU and GPU device.</p>
+two instances of a <code>Linear</code> model loaded on CPU and GPU devices.</p>
 <h3 id="inputs-and-outputs">Inputs and Outputs</h3>
-<p>The integration of Python model requires to provide the inputs and outputs types of the model. This is required to
+<p>The integration of the Python model requires the inputs and outputs types of the model. This is required to
 correctly map the input and output data passed through Triton Inference Server.</p>
 <p>The simplest definition on model inputs and outputs expect to provide the type of data and the shape per input:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
@@ -1059,7 +1059,7 @@ correctly map the input and output data passed through Triton Inference Server.<
 </ul>
 </li>
 </ul>
-<p>The <code>-1</code> mean a dynamic shape of the input or output.</p>
+<p>The <code>-1</code> means a dynamic shape of the input or output.</p>
 <p>In order to define the name of input and exact shapes the following definition can be used:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="kn">from</span> <span class="nn">pytriton.model_config</span> <span class="kn">import</span> <span class="n">Tensor</span>
@@ -1094,7 +1094,7 @@ array([b&#39;\xff&#39;], dtype=&#39;|S2&#39;)
 &gt; np.array([b&quot;\xff\x00&quot;], dtype=object)
 array([b&#39;\xff\x00&#39;], dtype=object)
 </code></pre></div>
-<p>For ease of use, for encoded string values user might use <code>bytes</code> dtype.</p>
+<p>For ease of use, for encoded string values users might use <code>bytes</code> dtype.</p>
 </div>
 <h3 id="unrecoverable-errors">Unrecoverable errors</h3>
 <p>When the model gets into a state where further inference is impossible,
@@ -1123,8 +1123,8 @@ to recover the model you need to restart all "workers" on the cluster.</p>
 </code></pre></div>
 <h2 id="model-configuration">Model Configuration</h2>
 <p>The additional model configuration for running model through Triton Inference Server can be provided in <code>config</code>
-argument in <code>bind</code> method. This section describe the possible configurations enhancements.
-The config of model can be adjusted through overriding the defaults for <code>ModelConfig</code> object.</p>
+argument in <code>bind</code> method. This section describes the possible configurations enhancements.
+The config of the model can be adjusted through overriding the defaults for <code>ModelConfig</code> object.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="kn">from</span> <span class="nn">pytriton.model_config.common</span> <span class="kn">import</span> <span class="n">DynamicBatcher</span>
 <a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>
 <a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="k">class</span> <span class="nc">ModelConfig</span><span class="p">:</span>
@@ -1134,19 +1134,19 @@ The config of model can be adjusted through overriding the defaults for <code>Mo
 <a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>    <span class="n">response_cache</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
 </code></pre></div>
 <h3 id="batching">Batching</h3>
-<p>The batching feature collect one or more samples and pass it to the model together. The model process
-multiple samples at the same time and return the output for all the samples process together.</p>
+<p>The batching feature collects one or more samples and passes it to the model together. The model process
+multiple samples at the same time and return the output for all the samples processed together.</p>
 <p>Batching can improve the throughput significantly. Processing multiple samples at the same time leverage benefits of
 utilizing GPU performance for inference.</p>
 <p>The Triton Inference Server is responsible to collect multiple incoming requests into a single batch. The batch is
-passed to the model what improve the inference performance (throughput and latency). This feature called
+passed to the model which improves the inference performance (throughput and latency). This feature called
 <code>dynamic batching</code>- collect samples from multiple clients into a single batch processed by model.</p>
 <p>On the PyTriton side, the <code>infer_fn</code> obtain the fully created batch by Triton Inference Server so the only
 responsibility is to perform computation and return the output.</p>
 <p>By default, batching is enabled for the model. The default behavior for Triton is to have dynamic batching enabled.
-If your model not support batching use <code>batching=False</code> to disable it in Triton.</p>
+If your model does not support batching use <code>batching=False</code> to disable it in Triton.</p>
 <h3 id="maximal-batch-size">Maximal batch size</h3>
-<p>The maximal batch size define the number of samples that can be processed at the same time by model. This configuration
+<p>The maximal batch size defines the number of samples that can be processed at the same time by model. This configuration
 has impact not only on throughput, but also at memory usage as bigger batch means more data loaded to the memory
 at the same time.</p>
 <p>The <code>max_batch_size</code> has to be a value greater or equal to 1.</p>
@@ -1169,7 +1169,7 @@ object:</p>
 the <a href="https://github.com/triton-inference-server/server/blob/main/docs/user_guide/model_configuration.md#dynamic-batcher">Triton Inference Server documentation</a>
 and <a href="../api/">API spec</a></p>
 <h3 id="response-cache">Response cache</h3>
-<p>The Triton Inference Server provide functionality to use a cached response for the model. To use response cache:</p>
+<p>The Triton Inference Server provides functionality to use a cached response for the model. To use response cache:</p>
 <ul>
 <li>provide the <code>response_cache_byte_size</code> in <code>TritonConfig</code></li>
 <li>set the <code>response_cache=True</code> in <code>ModelConfig</code></li>
@@ -1203,18 +1203,18 @@ and <a href="../api/">API spec</a></p>
 <a id="__codelineno-17-26" name="__codelineno-17-26" href="#__codelineno-17-26"></a>    <span class="o">...</span>
 </code></pre></div>
 <h2 id="deploying-in-cluster">Deploying in Cluster</h2>
-<p>The solution can be used inside containers and deployed on Kubernetes cluster. There are certain prerequisites and
-information that would help deploy solution in your cluster.</p>
+<p>The library can be used inside containers and deployed on Kubernetes cluster. There are certain prerequisites and
+information that would help deploy the library in your cluster.</p>
 <h3 id="health-checks">Health checks</h3>
-<p>The solution use Triton Inference Server to handle HTTP/gRPC requests. Triton Server provide endpoints to validate if
-the server is ready and in healthy state. The following API endpoint can be used in your orchestrator solution to
+<p>The library uses Triton Inference Server to handle HTTP/gRPC requests. Triton Server provide endpoints to validate if
+The server is ready and in a healthy state. The following API endpoint can be used in your orchestrator to
 control the application ready and live states:</p>
 <ul>
 <li>Ready: <code>/v2/health/ready</code></li>
 <li>Live: <code>/v2/health/live</code></li>
 </ul>
 <h3 id="exposing-ports">Exposing ports</h3>
-<p>The solution use Triton Inference Server that expose the HTTP, gRPC and metrics ports for communication. In default
+<p>The library uses Triton Inference Server that exposes the HTTP, gRPC and metrics ports for communication. In default
 configuration the following ports has to be exposed:</p>
 <ul>
 <li>8000 for HTTP</li>
@@ -1242,7 +1242,7 @@ command. Example of passing ports configuration:</p>
 <h3 id="configuring-shared-memory">Configuring shared memory</h3>
 <p>The connection between Python callbacks and Triton Inference Server is using the shared memory passing data between the
 processes. The Docker container the default amount of shared memory is 64MB which can be not enough to pass input and
-output data of model. In order to increase available shared memory size pass additional flag to <code>docker run</code> command.
+output data of model. In order to increase available shared memory size, pass an additional flag to <code>docker run</code> command.
 Example of increasing shared memory size to 8GB:</p>
 <!--pytest.mark.skip-->
 
@@ -1265,7 +1265,7 @@ Example of increasing shared memory size to 8GB:</p>
 <p>You can use the <a href="https://docs.docker.com/engine/reference/run/#specify-an-init-process"><code>--init</code> flag</a> of <code>docker run</code>
 command to indicate that an init process should be used as the PID 1 in the container.
 Specifying an init process ensures the reaping zombie processes are performed inside the container. The reaping zombie
-processes functionality is important in case of an unexpected errors occurrence in scripts hosting PyTriton.</p>
+processes functionality is important in case of an unexpected error occurrence in scripts hosting PyTriton.</p>
 
 
 

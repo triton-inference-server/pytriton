@@ -508,7 +508,7 @@ environment. In the example we are using a simple <code>Linear</code> PyTorch mo
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 </code></pre></div>
 <p>In the second step create an inference callback as a function. The function as an argument obtain the HTTP/gRPC
-request data in form of numpy array. The expected return object is also numpy array.</p>
+request data in the form of a numpy. The expected return object is also a numpy array.</p>
 <p>Example implementation:</p>
 <!--pytest-codeblocks:cont-->
 
@@ -558,9 +558,9 @@ request data in form of numpy array. The expected return object is also numpy ar
 </code></pre></div>
 <p>The <code>bind</code> method is creating a connection between Triton Inference Server and the <code>infer_fn</code> which handle
 the inference queries. The <code>inputs</code> and <code>outputs</code> describe the model inputs and outputs that are exposed in
-Triton. The config field allow to provide more parameters for model deployment.</p>
-<p>The <code>serve</code> method is blocking and at this point the application will wait for incoming HTTP/gRPC request. From that
-point the model is available under name <code>Linear</code> in Triton server.  The inference queries can be sent to
+Triton. The config field allows more parameters for model deployment.</p>
+<p>The <code>serve</code> method is blocking and at this point the application will wait for incoming HTTP/gRPC requests. From that
+moment the model is available under the name <code>Linear</code> in the Triton server.  The inference queries can be sent to
 <code>localhost:8000/v2/models/Linear/infer</code> which are passed to the <code>infer_fn</code> function.</p>
 <p>If you would like to use the Triton in background mode use <code>run</code>. More about that you can find
 in <a href="../deploying_models/">deploying models</a> section.</p>

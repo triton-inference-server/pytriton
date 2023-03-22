@@ -696,7 +696,7 @@ limitations under the License.
 -->
 
 <h1 id="inference-callable-design">Inference Callable Design</h1>
-<p>The following section provide more details about writing inference callable for PyTriton.</p>
+<p>The following section provides more details about writing inference callable for PyTriton.</p>
 <h3 id="inference-callable">Inference Callable</h3>
 <p>The inference callable is an entrypoint for handling inference requests. The interface of inference callable assumes
 that it receives list of requests as dictionaries (each dictionary represents one request mapping model input names
@@ -739,9 +739,9 @@ the input data and create output response. The two most popular implementations 
 </code></pre></div>
 <h3 id="batching-decorator">Batching decorator</h3>
 <p>In many cases it is much more convenient to get input already batched in form of numpy array
-(instead of list of separate requests).
+(instead of a list of separate requests).
 For such cases we prepared <code>@batch</code> decorator that adapts generic input into batched form (it passes kwargs to inference
-function where each named input contains numpy array with batch of requests received by Triton server).</p>
+function where each named input contains a numpy array with a batch of requests received by the Triton server).</p>
 <p>Below we show difference between decorated and undecorated function bound with triton:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span> <span class="nn">pytriton.decorators</span> <span class="kn">import</span> <span class="n">batch</span>
@@ -907,7 +907,7 @@ max batch size from model config whatever is closer to current input size)
 </code></pre></div></p>
 </li>
 <li>
-<p><code>@first_value</code> - This decorator takes first elements from batches for selected inputs by <code>keys</code> parameter.
+<p><code>@first_value</code> - This decorator takes the first elements from batches for selected inputs by <code>keys</code> parameter.
 If the value is one element array, it is converted to scalar value.
 It is convenient to use with dynamic model parameters that are sent by the user in the requests.
 You can use <code>@group_by_values</code> before to have batches with the same values in each batch.
@@ -940,7 +940,7 @@ in the future possibly have some interaction with triton</p>
 <hr />
 <p><strong>At the end we show the example of stacking even more decorators together</strong>
 As it is shown below, we have to start with a) type decorators then use b) and c)
-We recommend putting <code>@triton_context</code> as the last decorator in chain.</p>
+We recommend putting <code>@triton_context</code> as the last decorator in the chain.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="kn">from</span> <span class="nn">pytriton.decorators</span> <span class="kn">import</span> <span class="n">batch</span><span class="p">,</span> <span class="n">fill_optionals</span><span class="p">,</span> <span class="n">first_value</span><span class="p">,</span> <span class="n">group_by_keys</span><span class="p">,</span> <span class="n">group_by_values</span><span class="p">,</span> <span class="n">triton_context</span>
 <a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
