@@ -1,5 +1,5 @@
 <!--
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,20 +16,20 @@ limitations under the License.
 
 # Quick Start
 
-The prerequisite for this section is installing the PyTriton which can be found
-in [installation](installation.md)
-section.
+The prerequisite for this page is to install PyTriton, which can be found
+in the [installation](installation.md)
+page.
 
-The quick start presents how to run Python model in Triton Inference Server without need to change the current working
-environment. In the example we are using a simple `Linear` PyTorch model.
+The Quick Start presents how to run a Python model in the Triton Inference Server without needing to change the current working
+environment. In this example, we are using a simple `Linear` PyTorch model.
 
-The integration of model requires to provide following elements:
+The integration of the model requires providing the following elements:
 
-- The model - framework or Python model or function that handle inference requests
-- Inference callback - a lambda or function which handle the input data coming from Triton and return the result
-- Python function connection with Triton Inference Server - a binding for communication between Triton and Python callback
+- The model - a framework or Python model or function that handles inference requests
+- Inference Callable - function or class with `__call__` method, that handles the input data coming from Triton and returns the result
+- Python function connection with Triton Inference Server - a binding for communication between Triton and the Inference Callable
 
-The requirement for the example is to have installed PyTorch in your environment. You can do it running:
+The requirement for the example is to have PyTorch installed in your environment. You can do this by running:
 
 <!--pytest.mark.skip-->
 
@@ -37,7 +37,7 @@ The requirement for the example is to have installed PyTorch in your environment
 pip install torch
 ```
 
-In the next step define the `Linear` model:
+In the next step, define the `Linear` model:
 
 ```python
 import torch
@@ -45,8 +45,8 @@ import torch
 model = torch.nn.Linear(2, 3).to("cuda").eval()
 ```
 
-In the second step create an inference callback as a function. The function as an argument obtain the HTTP/gRPC
-request data in the form of a numpy. The expected return object is also a numpy array.
+In the second step, create an inference callable as a function. The function obtains the HTTP/gRPC
+request data in the form of a NumPy array as an argument. The expected return object is also a NumPy array.
 
 Example implementation:
 
@@ -92,7 +92,7 @@ with Triton() as triton:
     ...
 ```
 
-Finally, serve the model with Triton Inference Server:
+Finally, serve the model with the Triton Inference Server:
 
 <!--pytest.mark.skip-->
 
@@ -104,18 +104,18 @@ with Triton() as triton:
     triton.serve()
 ```
 
-The `bind` method is creating a connection between Triton Inference Server and the `infer_fn` which handle
+The `bind` method creates a connection between the Triton Inference Server and the `infer_fn`, which handles
 the inference queries. The `inputs` and `outputs` describe the model inputs and outputs that are exposed in
 Triton. The config field allows more parameters for model deployment.
 
-The `serve` method is blocking and at this point the application will wait for incoming HTTP/gRPC requests. From that
-moment the model is available under the name `Linear` in the Triton server.  The inference queries can be sent to
-`localhost:8000/v2/models/Linear/infer` which are passed to the `infer_fn` function.
+The `serve` method is blocking, and at this point, the application waits for incoming HTTP/gRPC requests. From that
+moment, the model is available under the name `Linear` in the Triton server. The inference queries can be sent to
+`localhost:8000/v2/models/Linear/infer`, which are passed to the `infer_fn` function.
 
-If you would like to use the Triton in background mode use `run`. More about that you can find
-in [deploying models](deploying_models.md) section.
+If you would like to use Triton in the background mode, use `run`. More about that can be found
+in the [Deploying Models](deploying_models.md) page.
 
-Once the `server` or `run` method is called on `Triton` object the server status can be obtained using:
+Once the `serve` or `run` method is called on the `Triton` object, the server status can be obtained using:
 
 <!--pytest.mark.skip-->
 
@@ -123,7 +123,7 @@ Once the `server` or `run` method is called on `Triton` object the server status
 curl -v localhost:8000/v2/health/live
 ```
 
-The model is loaded right after the server start and status can be queried using:
+The model is loaded right after the server starts, and its status can be queried using:
 
 <!--pytest.mark.skip-->
 ```shell
@@ -141,6 +141,7 @@ curl -X POST \
 ```
 
 The `input.json` with sample query:
+
 ```json
 {
   "id": "0",
@@ -156,12 +157,10 @@ The `input.json` with sample query:
 }
 ```
 
-Read more
-about HTTP/gRPC interface in Triton Inference
-Server [documentation](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#httprest-and-grpc-protocols)
-.
+Read more about the HTTP/gRPC interface in the Triton Inference Server
+[documentation](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#httprest-and-grpc-protocols).
 
-You can also validate the deployed model a simple client can be used to perform inference requests:
+You can also validate the deployed model using a simple client that can perform inference requests:
 
 <!--pytest.mark.skip-->
 
@@ -179,4 +178,4 @@ print(result_dict)
 
 The full example code can be found in [examples/linear_random_pytorch](../examples/linear_random_pytorch).
 
-More information about running the server and models can be found in [deploying models](deploying_models.md) section.
+More information about running the server and models can be found in [Deploying Models](deploying_models.md) page.

@@ -16,9 +16,9 @@ limitations under the License.
 
 # Examples
 
-We provide simple examples how to integrate the PyTorch, TensorFlow2, JAX and simple Python models with Triton Inference
+We provide simple examples on how to integrate PyTorch, TensorFlow2, JAX, and simple Python models with the Triton Inference
 Server using PyTriton. The examples are available
-at [GitHub repository](../examples).
+in the [GitHub repository](../examples).
 
 ## Samples Models Deployment
 
@@ -42,13 +42,13 @@ The list of example models deployments:
 ## Profiling models
 
 The [Perf Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md) can be
-used to profile the models served through PyTriton. We have prepared the example of
+used to profile the models served through PyTriton. We have prepared an example of
 using Perf Analyzer to profile BART PyTorch. See the example code in
-[GitHub repository](../examples/perf_analyzer).
+the [GitHub repository](../examples/perf_analyzer).
 
 ## Kubernetes Deployment
 
-The following examples contains guide how to deploy them on Kubernetes cluster:
+The following examples contain a guide on how to deploy them on a Kubernetes cluster:
 
 - [BART PyTorch from HuggingFace](../examples/huggingface_bart_pytorch)
 - [OPT JAX from HuggingFace with multi-node support](../examples/huggingface_opt_multinode_jax)

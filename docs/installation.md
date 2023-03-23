@@ -1,5 +1,5 @@
 <!--
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,40 +16,39 @@ limitations under the License.
 
 # Installation
 
-This section describes how to install the library. We assume you have a basic understanding of the Python programming language
-and are familiar with Machine Learning models. Using [Docker](https://www.docker.com/) is optional, but not required.
+This page explains how to install the library. We assume that you have a basic understanding of the Python programming language
+and are familiar with machine learning models. Using [Docker](https://www.docker.com/) is optional but not required.
 
 ## Prerequisites
 
-Before installing the library, make sure you meet the following requirements:
+Before installing the library, ensure that you meet the following requirements:
 
-- Operating system with glibc >= 2.31. Triton Inference Server and PyTriton has only been rigorously tested on Ubuntu 20.04.
-  Other supported operating systems include Ubuntu 20.04+, Debian 11+, Rocky Linux 9+, Red Hat Universal Base Image 9+.
+- An operating system with glibc >= 2.31. Triton Inference Server and PyTriton have only been rigorously tested on Ubuntu 20.04.
+Other supported operating systems include Ubuntu 20.04+, Debian 11+, Rocky Linux 9+, and Red Hat Universal Base Image 9+.
 - Python version >= 3.8. If you are using Python 3.9+, see the section "[Installation on Python 3.9+](#installation-on-python-39)" for additional steps.
 - pip >= 20.3
 
 The library can be installed in the system environment, a virtual environment, or a [Docker](https://www.docker.com) image.
 NVIDIA optimized Docker images for Python frameworks can be obtained from the [NVIDIA NGC Catalog](https://catalog.ngc.nvidia.com/containers).
-If you want to use these images, it is recommended to install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/overview.html) to run model inference on an NVIDIA GPU.
+If you want to use the Docker runtime, we recommend that you install [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/overview.html) to enable running model inference on NVIDIA GPU.
 
 ## Installing using pip
 
-The package can be installed from [GitHub](https://github.com/triton-inference-server/pytriton/releases) by running the following command:
+You can install the package from [GitHub](https://github.com/triton-inference-server/pytriton/releases) by running the following command:
 
 ```shell
 pip install -U https://github.com/triton-inference-server/pytriton/releases/download/v0.1.4/pytriton-0.1.4-py3-none-manylinux_2_31_x86_64.whl
 ```
 
-**Important**: The Triton Inference Server binary is installed as part of PyTriton package.
+**Important**: The Triton Inference Server binary is installed as part of the PyTriton package.
 
 ## Installation on Python 3.9+
 
-
-The Triton Inference Server python backend is linked to a fixed Python 3.8,
-so if you want to install PyTriton on a different version of Python,
-you need to prepare the environment for the Triton Inference Server python backend.
+The Triton Inference Server Python backend is linked to a fixed Python 3.8.
+Therefore, if you want to install PyTriton on a different version of Python,
+you need to prepare the environment for the Triton Inference Server Python backend.
 The environment should be located in the `~/.cache/pytriton/python_backend_interpreter`
-directory and contain the packages `numpy~=1.21` and `pyzmq~=23.0`.
+directory and should contain the packages `numpy~=1.21` and `pyzmq~=23.0`.
 
 ### Using pyenv
 
@@ -100,6 +99,6 @@ rm miniconda.sh
 
 ## Building binaries from source
 
-The binary package can be built from the source, which enables not only modifications to the PyTriton code,
-but also the integration of other versions of the Triton Inference Server, including custom-builds.
-For further information on building the PyTriton binary, refer to the [Building page](building.md)
+The binary package can be built from the source, which enables modifications to the PyTriton code,
+as well as the integration of other versions of the Triton Inference Server, including custom builds.
+For further information on building the PyTriton binary, refer to the [Building](building.md) page.

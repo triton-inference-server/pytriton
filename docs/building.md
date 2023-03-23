@@ -21,10 +21,11 @@ It offers the flexibility to modify the PyTriton code and integrate it with vari
 of the Triton Inference Server, including custom builds.
 
 ## Prerequisites
-Before building the PyTriton binary package, the following must be ensured:
 
-- Docker must be installed on the system. For more information, refer to the Docker Documentation.
-- Access to the Docker daemon must be available from the system or container.
+Before building the PyTriton binary package, ensure the following:
+
+- Docker is installed on the system. For more information, refer to the Docker documentation.
+- Access to the Docker daemon is available from the system or container.
 
 ## Building PyTriton binary package
 
@@ -55,6 +56,9 @@ For more information on the Triton Inference Server build process, refer to the
     The Triton Inference Server has only been rigorously tested on Ubuntu 20.04. Other OS and hardware platforms are not
     officially supported. You can test the build by following the steps outlined in the
     [Triton Inference Server testing guide](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/test.md).
+
+Using the following [docker method steps](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/build.md#building-with-docker),
+you can create a `tritonserver:latest` Docker image that can be used to build PyTriton with the following command:
 
 By the following [docker method steps](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/build.md#building-with-docker)
 you can create a `tritonserver:latest` Docker image that can be used to build PyTriton with the following command:

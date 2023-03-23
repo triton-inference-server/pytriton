@@ -1,5 +1,5 @@
 <!--
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,7 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 -->
+
 # Known Issues and Limitations
 
-- There is no 1 to 1 match between solution and [Triton Inference Server](https://github.com/triton-inference-server/server) features, especially supporting user model-store,
-- Only x86-64 instruction set architecture is currently supported
+- There is no one-to-one match between our solution and [Triton Inference Server](https://github.com/triton-inference-server/server) features, especially in terms of supporting a user model store.
+- Currently, only the x86-64 instruction set architecture is supported.
