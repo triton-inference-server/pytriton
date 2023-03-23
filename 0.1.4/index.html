@@ -570,7 +570,7 @@
 
 
 <!--
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -586,46 +586,45 @@ limitations under the License.
 -->
 
 <h1 id="pytriton">PyTriton</h1>
-<p>PyTriton is a Flask/FastAPI-like interface to simplify Triton's deployment in Python environments.
-The library allows to serve Machine Learning models directly from Python through
-NVIDIA <a href="https://github.com/triton-inference-server">Triton Inference Server</a>.</p>
+<p>PyTriton is a Flask/FastAPI-like interface that simplifies Triton's deployment in Python environments.
+The library allows serving Machine Learning models directly from Python through
+NVIDIA's <a href="https://github.com/triton-inference-server">Triton Inference Server</a>.</p>
 <h2 id="how-it-works">How it works?</h2>
-<p>In PyTriton, same as in Flask or FastAPI, you can define any Python function that execute a Machine Learning model prediction and expose
-it through HTTP/gRPC API. The PyTriton installs Triton Inference Server in your environment and use it for handling the
-HTTP/gRPC requests and responses. Our library provides a Python API that allow to attach a Python function to the Triton
-and a communication layer to send/receive data between Triton and the function. The solution helps use of the
-performance features of Triton Inference Server, like dynamic batching or response cache, without changing your model
-environment. Thus, improve the performance of running inference on GPU of models implemented in Python. The solution is
-framework-agnostic and can be used along with frameworks like PyTorch, TensorFlow or JAX.</p>
+<p>In PyTriton, as in Flask or FastAPI, you can define any Python function that executes a machine learning model prediction and exposes
+it through an HTTP/gRPC API. PyTriton installs Triton Inference Server in your environment and uses it for handling
+HTTP/gRPC requests and responses. Our library provides a Python API that allows attaching a Python function to Triton
+and a communication layer to send/receive data between Triton and the function. This solution helps utilize the
+performance features of Triton Inference Server, such as dynamic batching or response cache, without changing your model
+environment. Thus, it improves the performance of running inference on GPU for models implemented in Python. The solution is
+framework-agnostic and can be used along with frameworks like PyTorch, TensorFlow, or JAX.</p>
 <h2 id="architecture">Architecture</h2>
-<p>The diagram below presents the schema how the Python models are served through Triton Inference Server using the
-PyTriton. The solutions consist of two main components:</p>
+<p>The diagram below presents the schema of how the Python models are served through Triton Inference Server using
+PyTriton. The solution consists of two main components:</p>
 <ul>
-<li>Triton Inference Server - for exposing the HTTP/gRPC API, and benefits from performance features like dynamic batching
-  or response cache</li>
-<li>Python Model Environment - your environment where Python model is executed</li>
+<li>Triton Inference Server: for exposing the HTTP/gRPC API and benefiting from performance features like dynamic batching
+or response cache.</li>
+<li>Python Model Environment: your environment where the Python model is executed.</li>
 </ul>
 <p>The Triton Inference Server binaries are provided as part of the PyTriton installation. The Triton Server is
 installed in your current environment (system or container). The PyTriton controls the Triton Server process
-through <code>Triton Controller</code>.</p>
-<p>Exposing the model through PyTriton requires definition of <code>Inference Callable</code> - a Python function that is
-connected to Triton Inference Server and execute model or ensemble for predictions. The integration layer bind
-<code>Inference Callable</code> to Triton Server and expose it through Triton HTTP/gRPC API under a provided <code>&lt;model name&gt;</code>. Once
-the integration is done, the defined <code>Inference Callable</code> receive data send to HTTP/gRPC API endpoint
+through the <code>Triton Controller</code>.</p>
+<p>Exposing the model through PyTriton requires the definition of an <code>Inference Callable</code> - a Python function that is
+connected to Triton Inference Server and executes the model or ensemble for predictions. The integration layer binds
+the <code>Inference Callable</code> to Triton Server and exposes it through the Triton HTTP/gRPC API under a provided <code>&lt;model name&gt;</code>. Once
+the integration is done, the defined <code>Inference Callable</code> receives data sent to the HTTP/gRPC API endpoint
 <code>v2/models/&lt;model name&gt;/infer</code>. Read more about HTTP/gRPC interface in Triton Inference Server
-<a href="https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#httprest-and-grpc-protocols">documentation</a>
-.</p>
-<p>The HTTP/gRPC requests send to <code>v2/models/&lt;model name&gt;/infer</code> are handled by Triton
-Inference Server. The server batch requests and pass to the <code>Proxy Backend</code> which send the batched requests to appropriate
-<code>Inference Callable</code>. The data is sent as <code>numpy</code> array. Once the <code>Inference Callable</code> finish execution of
-model prediction the result is returned to <code>Proxy Backend</code> and response is created by Triton Server.</p>
+<a href="https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#httprest-and-grpc-protocols">documentation</a>.</p>
+<p>The HTTP/gRPC requests sent to <code>v2/models/&lt;model name&gt;/infer</code> are handled by Triton
+Inference Server. The server batches requests and passes them to the <code>Proxy Backend</code>, which sends the batched requests to the appropriate
+<code>Inference Callable</code>. The data is sent as a <code>numpy</code> array. Once the <code>Inference Callable</code> finishes execution of
+the model prediction, the result is returned to the <code>Proxy Backend</code>, and a response is created by Triton Server.</p>
 <p><img alt="High Level Design" src="assets/hld.svg" /></p>
 <h2 id="serving-the-models">Serving the models</h2>
-<p>The PyTriton provide an option to serve your Python model using Triton Inference Server to
+<p>PyTriton provides an option to serve your Python model using Triton Inference Server to
 handle HTTP/gRPC
-requests and pass the input/output tensors to and from the model. We it a blocking mode where the application is a
+requests and pass the input/output tensors to and from the model. We use a blocking mode where the application is a
 long-lived process deployed in your cluster to serve the requests from clients.</p>
-<p>Before you run the model for serving the inference callback function has to be defined. Inference callback receive the
+<p>Before you run the model for serving the inference callback function, it has to be defined. The inference callback receives the
 inputs and should return the model outputs:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span> <span class="nn">pytriton.decorators</span> <span class="kn">import</span> <span class="n">batch</span>
@@ -638,10 +637,10 @@ inputs and should return the model outputs:</p>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="k">return</span> <span class="p">[</span><span class="n">outputs</span><span class="p">]</span>
 </code></pre></div>
 <p>The <code>infer_fn</code> receives the batched input data for the model and should return the batched outputs.</p>
-<p>In the next step you need to create a connection between Triton and the model. On that purpose the <code>Triton</code> class has to
-be used and the <code>bind</code> method is required to be called to create a dedicated connection between Triton Inference
-Server the defined <code>infer_fn</code>.</p>
-<p>In the blocking mode we suggest to use the <code>Triton</code> object as a context manager where multiple model can be loaded in
+<p>In the next step, you need to create a connection between Triton and the model. For that purpose, the <code>Triton</code> class has to
+be used, and the <code>bind</code> method is required to be called to create a dedicated connection between Triton Inference
+Server and the defined <code>infer_fn</code>.</p>
+<p>In the blocking mode, we suggest using the <code>Triton</code> object as a context manager where multiple models can be loaded in
 the way presented below:</p>
 <!--pytest-codeblocks:cont-->
 
@@ -662,28 +661,28 @@ the way presented below:</p>
 <a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>        <span class="n">config</span><span class="o">=</span><span class="n">ModelConfig</span><span class="p">(</span><span class="n">max_batch_size</span><span class="o">=</span><span class="mi">16</span><span class="p">),</span>
 <a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    <span class="p">)</span>
 </code></pre></div>
-<p>At this point you have defined how the model has to be handled by Triton and where the HTTP/gRPC requests for model have
-to be directed. The last part for serving the model is call the <code>serve</code> method on Triton object:</p>
+<p>At this point, you have defined how the model has to be handled by Triton and where the HTTP/gRPC requests for the model have
+to be directed. The last part for serving the model is to call the <code>serve</code> method on the Triton object:</p>
 <!--pytest.mark.skip-->
 
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">with</span> <span class="n">Triton</span><span class="p">()</span> <span class="k">as</span> <span class="n">triton</span><span class="p">:</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="c1"># ...</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">triton</span><span class="o">.</span><span class="n">serve</span><span class="p">()</span>
 </code></pre></div>
-<p>When <code>.sever()</code>  method is called on <code>Triton</code> object, the inference queries can be sent to
-<code>localhost:8000/v2/models/MyModel</code> and the <code>infer_fn</code> is called to handle the inference query.</p>
+<p>When the <code>.serve()</code> method is called on the <code>Triton</code> object, the inference queries can be sent to
+<code>localhost:8000/v2/models/MyModel</code>, and the <code>infer_fn</code> is called to handle the inference query.</p>
 <h2 id="working-in-the-jupyter-notebook">Working in the Jupyter Notebook</h2>
-<p>The package provide an option to work with your model inside the Jupyter Notebook. We call it a
+<p>The package provides an option to work with your model inside the Jupyter Notebook. We call it a
 background mode where
-the model is deployed on Triton Inference Server for handling HTTP/gRPC request but there are other actions that you
+the model is deployed on Triton Inference Server for handling HTTP/gRPC requests, but there are other actions that you
 want to perform after loading and starting serving the model.</p>
-<p>Having the <code>infer_fn</code> defined in the same way as described in <a href="#serving-the-models">serving the models</a> section you
+<p>Having the <code>infer_fn</code> defined in the same way as described in the <a href="#serving-the-models">serving the models</a> section, you
 can use the <code>Triton</code> object without a context:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span> <span class="nn">pytriton.triton</span> <span class="kn">import</span> <span class="n">Triton</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">triton</span> <span class="o">=</span> <span class="n">Triton</span><span class="p">()</span>
 </code></pre></div>
-<p>In the next step the model has to be loaded for serving in Triton Inference Server (which is also the same
-as in serving example):</p>
+<p>In the next step, the model has to be loaded for serving in Triton Inference Server (which is also the same
+as in the serving example):</p>
 <!--pytest-codeblocks:cont-->
 
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
@@ -707,23 +706,23 @@ as in serving example):</p>
 <a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>    <span class="n">config</span><span class="o">=</span><span class="n">ModelConfig</span><span class="p">(</span><span class="n">max_batch_size</span><span class="o">=</span><span class="mi">16</span><span class="p">),</span>
 <a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a><span class="p">)</span>
 </code></pre></div>
-<p>Finally, to run the model in background mode use the <code>run</code> method:</p>
+<p>Finally, to run the model in background mode, use the <code>run</code> method:</p>
 <!--pytest.mark.skip-->
 
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">triton</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
 </code></pre></div>
-<p>When <code>.run()</code>  method is called on <code>Triton</code> object, the inference queries can be sent to
-<code>localhost:8000/v2/models/MyModel</code> and the <code>infer_fn</code> is called to handle the inference query.</p>
+<p>When the <code>.run()</code> method is called on the <code>Triton</code> object, the inference queries can be sent to
+<code>localhost:8000/v2/models/MyModel</code>, and the <code>infer_fn</code> is called to handle the inference query.</p>
 <p>The Triton server can be stopped at any time using the <code>stop</code> method:</p>
 <!--pytest.mark.skip-->
 
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">triton</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
 </code></pre></div>
 <h2 id="what-next">What next?</h2>
-<p>Read more about using the PyTriton in <a href="quick_start/">quick start</a>, <a href="examples/">examples</a> and
-find more options how to configure Triton, models and deployment on cluster in <a href="deploying_models/">deploying models</a>
+<p>Read more about using PyTriton in the <a href="quick_start/">Quick Start</a>, <a href="examples/">Examples</a> and
+find more options on how to configure Triton, models, and deployment on a cluster in the <a href="deploying_models/">Deploying Models</a>
 section.</p>
-<p>The details about classes and methods you can find in <a href="api/">API reference</a> section.</p>
+<p>The details about classes and methods can be found in the <a href="api/">API Reference</a> page.</p>
 
 
 

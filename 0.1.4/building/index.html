@@ -566,10 +566,10 @@ limitations under the License.
 It offers the flexibility to modify the PyTriton code and integrate it with various versions
 of the Triton Inference Server, including custom builds.</p>
 <h2 id="prerequisites">Prerequisites</h2>
-<p>Before building the PyTriton binary package, the following must be ensured:</p>
+<p>Before building the PyTriton binary package, ensure the following:</p>
 <ul>
-<li>Docker must be installed on the system. For more information, refer to the Docker Documentation.</li>
-<li>Access to the Docker daemon must be available from the system or container.</li>
+<li>Docker is installed on the system. For more information, refer to the Docker documentation.</li>
+<li>Access to the Docker daemon is available from the system or container.</li>
 </ul>
 <h2 id="building-pytriton-binary-package">Building PyTriton binary package</h2>
 <p>To build the wheel binary package, follow these steps from the root directory of the project:</p>
@@ -591,6 +591,8 @@ The build can be CPU-only, as inference is performed on Inference Handlers.</p>
 officially supported. You can test the build by following the steps outlined in the
 <a href="https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/test.md">Triton Inference Server testing guide</a>.</p>
 </div>
+<p>Using the following <a href="https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/build.md#building-with-docker">docker method steps</a>,
+you can create a <code>tritonserver:latest</code> Docker image that can be used to build PyTriton with the following command:</p>
 <p>By the following <a href="https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/build.md#building-with-docker">docker method steps</a>
 you can create a <code>tritonserver:latest</code> Docker image that can be used to build PyTriton with the following command:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>make<span class="w"> </span><span class="nv">TRITONSERVER_IMAGE_NAME</span><span class="o">=</span>tritonserver:latest<span class="w"> </span>dist

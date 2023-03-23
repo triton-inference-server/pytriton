@@ -470,7 +470,7 @@
 
 
 <!--
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -486,29 +486,29 @@ limitations under the License.
 -->
 
 <h1 id="quick-start">Quick Start</h1>
-<p>The prerequisite for this section is installing the PyTriton which can be found
-in <a href="../installation/">installation</a>
-section.</p>
-<p>The quick start presents how to run Python model in Triton Inference Server without need to change the current working
-environment. In the example we are using a simple <code>Linear</code> PyTorch model.</p>
-<p>The integration of model requires to provide following elements:</p>
+<p>The prerequisite for this page is to install PyTriton, which can be found
+in the <a href="../installation/">installation</a>
+page.</p>
+<p>The Quick Start presents how to run a Python model in the Triton Inference Server without needing to change the current working
+environment. In this example, we are using a simple <code>Linear</code> PyTorch model.</p>
+<p>The integration of the model requires providing the following elements:</p>
 <ul>
-<li>The model - framework or Python model or function that handle inference requests</li>
-<li>Inference callback - a lambda or function which handle the input data coming from Triton and return the result</li>
-<li>Python function connection with Triton Inference Server - a binding for communication between Triton and Python callback</li>
+<li>The model - a framework or Python model or function that handles inference requests</li>
+<li>Inference Callable - function or class with <code>__call__</code> method, that handles the input data coming from Triton and returns the result</li>
+<li>Python function connection with Triton Inference Server - a binding for communication between Triton and the Inference Callable</li>
 </ul>
-<p>The requirement for the example is to have installed PyTorch in your environment. You can do it running:</p>
+<p>The requirement for the example is to have PyTorch installed in your environment. You can do this by running:</p>
 <!--pytest.mark.skip-->
 
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>torch
 </code></pre></div>
-<p>In the next step define the <code>Linear</code> model:</p>
+<p>In the next step, define the <code>Linear</code> model:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span> <span class="nn">torch</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 </code></pre></div>
-<p>In the second step create an inference callback as a function. The function as an argument obtain the HTTP/gRPC
-request data in the form of a numpy. The expected return object is also a numpy array.</p>
+<p>In the second step, create an inference callable as a function. The function obtains the HTTP/gRPC
+request data in the form of a NumPy array as an argument. The expected return object is also a NumPy array.</p>
 <p>Example implementation:</p>
 <!--pytest-codeblocks:cont-->
 
@@ -547,7 +547,7 @@ request data in the form of a numpy. The expected return object is also a numpy 
 <a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>    <span class="p">)</span>
 <a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>    <span class="o">...</span>
 </code></pre></div>
-<p>Finally, serve the model with Triton Inference Server:</p>
+<p>Finally, serve the model with the Triton Inference Server:</p>
 <!--pytest.mark.skip-->
 
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span> <span class="nn">pytriton.triton</span> <span class="kn">import</span> <span class="n">Triton</span>
@@ -556,20 +556,20 @@ request data in the form of a numpy. The expected return object is also a numpy 
 <a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="o">...</span>  <span class="c1"># Load models here</span>
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">triton</span><span class="o">.</span><span class="n">serve</span><span class="p">()</span>
 </code></pre></div>
-<p>The <code>bind</code> method is creating a connection between Triton Inference Server and the <code>infer_fn</code> which handle
+<p>The <code>bind</code> method creates a connection between the Triton Inference Server and the <code>infer_fn</code>, which handles
 the inference queries. The <code>inputs</code> and <code>outputs</code> describe the model inputs and outputs that are exposed in
 Triton. The config field allows more parameters for model deployment.</p>
-<p>The <code>serve</code> method is blocking and at this point the application will wait for incoming HTTP/gRPC requests. From that
-moment the model is available under the name <code>Linear</code> in the Triton server.  The inference queries can be sent to
-<code>localhost:8000/v2/models/Linear/infer</code> which are passed to the <code>infer_fn</code> function.</p>
-<p>If you would like to use the Triton in background mode use <code>run</code>. More about that you can find
-in <a href="../deploying_models/">deploying models</a> section.</p>
-<p>Once the <code>server</code> or <code>run</code> method is called on <code>Triton</code> object the server status can be obtained using:</p>
+<p>The <code>serve</code> method is blocking, and at this point, the application waits for incoming HTTP/gRPC requests. From that
+moment, the model is available under the name <code>Linear</code> in the Triton server. The inference queries can be sent to
+<code>localhost:8000/v2/models/Linear/infer</code>, which are passed to the <code>infer_fn</code> function.</p>
+<p>If you would like to use Triton in the background mode, use <code>run</code>. More about that can be found
+in the <a href="../deploying_models/">Deploying Models</a> page.</p>
+<p>Once the <code>serve</code> or <code>run</code> method is called on the <code>Triton</code> object, the server status can be obtained using:</p>
 <!--pytest.mark.skip-->
 
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>curl<span class="w"> </span>-v<span class="w"> </span>localhost:8000/v2/health/live
 </code></pre></div>
-<p>The model is loaded right after the server start and status can be queried using:</p>
+<p>The model is loaded right after the server starts, and its status can be queried using:</p>
 <!--pytest.mark.skip-->
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>curl<span class="w"> </span>-v<span class="w"> </span>localhost:8000/v2/models/Linear/ready
 </code></pre></div>
@@ -581,7 +581,7 @@ in <a href="../deploying_models/">deploying models</a> section.</p>
 <a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span>-d<span class="w"> </span>@input.json<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span>localhost:8000/v2/models/Linear/infer
 </code></pre></div>
-<p>The <code>input.json</code> with sample query:
+<p>The <code>input.json</code> with sample query:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">{</span>
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0&quot;</span><span class="p">,</span>
 <a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">&quot;inputs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
@@ -594,12 +594,10 @@ in <a href="../deploying_models/">deploying models</a> section.</p>
 <a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">    </span><span class="p">}</span>
 <a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">  </span><span class="p">]</span>
 <a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="p">}</span>
-</code></pre></div></p>
-<p>Read more
-about HTTP/gRPC interface in Triton Inference
-Server <a href="https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#httprest-and-grpc-protocols">documentation</a>
-.</p>
-<p>You can also validate the deployed model a simple client can be used to perform inference requests:</p>
+</code></pre></div>
+<p>Read more about the HTTP/gRPC interface in the Triton Inference Server
+<a href="https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#httprest-and-grpc-protocols">documentation</a>.</p>
+<p>You can also validate the deployed model using a simple client that can perform inference requests:</p>
 <!--pytest.mark.skip-->
 
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">import</span> <span class="nn">torch</span>
@@ -613,7 +611,7 @@ Server <a href="https://github.com/triton-inference-server/server/blob/main/docs
 <a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">result_dict</span><span class="p">)</span>
 </code></pre></div>
 <p>The full example code can be found in <a href="https://github.com/triton-inference-server/pytriton/blob/main/examples/linear_random_pytorch">examples/linear_random_pytorch</a>.</p>
-<p>More information about running the server and models can be found in <a href="../deploying_models/">deploying models</a> section.</p>
+<p>More information about running the server and models can be found in <a href="../deploying_models/">Deploying Models</a> page.</p>
 
 
 
