@@ -26,27 +26,27 @@ There are two common implementations for inference callables:
 
 1. Functions:
 
-```python
-import numpy as np
-from typing import Dict, List
+    ```python
+    import numpy as np
+    from typing import Dict, List
 
-def infer_fn(requests: List[Dict[str, np.ndarray]]) -> List[Dict[str, np.ndarray]]:
-    ...
-```
+    def infer_fn(requests: List[Dict[str, np.ndarray]]) -> List[Dict[str, np.ndarray]]:
+        ...
+    ```
 
 2. Class:
 
-<!--pytest-codeblocks:cont-->
+    <!--pytest-codeblocks:cont-->
 
-```python
-import numpy as np
-from typing import Dict, List
+    ```python
+    import numpy as np
+    from typing import Dict, List
 
-class InferCallable:
+    class InferCallable:
 
-    def __call__(self, requests: List[Dict[str, np.ndarray]]) -> List[Dict[str, np.ndarray]]:
-       ...
-```
+        def __call__(self, requests: List[Dict[str, np.ndarray]]) -> List[Dict[str, np.ndarray]]:
+           ...
+    ```
 
 To use the inference callable with PyTriton, it must be bound to a Triton server instance using the `bind` method:
 
@@ -194,98 +194,98 @@ We have prepared several useful decorators for converting generic request input 
 
 Our standard decorators implement three types of interfaces:
 
-a) Receive a list of request dictionaries and return a list of response dictionaries (dictionaries map input/output names to NumPy arrays)
+1. Receive a list of request dictionaries and return a list of response dictionaries (dictionaries map input/output names to NumPy arrays)
 
-- `@group_by_keys` - groups requests with the same set of keys and calls the wrapped function for each group separately. This decorator is convenient to use before batching because the batching decorator requires a consistent set of inputs as it stacks them into batches.
+    - `@group_by_keys` - groups requests with the same set of keys and calls the wrapped function for each group separately. This decorator is convenient to use before batching because the batching decorator requires a consistent set of inputs as it stacks them into batches.
 
-  ```python
-  from pytriton.decorators import batch, group_by_keys
+      ```python
+      from pytriton.decorators import batch, group_by_keys
 
-  @group_by_keys
-  @batch
-  def infer_fn(mandatory_input, optional_input=None):
-      # perform inference
-      pass
-  ```
+      @group_by_keys
+      @batch
+      def infer_fn(mandatory_input, optional_input=None):
+          # perform inference
+          pass
+      ```
 
-- `@group_by_values(*keys)` - groups requests with the same input value (for selected keys) and calls the wrapped function for each group separately. This decorator is particularly useful with models requiring dynamic parameters sent by users, such as temperature. In this case, we want to run the model only for requests with the same temperature value.
+    - `@group_by_values(*keys)` - groups requests with the same input value (for selected keys) and calls the wrapped function for each group separately. This decorator is particularly useful with models requiring dynamic parameters sent by users, such as temperature. In this case, we want to run the model only for requests with the same temperature value.
 
-  ```python
-  from pytriton.decorators import batch, group_by_values
+      ```python
+      from pytriton.decorators import batch, group_by_values
 
-  @batch
-  @group_by_values('temperature')
-  def infer_fn(mandatory_input, temperature):
-      # perform inference
-      pass
-  ```
+      @batch
+      @group_by_values('temperature')
+      def infer_fn(mandatory_input, temperature):
+          # perform inference
+          pass
+      ```
 
-- `@fill_optionals(**defaults)` - fills missing inputs in requests with default values provided by the user. If model owners have default values for some optional parameters, it's a good idea to provide them at the beginning, so other decorators can create larger consistent groups and send them to the inference callable.
+    - `@fill_optionals(**defaults)` - fills missing inputs in requests with default values provided by the user. If model owners have default values for some optional parameters, it's a good idea to provide them at the beginning, so other decorators can create larger consistent groups and send them to the inference callable.
 
-  ```python
-  import numpy as np
-  from pytriton.decorators import batch, fill_optionals, group_by_values
+      ```python
+      import numpy as np
+      from pytriton.decorators import batch, fill_optionals, group_by_values
 
-  @fill_optionals(temperature=np.array([10.0]))
-  @batch
-  @group_by_values('temperature')
-  def infer_fn(mandatory_input, temperature):
-      # perform inference
-      pass
-  ```
+      @fill_optionals(temperature=np.array([10.0]))
+      @batch
+      @group_by_values('temperature')
+      def infer_fn(mandatory_input, temperature):
+          # perform inference
+          pass
+      ```
 
-b) Receive a list of request dictionaries and return a dictionary that maps input names to arrays (passes the dictionary to the wrapped infer function as named arguments - `kwargs`):
+2. Receive a list of request dictionaries and return a dictionary that maps input names to arrays (passes the dictionary to the wrapped infer function as named arguments - `kwargs`):
 
-- `@batch` - generates a batch from input requests.
-- `@sample` - takes the first request and converts it into named inputs. This decorator is useful with non-batching models. Instead of a one-element list of requests, we get named inputs - `kwargs` (usage is shown in previous examples).
+    - `@batch` - generates a batch from input requests.
+    - `@sample` - takes the first request and converts it into named inputs. This decorator is useful with non-batching models. Instead of a one-element list of requests, we get named inputs - `kwargs` (usage is shown in previous examples).
 
-c) Receive a batch (a dictionary that maps input names to arrays) and return a batch after some processing:
+3. Receive a batch (a dictionary that maps input names to arrays) and return a batch after some processing:
 
-- `@pad_batch` - appends the last row to the input multiple times to achieve the desired batch size (preferred batch size or max batch size from the model config, whichever is closer to the current input size).
+    - `@pad_batch` - appends the last row to the input multiple times to achieve the desired batch size (preferred batch size or max batch size from the model config, whichever is closer to the current input size).
 
-  ```python
-  from pytriton.decorators import batch, pad_batch
+      ```python
+      from pytriton.decorators import batch, pad_batch
 
-  @batch
-  @pad_batch
-  def infer_fn(mandatory_input):
-      # this model requires mandatory_input batch to be the size provided in the model config
-      pass
-  ```
+      @batch
+      @pad_batch
+      def infer_fn(mandatory_input):
+          # this model requires mandatory_input batch to be the size provided in the model config
+          pass
+      ```
 
-- `@first_value` - this decorator takes the first elements from batches for selected inputs specified by the `keys` parameter.
-  If the value is a one-element array, it is converted to a scalar value.
-  This decorator is convenient to use with dynamic model parameters that users send in requests.
-  You can use `@group_by_values` before to have batches with the same values in each batch.
+    - `@first_value` - this decorator takes the first elements from batches for selected inputs specified by the `keys` parameter.
+      If the value is a one-element array, it is converted to a scalar value.
+      This decorator is convenient to use with dynamic model parameters that users send in requests.
+      You can use `@group_by_values` before to have batches with the same values in each batch.
 
-  ```python
-  import numpy as np
-  from pytriton.decorators import batch, fill_optionals, first_value, group_by_values
+      ```python
+      import numpy as np
+      from pytriton.decorators import batch, fill_optionals, first_value, group_by_values
 
-  @fill_optionals(temperature=np.array([10.0]))
-  @batch
-  @group_by_values('temperature')
-  @first_value('temperature')
-  def infer_fn(mandatory_input, temperature):
-      # perform inference with scalar temperature=10
-      pass
-  ```
+      @fill_optionals(temperature=np.array([10.0]))
+      @batch
+      @group_by_values('temperature')
+      @first_value('temperature')
+      def infer_fn(mandatory_input, temperature):
+          # perform inference with scalar temperature=10
+          pass
+      ```
 
-d) The `@triton_context` decorator provides an additional argument called `triton_context`,
+4. The `@triton_context` decorator provides an additional argument called `triton_context`,
    from which you can read the model config.
 
-   ```python
-   from pytriton.decorators import triton_context
+    ```python
+    from pytriton.decorators import triton_context
 
-   @triton_context
-   def infer_fn(input_list, **kwargs):
-       model_config = kwargs['triton_context'].model_config
-       # perform inference using some information from model_config
-       pass
-  ```
+    @triton_context
+    def infer_fn(input_list, **kwargs):
+        model_config = kwargs['triton_context'].model_config
+        # perform inference using some information from model_config
+        pass
+    ```
 
 Here is an example of stacking multiple decorators together.
-We recommend starting with type a) decorators, followed by types b) and c).
+We recommend starting with type 1 decorators, followed by types 2 and 3.
 Place the `@triton_context` decorator last in the chain.
 
 ```python
