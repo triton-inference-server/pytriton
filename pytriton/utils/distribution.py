@@ -12,36 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Set of utils to obtain properties of pytriton distribution."""
+import logging
 import pathlib
 import site
 
-
-def _get_site_packages() -> pathlib.Path:
-    """Obtains path to current interpreter site-packages directory where pytriton is installed.
-
-    Returns:
-        Path to current interpreter site directory where pytriton is installed.
-    """
-
-    def _has_pytriton_installed(site_package_path: str):
-        site_package_path = pathlib.Path(site_package_path)
-        return bool(list(site_package_path.glob("*pytriton*")))
-
-    site_packages_with_pytriton = [pathlib.Path(p) for p in site.getsitepackages() if _has_pytriton_installed(p)]
-    assert site_packages_with_pytriton, f"Could not find pytriton package installed in {site.getsitepackages()}"
-    return site_packages_with_pytriton[0]
-
-
-def get_libs_path():
-    """Obtains path to directory with external libraries required by library.
-
-    Returns:
-        Path to directory with external libraries required by library.
-    """
-    if is_editable_install():
-        return get_root_module_path() / "tritonserver/external_libs"
-    else:
-        return _get_site_packages() / "pytriton.libs"
+LOGGER = logging.getLogger(__name__)
 
 
 def get_root_module_path() -> pathlib.Path:
@@ -50,20 +25,41 @@ def get_root_module_path() -> pathlib.Path:
     Returns:
         Path to pytriton root module in site or if installed in editable model - local.
     """
-    return pathlib.Path(__file__).parent.parent
+    pytriton_module_path = pathlib.Path(__file__).parent.parent
+    LOGGER.debug("Obtained pytriton module path: %s", pytriton_module_path)
+    return pytriton_module_path
 
 
 def is_editable_install() -> bool:
     """Checks if pytriton is installed in editable mode.
 
     Returns:
-        True if pytriton is installed in editable model, False otherwise.
+        True if pytriton is installed in editable mode, False otherwise.
     """
-    import pytriton
+    editable_mode = True
+    site_packages = site.getsitepackages() + [site.getusersitepackages()]
+    pytriton_module_path = get_root_module_path()
+    for site_package in site_packages:
+        try:
+            pytriton_module_path.relative_to(site_package)
+            editable_mode = False
+            break
+        except ValueError:
+            pass
+    LOGGER.debug("pytriton is installed in editable mode: %s", editable_mode)
+    return editable_mode
 
-    pytriton_module_path = pathlib.Path(list(pytriton.__path__)[0]).parent
-    try:
-        pytriton_module_path.relative_to(_get_site_packages())
-        return False
-    except ValueError:
-        return True
+
+def get_libs_path():
+    """Obtains path to directory with external libraries required by library.
+
+    Returns:
+        Path to directory with external libraries required by library.
+    """
+    pytriton_module_path = get_root_module_path()
+    if is_editable_install():
+        libs_path = pytriton_module_path / "tritonserver/external_libs"
+    else:
+        libs_path = pytriton_module_path.parent / "pytriton.libs"
+    LOGGER.debug("Obtained pytriton.libs path: %s", libs_path)
+    return libs_path
