@@ -39,7 +39,7 @@ make dist
 The wheel package will be located in the `dist` directory. To install the library, run the following `pip` command:
 
 ```shell
-pip install dist/pytriton-*-py3-none-*_x86_64.whl
+pip install dist/nvidia_pytriton-*-py3-none-*_x86_64.whl
 ```
 
 ## Building for a specific Triton Inference Server version
