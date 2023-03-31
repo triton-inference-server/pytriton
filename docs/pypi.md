@@ -16,18 +16,17 @@ limitations under the License.
 
 # Project description
 
+PyTriton is a Flask/FastAPI-like interface that simplifies Triton's deployment in Python environments.
+The library allows serving Machine Learning models directly from Python through
+NVIDIA's [Triton Inference Server](https://github.com/triton-inference-server).
 
-PyTriton is a Flask/FastAPI-like interface to simplify Triton's deployment in Python environments.
-The library allows to serve Machine Learning models directly from Python through
-NVIDIA [Triton Inference Server](https://github.com/triton-inference-server).
-
-In PyTriton, same as in Flask or FastAPI, you can define any Python function that execute a Machine Learning model prediction and expose
-it through HTTP/gRPC API. The library installs Triton Inference Server in your environment and use it for handling the
-HTTP/gRPC requests and responses. Our library provides a Python API that allow to attach a Python function to the Triton
-and a communication layer to send/receive data between Triton and the function. The solution helps use of the
-performance features of Triton Inference Server, like dynamic batching or response cache, without changing your model
-environment. Thus, improve the performance of running inference on GPU of models implemented in Python. The solution is
-framework-agnostic and can be used along with frameworks like PyTorch, TensorFlow or JAX.
+In PyTriton, as in Flask or FastAPI, you can define any Python function that executes a machine learning model prediction and exposes
+it through an HTTP/gRPC API. PyTriton installs Triton Inference Server in your environment and uses it for handling
+HTTP/gRPC requests and responses. Our library provides a Python API that allows attaching a Python function to Triton
+and a communication layer to send/receive data between Triton and the function. This solution helps utilize the
+performance features of Triton Inference Server, such as dynamic batching or response cache, without changing your model
+environment. Thus, it improves the performance of running inference on GPU for models implemented in Python. The solution is
+framework-agnostic and can be used along with frameworks like PyTorch, TensorFlow, or JAX.
 
 
 # Installing
@@ -37,7 +36,7 @@ The package can be installed from `GitHub` using:
 <!--pytest.mark.skip-->
 
 ```shell
-pip install -U https://github.com/triton-inference-server/pytriton/releases/download/v0.1.4/pytriton-0.1.4-py3-none-manylinux_2_31_x86_64.whl
+pip install -U nvidia-pytriton
 ```
 
 # Example
@@ -128,6 +127,6 @@ moment the model is available under name `Linear` in Triton server. The inferenc
 * Documentation: https://triton-inference-server.github.io/pytriton
 * Source: https://github.com/triton-inference-server/pytriton
 * Issues: https://github.com/triton-inference-server/pytriton/issues
-* Changelog: https://github.com/triton-inference-server/pytriton/CHANGELOG.md
-* Known Issues: https://github.com/triton-inference-server/pytriton/docs/known_issues.md
-* Contributing: https://github.com/triton-inference-server/pytriton/CONTRIBUTING.md
+* Changelog: https://github.com/triton-inference-server/pytriton/blob/main/CHANGELOG.md
+* Known Issues: https://github.com/triton-inference-server/pytriton/blob/main/docs/known_issues.md
+* Contributing: https://github.com/triton-inference-server/pytriton/blob/main/CONTRIBUTING.md

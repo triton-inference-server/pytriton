@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 [project]
-name = "pytriton"
+name = "nvidia-pytriton"
 readme = "docs/pypi.md"
 description = "PyTriton - Flask/FastAPI-like interface to simplify Triton's deployment in Python environments."
 dynamic = ["version"]
@@ -70,8 +70,8 @@ doc = [
     "mkdocstrings[python] >= 0.19.0",
 ]
 dev = [
-    "pytriton[test]",
-    "pytriton[doc]",
+    "nvidia-pytriton[test]",
+    "nvidia-pytriton[doc]",
     "black >= 22.8",
     "build >= 0.8",
     "ipython >= 7.16",

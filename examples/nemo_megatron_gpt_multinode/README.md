@@ -54,7 +54,7 @@ If you select to use container we recommend to install
 
 2. While being in just started container, [install PyTriton](../../docs/installation.md):
     ```bash
-    pip install -U https://github.com/triton-inference-server/pytriton/releases/download/v0.1.4/pytriton-0.1.4-py3-none-manylinux_2_31_x86_64.whl
+    pip install -U nvidia-pytriton
     ```
 
 3. Start NeMo Megatron GPT model:
@@ -121,7 +121,7 @@ For that we can use [Slurm](https://slurm.schedmd.com/) cluster management syste
         --container-workdir "${PWD}" \
         --no-container-mount-home \
         --unbuffered \
-        bash -c '[[ ${LOCAL_RANK} -eq 0 ]] && pip install -U https://github.com/triton-inference-server/pytriton/releases/download/v0.1.4/pytriton-0.1.4-py3-none-manylinux_2_31_x86_64.whl || true'
+        bash -c '[[ ${LOCAL_RANK} -eq 0 ]] && pip install -U nvidia-pytriton || true'
    # reuse of container prepared in above srun
    srun --output slurm_job-%x-%J.out \
         --container-name nemo_megatron_gpt_container \
@@ -168,7 +168,7 @@ Example client calls:
    cd <pytriton_repository_dir>
    docker run --rm -it -v $PWD:$PWD -w $PWD --link nemo_megatron_gpt_server nvcr.io/nvidia/pytorch:22.07-py3 bash
    # now inside obtained container
-   pip install -U https://github.com/triton-inference-server/pytriton/releases/download/v0.1.4/pytriton-0.1.4-py3-none-manylinux_2_31_x86_64.whl
+   pip install -U nvidia-pytriton
    ./examples/nemo_megatron_gpt_multinode/client.py --url http://nemo_megatron_gpt_server:8000
    ```
 
@@ -180,7 +180,7 @@ Example client calls:
    virtualenv -p $(which python3.8) .venv
    source .venv/bin/activate
    # and install pytriton
-   pip install -U https://github.com/triton-inference-server/pytriton/releases/download/v0.1.4/pytriton-0.1.4-py3-none-manylinux_2_31_x86_64.whl
+   pip install -U nvidia-pytriton
    # run client
    # thanks to docker port publishing it is available outside of docker
    ./examples/nemo_megatron_gpt_multinode/client.py --url http://localhost:8000
@@ -214,7 +214,7 @@ For multi-node scenario you can run client:
       --no-container-mount-home \
       bash
    # in newly created container install PyTriton and execute
-   pip install -U https://github.com/triton-inference-server/pytriton/releases/download/v0.1.4/pytriton-0.1.4-py3-none-manylinux_2_31_x86_64.whl
+   pip install -U nvidia-pytriton
    ./examples/nemo_megatron_gpt_multinode/client.py --url http://<pytriton_hostname>:8000
    ```
 
