@@ -13,7 +13,7 @@
 # limitations under the License.
 [project]
 name = "nvidia-pytriton"
-readme = "docs/pypi.md"
+readme = "docs/pypi.rst"
 description = "PyTriton - Flask/FastAPI-like interface to simplify Triton's deployment in Python environments."
 dynamic = ["version"]
 classifiers = [

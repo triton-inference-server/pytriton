@@ -1,24 +1,26 @@
-<!--
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+..
+    Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+        http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
--->
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
 
-# Project description
+PyTriton
+========
 
 PyTriton is a Flask/FastAPI-like interface that simplifies Triton's deployment in Python environments.
 The library allows serving Machine Learning models directly from Python through
-NVIDIA's [Triton Inference Server](https://github.com/triton-inference-server).
+NVIDIA's `Triton Inference Server`_.
+
+.. _Triton Inference Server: https://github.com/triton-inference-server
 
 In PyTriton, as in Flask or FastAPI, you can define any Python function that executes a machine learning model prediction and exposes
 it through an HTTP/gRPC API. PyTriton installs Triton Inference Server in your environment and uses it for handling
@@ -29,90 +31,87 @@ environment. Thus, it improves the performance of running inference on GPU for m
 framework-agnostic and can be used along with frameworks like PyTorch, TensorFlow, or JAX.
 
 
-# Installing
+Installing
+----------
 
-The package can be installed from `GitHub` using:
+The package can be installed from `pypi`_ using:
 
-<!--pytest.mark.skip-->
+.. _pypi: https://pypi.org/project/nvidia-pytriton/
 
-```shell
-pip install -U nvidia-pytriton
-```
+.. code-block:: text
 
-# Example
+    pip install -U nvidia-pytriton
+
+
+Example
+-------
 
 The example presents how to run Python model in Triton Inference Server without need to change the current working
 environment. In the example we are using a simple `Linear` PyTorch model.
 
 The requirement for the example is to have installed PyTorch in your environment. You can do it running:
 
-<!--pytest.mark.skip-->
 
-```shell
-pip install torch
-```
+.. code-block:: text
+
+    pip install torch
 
 In the next step define the `Linear` model:
 
-```python
-import torch
+.. code-block:: python
 
-model = torch.nn.Linear(2, 3).to("cuda").eval()
-```
+    import torch
+
+    model = torch.nn.Linear(2, 3).to("cuda").eval()
 
 Create a function for handling inference request:
 
-<!--pytest-codeblocks:cont-->
+.. code-block:: python
 
-```python
-import numpy as np
-from pytriton.decorators import batch
+    import numpy as np
+    from pytriton.decorators import batch
 
 
-@batch
-def infer_fn(**inputs: np.ndarray):
-    (input1_batch,) = inputs.values()
-    input1_batch_tensor = torch.from_numpy(input1_batch).to("cuda")
-    output1_batch_tensor = model(input1_batch_tensor)  # Calling the Python model inference
-    output1_batch = output1_batch_tensor.cpu().detach().numpy()
-    return [output1_batch]
-```
+    @batch
+    def infer_fn(**inputs: np.ndarray):
+        (input1_batch,) = inputs.values()
+        input1_batch_tensor = torch.from_numpy(input1_batch).to("cuda")
+        output1_batch_tensor = model(input1_batch_tensor)  # Calling the Python model inference
+        output1_batch = output1_batch_tensor.cpu().detach().numpy()
+        return [output1_batch]
+
 
 In the next step, create the connection between the model and Triton Inference Server using the bind method:
 
-<!--pytest-codeblocks:cont-->
+.. code-block:: python
 
-```python
-from pytriton.model_config import ModelConfig, Tensor
-from pytriton.triton import Triton
+    from pytriton.model_config import ModelConfig, Tensor
+    from pytriton.triton import Triton
 
-# Connecting inference callback with Triton Inference Server
-with Triton() as triton:
-    # Load model into Triton Inference Server
-    triton.bind(
-        model_name="Linear",
-        infer_func=infer_fn,
-        inputs=[
-            Tensor(dtype=np.float32, shape=(-1,)),
-        ],
-        outputs=[
-            Tensor(dtype=np.float32, shape=(-1,)),
-        ],
-        config=ModelConfig(max_batch_size=128)
-    )
-```
+    # Connecting inference callback with Triton Inference Server
+    with Triton() as triton:
+        # Load model into Triton Inference Server
+        triton.bind(
+            model_name="Linear",
+            infer_func=infer_fn,
+            inputs=[
+                Tensor(dtype=np.float32, shape=(-1,)),
+            ],
+            outputs=[
+                Tensor(dtype=np.float32, shape=(-1,)),
+            ],
+            config=ModelConfig(max_batch_size=128)
+        )
 
 Finally, serve the model with Triton Inference Server:
 
-<!--pytest.mark.skip-->
+.. code-block:: python
 
-```python
-from pytriton.triton import Triton
+    from pytriton.triton import Triton
 
-with Triton() as triton:
-    ...  # Load models here
-    triton.serve()
-```
+    with Triton() as triton:
+        ...  # Load models here
+        triton.serve()
 
 The `bind` method is creating a connection between Triton Inference Server and the `infer_fn` which handle
 the inference queries. The `inputs` and `outputs` describe the model inputs and outputs that are exposed in
@@ -122,7 +121,8 @@ The `serve` method is blocking and at this point the application will wait for i
 moment the model is available under name `Linear` in Triton server. The inference queries can be sent to
 `localhost:8000/v2/models/Linear/infer` which are passed to the `infer_fn` function.
 
-# Links
+Links
+-----
 
 * Documentation: https://triton-inference-server.github.io/pytriton
 * Source: https://github.com/triton-inference-server/pytriton
