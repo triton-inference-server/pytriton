@@ -488,7 +488,9 @@ limitations under the License.
 <h1 id="known-issues-and-limitations">Known Issues and Limitations</h1>
 <ul>
 <li>There is no one-to-one match between our solution and <a href="https://github.com/triton-inference-server/server">Triton Inference Server</a> features, especially in terms of supporting a user model store.</li>
-<li>Currently, only the x86-64 instruction set architecture is supported.</li>
+<li>Support is currently limited to the x86-64 instruction set architecture.</li>
+<li>Running multiple scripts hosting PyTriton on the same machine or container is not feasible.</li>
+<li>Deadlocks may occur in some models when employing the NCCL communication library and multiple Inference Callables are triggered concurrently. This issue can be observed when deploying multiple instances of the same model or multiple models within a single server script. Additional information about this issue can be found <a href="https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/communicators.html#using-multiple-nccl-communicators-concurrently">here</a>.</li>
 </ul>
 
 
