@@ -14,7 +14,7 @@
     limitations under the License.
 
 PyTriton
-========
+==========
 
 PyTriton is a Flask/FastAPI-like interface that simplifies Triton's deployment in Python environments.
 The library allows serving Machine Learning models directly from Python through
@@ -31,8 +31,8 @@ environment. Thus, it improves the performance of running inference on GPU for m
 framework-agnostic and can be used along with frameworks like PyTorch, TensorFlow, or JAX.
 
 
-Installing
-----------
+Installation
+--------------
 
 The package can be installed from `pypi`_ using:
 
@@ -44,7 +44,7 @@ The package can be installed from `pypi`_ using:
 
 
 Example
--------
+---------
 
 The example presents how to run Python model in Triton Inference Server without need to change the current working
 environment. In the example we are using a simple `Linear` PyTorch model.
@@ -122,7 +122,7 @@ moment the model is available under name `Linear` in Triton server. The inferenc
 `localhost:8000/v2/models/Linear/infer` which are passed to the `infer_fn` function.
 
 Links
------
+-------
 
 * Documentation: https://triton-inference-server.github.io/pytriton
 * Source: https://github.com/triton-inference-server/pytriton
