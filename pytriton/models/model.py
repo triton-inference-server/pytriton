@@ -103,7 +103,7 @@ class Model:
         self.inputs = inputs
         self.outputs = outputs
 
-        if any([output.optional for output in self.outputs]):
+        if any(output.optional for output in self.outputs):
             raise PyTritonValidationError("Output tensors cannot be optional.")
 
         self.config = config

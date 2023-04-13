@@ -107,14 +107,14 @@ def _run_test(init_timeout_s, verbose, seed, signal_value, test_timeout_s):
             return _process.is_running() and _process.status() != psutil.STATUS_ZOMBIE
 
         while (
-            server_thread.is_alive() or any([_process_running_and_not_zombie(child) for child in children_processes])
+            server_thread.is_alive() or any(_process_running_and_not_zombie(child) for child in children_processes)
         ) and elapsed_s <= test_timeout_s:
             time.sleep(wait_time_s)
             elapsed_s = time.time() - start_time_s
             monitoring.dump_state()
 
         timeout = elapsed_s >= test_timeout_s and (
-            server_thread.is_alive() or any([child.is_running() for child in children_processes])
+            server_thread.is_alive() or any(child.is_running() for child in children_processes)
         )
 
         if timeout:

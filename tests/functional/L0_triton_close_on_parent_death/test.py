@@ -81,7 +81,7 @@ def main():
             return _process.is_running() and _process.status() != psutil.STATUS_ZOMBIE
 
         while (
-            server_thread.is_alive() or any([_process_running_and_not_zombie(child) for child in children_processes])
+            server_thread.is_alive() or any(_process_running_and_not_zombie(child) for child in children_processes)
         ) and elapsed_s <= args.timeout_s:
             time.sleep(wait_time_s)
             elapsed_s = time.time() - start_time_s
@@ -93,7 +93,7 @@ def main():
         LOGGER.error("Triton HTTP socket is closed")
 
         timeout = elapsed_s >= args.timeout_s and (
-            server_thread.is_alive() or any([child.is_running() for child in children_processes])
+            server_thread.is_alive() or any(child.is_running() for child in children_processes)
         )
 
     if timeout:

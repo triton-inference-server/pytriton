@@ -369,7 +369,7 @@ def fill_optionals(**defaults):
 
         def _shape_match(_have_shape, _expected_shape):
             return len(_have_shape) == len(_expected_shape) and all(
-                [e == -1 or h == e for h, e in zip(_have_shape, _expected_shape)]
+                e == -1 or h == e for h, e in zip(_have_shape, _expected_shape)
             )
 
         not_matching_shapes = {

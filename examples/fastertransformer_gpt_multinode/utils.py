@@ -254,9 +254,9 @@ def patch_gpt_model_if_needed(gpt, inter_size: int, tp: int):
         ffn_kernel2_idxes = ffn_bias1_idxes + gpt.weights.layer_num
         # sanity check of idxes
         w = gpt.weights.w
-        assert all([w[idx].shape == expected_ffn_kernel1_shape for idx in ffn_kernel1_idxes])
-        assert all([w[idx].shape == expected_ffn_bias1_shape for idx in ffn_bias1_idxes])
-        assert all([w[idx].shape == expected_ffn_kernel2_shape for idx in ffn_kernel2_idxes])
+        assert all(w[idx].shape == expected_ffn_kernel1_shape for idx in ffn_kernel1_idxes)
+        assert all(w[idx].shape == expected_ffn_bias1_shape for idx in ffn_bias1_idxes)
+        assert all(w[idx].shape == expected_ffn_kernel2_shape for idx in ffn_kernel2_idxes)
 
         gpt.weights.local_inter_size = inter_size / tp
         for idx in ffn_kernel1_idxes:
