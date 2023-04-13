@@ -98,6 +98,7 @@ dist: clean extract-triton ## builds source and wheel package
 	find ./dist -iname *-linux*.whl -type f -exec bash ./scripts/add_libs_to_wheel.sh $(TRITONSERVER_IMAGE_NAME) $(TRITONSERVER_OUTPUT_DIR) {} \;
 	find ./dist -iname *-linux*.whl -type f -delete
 	ls -lh dist
+	twine check dist/*
 
 extract-triton:
 	# changing dst path, change also in clean-build and pyproject.toml

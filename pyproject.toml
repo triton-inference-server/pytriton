@@ -79,6 +79,7 @@ dev = [
     "pdbpp >= 0.10",
     "pip >= 21.3",  # to support editable installation
     "pre-commit >= 2.20.0",
+    "twine >= 4.0"
 ]
 
 [build-system]
