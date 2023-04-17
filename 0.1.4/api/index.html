@@ -5138,6 +5138,12 @@ The latest versions of the model are numerically the greatest version numbers.</
         </tr>
         <tr>
           <td>
+                <code>PyTritonClientTimeoutError</code>
+          </td>
+          <td><p>if <code>lazy_init</code> argument is False and wait time for server and model being ready exceeds <code>init_timeout_s</code>.</p></td>
+        </tr>
+        <tr>
+          <td>
                 <code><span title="pytriton.client.exceptions.PyTritonClientUrlParseError">PyTritonClientUrlParseError</span></code>
           </td>
           <td><p>In case of problems with parsing url.</p></td>
@@ -5492,6 +5498,14 @@ result_dict = client.infer_batch(a=input1, b=input2)</p>
         </tr>
         <tr>
           <td>
+                <code>PyTritonClientTimeoutError</code>
+          </td>
+          <td><p>in case of first method call, <code>lazy_init</code> argument is False
+and wait time for server and model being ready exceeds <code>init_timeout_s</code>
+or inference time exceeds <code>timeout_s</code>.</p></td>
+        </tr>
+        <tr>
+          <td>
                 <code><span title="pytriton.client.exceptions.PyTritonClientModelDoesntSupportBatchingError">PyTritonClientModelDoesntSupportBatchingError</span></code>
           </td>
           <td><p>if model doesn't support batching.</p></td>
@@ -5689,6 +5703,14 @@ result_dict = client.infer_sample(a=input1, b=input2)</p>
                 <code><span title="pytriton.client.exceptions.PyTritonClientValueError">PyTritonClientValueError</span></code>
           </td>
           <td><p>if mixing of positional and named arguments passing detected.</p></td>
+        </tr>
+        <tr>
+          <td>
+                <code>PyTritonClientTimeoutError</code>
+          </td>
+          <td><p>in case of first method call, <code>lazy_init</code> argument is False
+and wait time for server and model being ready exceeds <code>init_timeout_s</code>
+or inference time exceeds <code>timeout_s</code>.</p></td>
         </tr>
         <tr>
           <td>
