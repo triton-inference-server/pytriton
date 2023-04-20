@@ -85,7 +85,7 @@ dev = [
 [build-system]
 requires = [
     "setuptools>=65.3.0",
-    "setuptools_scm>=2.0.0,<3",
+    "setuptools_scm[toml]>=6.2",
     "wheel>=0.37.1",
 ]
 build-backend = "setuptools.build_meta"
@@ -107,8 +107,7 @@ pytriton = [
     "tritonserver/external_libs/*",
 ]
 
-[tool.setuptools.dynamic]
-version = {attr = "pytriton.__version__"}
+[tool.setuptools_scm]
 
 [tool.distutils.bdist_wheel]
 plat-name = "linux_x86_64"

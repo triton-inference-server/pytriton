@@ -32,6 +32,7 @@ NVIDIA's [Triton Inference Server](https://github.com/triton-inference-server).
 - [Examples](#examples)
 - [Profiling model](#profiling-model)
 - [Documentation](#documentation)
+- [Version management](#version-management)
 - [Useful Links](#useful-links)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -51,7 +52,7 @@ framework-agnostic and can be used along with frameworks like PyTorch, TensorFlo
 Before installing the library, ensure that you meet the following requirements:
 
 - An operating system with glibc >= 2.31. Triton Inference Server and PyTriton have only been rigorously tested on Ubuntu 20.04.
-Other supported operating systems include Ubuntu 20.04+, Debian 11+, Rocky Linux 9+, and Red Hat Universal Base Image 9+.
+  Other supported operating systems include Ubuntu 20.04+, Debian 11+, Rocky Linux 9+, and Red Hat Universal Base Image 9+.
 - Python version >= 3.8. If you are using Python 3.9+, see the section "[Installation on Python 3.9+](https://triton-inference-server.github.io/pytriton/latest/installation#installation-on-python-39)" for additional steps.
 - pip >= 20.3
 
@@ -83,8 +84,7 @@ pip install -U nvidia-pytriton
 
 ### Building binaries from source
 
-The binary package can be built from the source, which enables flexibility to modify the PyTriton code
-and integrate it with various versions of the Triton Inference Server, including custom builds.
+The binary package can be built from the source, allowing access to unreleased hotfixes, the ability to modify the PyTriton code, and compatibility with various Triton Inference Server versions, including custom server builds.
 For further information on building the PyTriton binary, refer to the [Building](https://triton-inference-server.github.io/pytriton/latest/building/) page of documentation.
 
 ## Quick Start
@@ -192,11 +192,13 @@ curl -v localhost:8000/v2/health/live
 The model is loaded right after the server starts, and its status can be queried using:
 
 <!--pytest.mark.skip-->
+
 ```shell
 curl -v localhost:8000/v2/models/Linear/ready
 ```
 
 Finally, you can send an inference query to the model:
+
 <!--pytest.mark.skip-->
 
 ```shell
@@ -253,9 +255,8 @@ The diagram below presents the schema of how the Python models are served throug
 PyTriton. The solution consists of two main components:
 
 - Triton Inference Server: for exposing the HTTP/gRPC API and benefiting from performance features like dynamic batching
-or response cache.
+  or response cache.
 - Python Model Environment: your environment where the Python model is executed.
-
 
 The Triton Inference Server binaries are provided as part of the PyTriton installation. The Triton Server is
 installed in your current environment (system or container). The PyTriton controls the Triton Server process
@@ -294,8 +295,13 @@ in [examples/perf_analyzer](examples/perf_analyzer).
 More information on how to customize the Triton Inference Server, load models, deploy on clusters, and the API reference
 can be found in the [documentation](https://triton-inference-server.github.io/pytriton).
 
+## Version management
+
+PyTriton follows the [Semantic Versioning](https://semver.org/) scheme for versioning. Official releases can be found on [PyPI](https://pypi.org/project/nvidia-pytriton/) and [GitHub releases](https://github.com/triton-inference-server/pytriton/releases). The most up-to-date development version is available on the `main` branch, which may include hotfixes that have not yet been released through the standard channels. To install the latest development version, refer to the instructions in the
+[building binaries from source](#building-binaries-from-source) section.
+
 ## Useful Links
 
-* [Changelog](CHANGELOG.md)
-* [Known Issues](https://triton-inference-server.github.io/pytriton/latest/known_issues)
-* [Contributing](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
+- [Known Issues](https://triton-inference-server.github.io/pytriton/latest/known_issues)
+- [Contributing](CONTRIBUTING.md)

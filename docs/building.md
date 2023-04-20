@@ -19,6 +19,7 @@ limitations under the License.
 This guide provides an outline of the process for building the PyTriton binary package from source.
 It offers the flexibility to modify the PyTriton code and integrate it with various versions
 of the Triton Inference Server, including custom builds.
+Additionally, it allows you to incorporate hotfixes that have not yet been officially released.
 
 ## Prerequisites
 

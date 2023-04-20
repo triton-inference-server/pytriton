@@ -24,7 +24,7 @@ and are familiar with machine learning models. Using [Docker](https://www.docker
 Before installing the library, ensure that you meet the following requirements:
 
 - An operating system with glibc >= 2.31. Triton Inference Server and PyTriton have only been rigorously tested on Ubuntu 20.04.
-Other supported operating systems include Ubuntu 20.04+, Debian 11+, Rocky Linux 9+, and Red Hat Universal Base Image 9+.
+  Other supported operating systems include Ubuntu 20.04+, Debian 11+, Rocky Linux 9+, and Red Hat Universal Base Image 9+.
 - Python version >= 3.8. If you are using Python 3.9+, see the section "[Installation on Python 3.9+](#installation-on-python-39)" for additional steps.
 - pip >= 20.3
 
@@ -99,6 +99,5 @@ rm miniconda.sh
 
 ## Building binaries from source
 
-The binary package can be built from the source, which enables modifications to the PyTriton code,
-as well as the integration of other versions of the Triton Inference Server, including custom builds.
+The binary package can be built from the source, allowing access to unreleased hotfixes, the ability to modify the PyTriton code, and compatibility with various Triton Inference Server versions, including custom server builds.
 For further information on building the PyTriton binary, refer to the [Building](building.md) page.
