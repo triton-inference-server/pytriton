@@ -33,7 +33,7 @@ docker exec "${DOCKER_CONTAINER_ID}" mkdir -p "$(dirname "${TRITON_LOCAL_DIR}")"
 docker cp "${WHEEL_PATH}" "${DOCKER_CONTAINER_ID}:${WHEEL_PATH}"
 docker cp "${TRITON_LOCAL_DIR}" "${DOCKER_CONTAINER_ID}:${TRITON_LOCAL_DIR}"
 
-docker exec "${DOCKER_CONTAINER_ID}" pip install auditwheel patchelf
+docker exec "${DOCKER_CONTAINER_ID}" pip install auditwheel==5.3.0 patchelf==0.17.2
 docker cp "${SCRIPTS_DIR}/auditwheel_patched.py" "${DOCKER_CONTAINER_ID}:/tmp/"
 docker exec "${DOCKER_CONTAINER_ID}" bash -c "LD_LIBRARY_PATH=${TRITON_LOCAL_DIR}/external_libs /tmp/auditwheel_patched.py -vvvv repair --plat ${TARGET_PLATFORM} ${WHEEL_PATH}"
 
