@@ -20,8 +20,10 @@ import wrapt
 
 from pytriton.constants import TRITON_CONTEXT_FIELD_NAME
 from pytriton.decorators import (
+    ConstantPadder,
     InferenceRequest,
     InferenceRequests,
+    InferenceResult,
     InputNames,
     ModelConfigDict,
     TritonContext,
@@ -396,11 +398,16 @@ def test_group_by_keys():
 class GroupByValuesTestCase(typing.NamedTuple):
     inference_request: InferenceRequest
     keys: InputNames
-    expected: InferenceRequests
+    expected: typing.Optional[InferenceRequests] = None
+    expected_result: typing.Optional[InferenceResult] = None
+
+
+_idx1 = "1"
+_idx2 = "2"
 
 
 @pytest.mark.parametrize(
-    "inference_request, keys, expected",
+    "inference_request, keys, expected, expected_result",
     (
         GroupByValuesTestCase(
             inference_request={
@@ -416,35 +423,56 @@ class GroupByValuesTestCase(typing.NamedTuple):
                 {"a": np.array([[2], [2], [2], [2]]), "b": np.array([[5, 6], [7, 2], [4, 2], [1, 122]])},
             ),
         ),
+        # using concatenation with _idx variables to avoid string interning
+        # https://stackabuse.com/guide-to-string-interning-in-python/
         GroupByValuesTestCase(  # string values
             inference_request={
                 "a": np.array([[1], [1], [1], [1], [1], [1], [2], [2], [2], [2]]),
-                "s": np.array(["t1", "t2", "t1", "t1", "t2", "t2", "t1", "t1", "t1", "t1"], dtype=object),
+                "s": np.array(
+                    [
+                        "t" + _idx1,
+                        "t" + _idx2,
+                        "t" + _idx1,
+                        "t" + _idx1,
+                        "t" + _idx2,
+                        "t" + _idx2,
+                        "t" + _idx1,
+                        "t" + _idx1,
+                        "t" + _idx1,
+                        "t" + _idx1,
+                    ],
+                    dtype=object,
+                ),
             },
             keys=["s"],
             expected=(
                 {
                     "a": np.array([[1], [1], [1], [2], [2], [2], [2]]),
-                    "s": np.array(["t1", "t1", "t1", "t1", "t1", "t1", "t1"], dtype=object),
+                    "s": np.array(
+                        ["t" + _idx1, "t" + _idx1, "t" + _idx1, "t" + _idx1, "t" + _idx1, "t" + _idx1, "t" + _idx1],
+                        dtype=object,
+                    ),
                 },
-                {"a": np.array([[1], [1], [1]]), "s": np.array(["t2", "t2", "t2"], dtype=object)},
+                {"a": np.array([[1], [1], [1]]), "s": np.array(["t" + _idx2, "t" + _idx2, "t" + _idx2], dtype=object)},
             ),
         ),
+        # using concatenation with _idx variables to avoid string interning
+        # https://stackabuse.com/guide-to-string-interning-in-python/
         GroupByValuesTestCase(  # 2d array of string values
             inference_request={
                 "a": np.array([[1], [1], [1], [1], [1], [1], [2], [2], [2], [2]]),
                 "s": np.array(
                     [
-                        ["t1", "t1"],
-                        ["t2", "t2"],
-                        ["t1", "t1"],
-                        ["t1", "t1"],
-                        ["t2", "t2"],
-                        ["t2", "t1"],
-                        ["t1", "t1"],
-                        ["t1", "t1"],
-                        ["t1", "t1"],
-                        ["t1", "t1"],
+                        ["t" + _idx1, "t" + _idx1],
+                        ["t" + _idx2, "t" + _idx2],
+                        ["t" + _idx1, "t" + _idx1],
+                        ["t" + _idx1, "t" + _idx1],
+                        ["t" + _idx2, "t" + _idx2],
+                        ["t" + _idx2, "t" + _idx1],
+                        ["t" + _idx1, "t" + _idx1],
+                        ["t" + _idx1, "t" + _idx1],
+                        ["t" + _idx1, "t" + _idx1],
+                        ["t" + _idx1, "t" + _idx1],
                     ],
                     dtype=object,
                 ),
@@ -455,19 +483,22 @@ class GroupByValuesTestCase(typing.NamedTuple):
                     "a": np.array([[1], [1], [1], [2], [2], [2], [2]]),
                     "s": np.array(
                         [
-                            ["t1", "t1"],
-                            ["t1", "t1"],
-                            ["t1", "t1"],
-                            ["t1", "t1"],
-                            ["t1", "t1"],
-                            ["t1", "t1"],
-                            ["t1", "t1"],
+                            ["t" + _idx1, "t" + _idx1],
+                            ["t" + _idx1, "t" + _idx1],
+                            ["t" + _idx1, "t" + _idx1],
+                            ["t" + _idx1, "t" + _idx1],
+                            ["t" + _idx1, "t" + _idx1],
+                            ["t" + _idx1, "t" + _idx1],
+                            ["t" + _idx1, "t" + _idx1],
                         ],
                         dtype=object,
                     ),
                 },
-                {"a": np.array([[1]]), "s": np.array([["t2", "t1"]], dtype=object)},
-                {"a": np.array([[1], [1]]), "s": np.array([["t2", "t2"], ["t2", "t2"]], dtype=object)},
+                {"a": np.array([[1]]), "s": np.array([["t" + _idx2, "t" + _idx1]], dtype=object)},
+                {
+                    "a": np.array([[1], [1]]),
+                    "s": np.array([["t" + _idx2, "t" + _idx2], ["t" + _idx2, "t" + _idx2]], dtype=object),
+                },
             ),
         ),
         GroupByValuesTestCase(  # group by 2 keys
@@ -505,7 +536,7 @@ class GroupByValuesTestCase(typing.NamedTuple):
         ),
     ),
 )
-def test_group_by_values(mocker, inference_request, keys, expected):
+def test_group_by_values(mocker, inference_request, keys, expected, expected_result):
     class PassTrough:
         def __call__(self, **inputs):
             return inputs
@@ -523,6 +554,225 @@ def test_group_by_values(mocker, inference_request, keys, expected):
     for call_args, expected_request in zip(spy_passtrough.call_args_list, expected):
         called_request = call_args.kwargs
         verify_equalness_of_dicts_with_ndarray(called_request, expected_request)
+
+
+def _expected_test_group_by_values_with_dynamic_axes_on_output():
+    expected = np.zeros((10, 16, 4, 4), dtype="int")
+    expected[:6, :16, :4, :2] = 1
+    expected[6:, :3, :2, :4] = 1
+    return expected
+
+
+@pytest.mark.parametrize(
+    "inference_request, keys, expected, expected_result",
+    (
+        GroupByValuesTestCase(  # output axes: a: (1,), output: (-1,)
+            inference_request={
+                "a": np.array([[1], [1], [1], [1], [1], [1], [2], [2], [2], [2]]),
+                "b": np.array([[7, 5], [8, 6], [1, 2], [1, 2], [11, 12], [1, 2], [5, 6], [7, 2], [4, 2], [1, 122]]),
+                "output_length": np.array([[8], [8], [16], [16], [4], [8], [3], [3], [3], [3]]),
+            },
+            keys=["a"],
+            expected_result={
+                "a": np.array([[1], [1], [1], [1], [1], [1], [2], [2], [2], [2]]),
+                "output": np.block(
+                    [  # 16 is the max output_length
+                        [np.ones((6, 16), dtype="int")],
+                        [np.ones((4, 3), dtype="int"), np.zeros((4, 13), dtype="int")],
+                    ]
+                ),
+            },
+        ),
+        GroupByValuesTestCase(  # output axes: a: (1,), output: (-1, -1, -1)
+            inference_request={
+                "a": np.array([[1], [1], [1], [1], [1], [1], [2], [2], [2], [2]]),
+                "b": np.array([[7, 5], [8, 6], [1, 2], [1, 2], [11, 12], [1, 2], [5, 6], [7, 2], [4, 2], [1, 122]]),
+                "output_length": np.array(
+                    [
+                        [8, 2, 1],
+                        [8, 2, 1],
+                        [16, 4, 2],
+                        [16, 4, 2],
+                        [4, 2, 2],
+                        [8, 2, 2],
+                        [3, 1, 4],
+                        [3, 1, 4],
+                        [3, 2, 2],
+                        [3, 2, 2],
+                    ]
+                ),
+            },
+            keys=["a"],
+            expected_result={
+                "a": np.array([[1], [1], [1], [1], [1], [1], [2], [2], [2], [2]]),
+                "output": _expected_test_group_by_values_with_dynamic_axes_on_output(),
+            },
+        ),
+    ),
+)
+def test_group_by_values_with_dynamic_axes_on_output(mocker, inference_request, keys, expected, expected_result):
+    @group_by_values(*keys, pad_fn=ConstantPadder(0))
+    def _fn(**inputs):
+        return {
+            "a": inputs["a"],
+            "output": np.ones((len(inputs["a"]), *np.max(inputs["output_length"], axis=0).tolist()), dtype="int"),
+        }
+
+    result = _fn(**inference_request)
+    verify_equalness_of_dicts_with_ndarray(result, expected_result)
+
+
+def test_group_by_values_with_dynamic_axes_of_bytes_on_output():
+    @group_by_values("a", pad_fn=ConstantPadder(0))
+    def _fn(**inputs):
+        if inputs["a"][0][0] == 1:
+            sequences = np.array(
+                [
+                    [b"foo", b"barxxx", b""],
+                    [b"bar1", b"Loriem ipsum", b"foo"],
+                    [b"foo", b"barxxx", b""],
+                    [b"bar1", b"Loriem ipsum", b"foo"],
+                    [b"foo", b"barxxx", b""],
+                    [b"bar1", b"Loriem ipsum", b"foo"],
+                ]
+            )
+        else:
+            sequences = np.array(
+                [
+                    [b"foo", b"bar", b"", b""],
+                    [b"1", b"22", b"3", b"4444"],
+                    [b"foo", b"bar", b"", b""],
+                    [b"1", b"22", b"3", b"4444"],
+                ]
+            )
+
+        return {"a": inputs["a"], "output": sequences}
+
+    a = np.array([[1], [1], [1], [1], [1], [1], [2], [2], [2], [2]])
+    inference_request = {"a": a}
+    expected_result = {
+        "a": a,
+        "output": np.array(
+            [
+                [b"foo", b"barxxx", b"", b""],
+                [b"bar1", b"Loriem ipsum", b"foo", b""],
+                [b"foo", b"barxxx", b"", b""],
+                [b"bar1", b"Loriem ipsum", b"foo", b""],
+                [b"foo", b"barxxx", b"", b""],
+                [b"bar1", b"Loriem ipsum", b"foo", b""],
+                [b"foo", b"bar", b"", b""],
+                [b"1", b"22", b"3", b"4444"],
+                [b"foo", b"bar", b"", b""],
+                [b"1", b"22", b"3", b"4444"],
+            ]
+        ),
+    }
+
+    result = _fn(**inference_request)
+    verify_equalness_of_dicts_with_ndarray(result, expected_result)
+
+
+def test_group_by_values_with_dynamic_axes_of_unicode_on_output():
+    @group_by_values("a", pad_fn=ConstantPadder(0))
+    def _fn(**inputs):
+        if inputs["a"][0][0] == 1:
+            sequences = np.array(
+                [
+                    ["foo", "barxxx", ""],
+                    ["bar1", "Loriem ipsum", "foo"],
+                    ["foo", "barxxx", ""],
+                    ["bar1", "Loriem ipsum", "foo"],
+                    ["foo", "barxxx", ""],
+                    ["bar1", "Loriem ipsum", "foo"],
+                ]
+            )
+        else:
+            sequences = np.array(
+                [
+                    ["foo", "bar", "", ""],
+                    ["1", "22", "3", "4444"],
+                    ["foo", "bar", "", ""],
+                    ["1", "22", "3", "4444"],
+                ]
+            )
+
+        return {"a": inputs["a"], "output": sequences}
+
+    a = np.array([[1], [1], [1], [1], [1], [1], [2], [2], [2], [2]])
+    inference_request = {"a": a}
+    expected_result = {
+        "a": a,
+        "output": np.array(
+            [
+                ["foo", "barxxx", "", ""],
+                ["bar1", "Loriem ipsum", "foo", ""],
+                ["foo", "barxxx", "", ""],
+                ["bar1", "Loriem ipsum", "foo", ""],
+                ["foo", "barxxx", "", ""],
+                ["bar1", "Loriem ipsum", "foo", ""],
+                ["foo", "bar", "", ""],
+                ["1", "22", "3", "4444"],
+                ["foo", "bar", "", ""],
+                ["1", "22", "3", "4444"],
+            ]
+        ),
+    }
+
+    result = _fn(**inference_request)
+    verify_equalness_of_dicts_with_ndarray(result, expected_result)
+
+
+def test_group_by_values_with_dynamic_axes_of_bytes_as_objects_on_output():
+    @group_by_values("a", pad_fn=ConstantPadder(0))
+    def _fn(**inputs):
+        if inputs["a"][0][0] == 1:
+            sequences = np.array(
+                [
+                    [b"foo", b"barxxx", b""],
+                    [b"bar1", b"Loriem ipsum", b"foo"],
+                    [b"foo", b"barxxx", b""],
+                    [b"bar1", b"Loriem ipsum", b"foo"],
+                    [b"foo", b"barxxx", b""],
+                    [b"bar1", b"Loriem ipsum", b"foo"],
+                ],
+                dtype=object,
+            )
+        else:
+            sequences = np.array(
+                [
+                    [b"foo", b"bar", b"", b""],
+                    [b"1", b"22", b"3", b"4444"],
+                    [b"foo", b"bar", b"", b""],
+                    [b"1", b"22", b"3", b"4444"],
+                ],
+                dtype=object,
+            )
+
+        return {"a": inputs["a"], "output": sequences}
+
+    a = np.array([[1], [1], [1], [1], [1], [1], [2], [2], [2], [2]])
+    inference_request = {"a": a}
+    expected_result = {
+        "a": a,
+        "output": np.array(
+            [
+                [b"foo", b"barxxx", b"", b""],
+                [b"bar1", b"Loriem ipsum", b"foo", b""],
+                [b"foo", b"barxxx", b"", b""],
+                [b"bar1", b"Loriem ipsum", b"foo", b""],
+                [b"foo", b"barxxx", b"", b""],
+                [b"bar1", b"Loriem ipsum", b"foo", b""],
+                [b"foo", b"bar", b"", b""],
+                [b"1", b"22", b"3", b"4444"],
+                [b"foo", b"bar", b"", b""],
+                [b"1", b"22", b"3", b"4444"],
+            ],
+            dtype=object,
+        ),
+    }
+
+    result = _fn(**inference_request)
+    verify_equalness_of_dicts_with_ndarray(result, expected_result)
 
 
 def test_group_by_values_raise_error_if_placed_before_batch():

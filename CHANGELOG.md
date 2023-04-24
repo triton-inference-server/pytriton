@@ -18,6 +18,9 @@ limitations under the License.
 
 ## Unreleased
 
+- Improved `pytriton.decorators.group_by_values` function
+  - Modified the function to avoid calling the inference callable on each individual sample when grouping by string/bytes input
+  - Added `pad_fn` argument for easy padding and combining of the inference results
 - Fixed Triton binaries search
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)

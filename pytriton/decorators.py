@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Inference callable decorators."""
+import collections
 import dataclasses
 import inspect
 import itertools
@@ -27,6 +28,7 @@ import wrapt
 from pytriton.constants import TRITON_CONTEXT_FIELD_NAME
 from pytriton.exceptions import PyTritonBadParameterError, PyTritonRuntimeError, PyTritonValidationError
 from pytriton.model_config.triton_model_config import TritonModelConfig
+from pytriton.proxy.communication import _serialize_byte_tensor
 
 _WrappedWithWrapper = NamedTuple(
     "WrappedWithWrapper", [("wrapped", Optional[Callable]), ("wrapper", Optional[Callable])]
@@ -36,6 +38,8 @@ _WrappedWithWrapper = NamedTuple(
 InputNames = typing.List[str]
 InferenceRequest = typing.Dict[str, np.ndarray]
 InferenceRequests = typing.Union[typing.List[InferenceRequest], typing.Tuple[InferenceRequest, ...]]
+InferenceResult = typing.Dict[str, np.ndarray]
+InferenceResults = typing.Union[typing.List[InferenceResult], typing.Tuple[InferenceResult, ...]]
 
 
 def get_inference_request_batch_size(inference_request: InferenceRequest) -> int:
@@ -214,13 +218,14 @@ def batch(wrapped, instance, args, kwargs):
     return out_list
 
 
-def group_by_values(*keys):
+def group_by_values(*keys, pad_fn: typing.Optional[typing.Callable[[InferenceRequests], InferenceRequests]] = None):
     """Decorator for grouping requests by values of selected keys.
 
-    Splits a batch into multiple sub-batches with the same values of selected keys and
-    calls the decorated function with each of them.
-    This is especially convenient when working with models that require dynamic parameters
-    sent by the user. For example, given an input of the form:
+    This function splits a batch into multiple sub-batches based on the specified keys values and
+    calls the decorated function with each sub-batch. This is particularly useful when working with models
+    that require dynamic parameters sent by the user.
+
+    For example, given an input of the form:
 
         {"sentences": [b"Sentence1", b"Sentence2", b"Sentence3"], "param1": [1, 1, 2], "param2": [1, 1, 1]}
 
@@ -233,7 +238,7 @@ def group_by_values(*keys):
 
     This decorator should be used after the @batch decorator.
 
-    Typical use:
+    Example usage:
 
         @batch
         @group_by_values("param1", "param2")
@@ -243,20 +248,24 @@ def group_by_values(*keys):
 
     Args:
         *keys: List of keys to group by.
+        pad_fn: Optional function to pad the batch to the same size before merging again to a single batch.
 
     Returns:
         The decorator function.
     """
 
-    def _value2key(_v):
-        return _v.tobytes() if isinstance(_v, np.ndarray) else _v
+    def value_to_key(value):
+        if isinstance(value, np.ndarray):
+            if value.dtype == np.object_ or value.dtype.type == np.bytes_:
+                return _serialize_byte_tensor(value)
+            else:
+                return value.tobytes()
+        return value
 
     def _get_sort_key_for_sample(_request, _sample_idx: int):
-        return tuple(_value2key(_request[_key][_sample_idx]) for _key in keys)
+        return tuple(value_to_key(_request[_key][_sample_idx]) for _key in keys)
 
-    def _group_request(
-        _request: InferenceRequest, _batch_size: int
-    ) -> typing.Generator[Tuple[Tuple[int, ...], InferenceRequest], None, None]:
+    def _group_request(_request: InferenceRequest, _batch_size: int):
         idx_inputs = [(sample_idx, _get_sort_key_for_sample(_request, sample_idx)) for sample_idx in range(_batch_size)]
         idx_inputs.sort(key=operator.itemgetter(1))
         for _, group in itertools.groupby(idx_inputs, key=operator.itemgetter(1)):
@@ -279,17 +288,95 @@ def group_by_values(*keys):
         other_kwargs = {k: v for k, v in kwargs.items() if k in _SPECIAL_KEYS}
 
         batch_size = get_inference_request_batch_size(request)
-        result = {}
-        for samples_idxes, _grouped_sub_request in _group_request(request, batch_size):
+        sample_indices_with_interim_result = []
+        for sample_indices, _grouped_sub_request in _group_request(request, batch_size):
             interim_result = wrapped(*args, **_grouped_sub_request, **other_kwargs)
+            sample_indices_with_interim_result.append((sample_indices, interim_result))
 
-            for key, result_data in interim_result.items():
-                result.setdefault(key, np.empty((batch_size, *result_data.shape[1:]), dtype=result_data.dtype))
-                result[key][samples_idxes, ...] = result_data  # make copy here
+        if pad_fn is not None:
+            indices, results = tuple(map(tuple, zip(*sample_indices_with_interim_result)))
+            results = pad_fn(results)
+            sample_indices_with_interim_result = tuple(zip(indices, results))
+
+        _, first_result_data = sample_indices_with_interim_result[0]
+        result = {
+            output_name: np.zeros((batch_size,) + data.shape[1:], dtype=data.dtype)
+            for output_name, data in first_result_data.items()
+        }
+        for indices, results in sample_indices_with_interim_result:
+            for output_name, data in results.items():
+                result[output_name][indices, ...] = data
 
         return result
 
     return _wrapper
+
+
+class ConstantPadder:
+    """Padder that pads the given batches with a constant value."""
+
+    def __init__(self, pad_value=0):
+        """Initialize the padder.
+
+        Args:
+            pad_value (int, optional): Padding value. Defaults to 0.
+        """
+        self.pad_value = pad_value
+
+    def __call__(self, batches_list: InferenceResults) -> InferenceResults:
+        """Pad the given batches with the specified value to pad size enabling further batching to single arrays.
+
+        Args:
+            batches_list (List[Dict[str, np.ndarray]]): List of batches to pad.
+
+        Returns:
+            List[Dict[str, np.ndarray]]: List of padded batches.
+
+        Raises:
+            PyTritonRuntimeError: If the input arrays for a given input name have different dtypes.
+        """
+
+        def _get_padded_shape(_batches: List[np.ndarray]) -> Tuple[int, ...]:
+            """Get the shape of the padded array without batch axis."""
+            return tuple(np.max([batch.shape[1:] for batch in _batches if batch is not None], axis=0))
+
+        def _get_padded_dtype(_batches: List[np.ndarray]) -> np.dtype:
+            dtypes = [batch.dtype for batch in _batches if batch is not None]
+            result_dtype = dtypes[0]
+
+            if not all(dtype.kind == result_dtype.kind for dtype in dtypes):
+                raise PyTritonRuntimeError("All input arrays for given input name must have the same dtype.")
+
+            # for bytes (encoded string) or unicode string need to obtain the max length
+            if result_dtype.kind in "SU":
+                order_and_kind = result_dtype.str[:2]
+                max_len = max([int(dtype.str[2:]) for dtype in dtypes])
+                result_dtype = f"{order_and_kind}{max_len}"
+            else:
+                if not all(dtype == result_dtype for dtype in dtypes):
+                    raise PyTritonRuntimeError("All input arrays for given input name must have the same dtype.")
+
+            return np.dtype(result_dtype)
+
+        input_names = list(
+            collections.OrderedDict.fromkeys(input_name for batch in batches_list for input_name in batch.keys())
+        )
+        batches_by_name = {input_name: [batch.get(input_name) for batch in batches_list] for input_name in input_names}
+        for input_batches in batches_by_name.values():
+            result_shape, result_dtype = _get_padded_shape(input_batches), _get_padded_dtype(input_batches)
+            for batch_idx, batch in enumerate(input_batches):
+                if batch is not None:
+                    input_batches[batch_idx] = np.pad(
+                        batch,
+                        [(0, 0)] + [(0, b - a) for a, b in zip(batch.shape[1:], result_shape)],
+                        mode="constant",
+                        constant_values=self.pad_value if result_dtype.kind not in ["S", "U", "O"] else b"",
+                    ).astype(result_dtype)
+
+        return [
+            {name: batches[batch_idx] for name, batches in batches_by_name.items() if batches[batch_idx] is not None}
+            for batch_idx in range(len(batches_list))
+        ]
 
 
 @wrapt.decorator
