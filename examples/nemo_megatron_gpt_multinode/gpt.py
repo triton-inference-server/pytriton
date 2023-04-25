@@ -11,82 +11,105 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import dataclasses
 import typing
 
 import numpy as np
 import torch  # pytype: disable=import-error
-from nemo.collections.nlp.modules.common.text_generation_utils import generate  # pytype: disable=import-error
+from nemo.collections.nlp.modules.common.transformer.text_generation import (  # pytype: disable=import-error
+    LengthParam,
+    OutputType,
+    SamplingParam,
+)
 
-from pytriton.decorators import batch, fill_optionals, first_value, group_by_values
-from pytriton.exceptions import PyTritonUnrecoverableError
+from pytriton.decorators import ConstantPadder, batch, first_value, group_by_values
+from pytriton.exceptions import PyTritonInvalidOperationError, PyTritonUnrecoverableError
 from pytriton.model_config import Tensor
 
-from helpers import cast_output  # pytype: disable=import-error # isort:skip
+from helpers import cast_output, typedict2tensor  # pytype: disable=import-error # isort:skip
 
 
-@dataclasses.dataclass
-class ModelParameters:
-    tokens_to_generate: np.ndarray = np.array([64], dtype=np.int32)
-    min_tokens_to_generate: np.ndarray = np.array([0], dtype=np.int32)
-    all_probs: np.ndarray = np.array([False], dtype=np.bool_)
-    temperature: np.ndarray = np.array([1.0], dtype=np.float32)
-    add_BOS: np.ndarray = np.array([False], dtype=np.bool_)  # noqa: N815
-    top_k: np.ndarray = np.array([0], dtype=np.int32)
-    top_p: np.ndarray = np.array([0.9], dtype=np.float32)
-    greedy: np.ndarray = np.array([False], dtype=np.bool_)
-    repetition_penalty: np.ndarray = np.array([1.2], dtype=np.float32)
-
-
-_PARAMETERS_NAMES = tuple(field.name for field in dataclasses.fields(ModelParameters))
+_INPUT_PARAMETERS_NAMES = list(typing.get_type_hints(LengthParam)) + list(typing.get_type_hints(SamplingParam))
 
 
 class NemoGptCallable:
     def __init__(self, *, model_name: str, model):
         self.model_name = model_name
         self._model = model.cuda()
+        self._is_prompt_learning_model = hasattr(model, "virtual_prompt_style")
+        self._text_generate_fn = (
+            self._model.frozen_model.generate if self._is_prompt_learning_model else self._model.generate
+        )
+        self._task_generate_fn = self._model.generate if self._is_prompt_learning_model else None
         self.inputs = (
-            Tensor(name="sentences", shape=(1,), dtype=bytes),
-            Tensor(name="tokens_to_generate", shape=(1,), dtype=np.int32, optional=True),
-            Tensor(name="min_tokens_to_generate", shape=(1,), dtype=np.int32, optional=True),
-            Tensor(name="all_probs", shape=(1,), dtype=np.bool_, optional=True),
-            Tensor(name="temperature", shape=(1,), dtype=np.float32, optional=True),
-            Tensor(name="add_BOS", shape=(1,), dtype=np.bool_, optional=True),
-            Tensor(name="top_k", shape=(1,), dtype=np.int32, optional=True),
-            Tensor(name="top_p", shape=(1,), dtype=np.float32, optional=True),
-            Tensor(name="greedy", shape=(1,), dtype=np.bool_, optional=True),
-            Tensor(name="repetition_penalty", shape=(1,), dtype=np.float32, optional=True),
+            (
+                Tensor(name="tasks", shape=(1,), dtype=bytes),
+                Tensor(name="prompts", shape=(1,), dtype=bytes),
+            )
+            + typedict2tensor(LengthParam, overwrite_kwargs={"optional": True}, defaults=None)
+            + typedict2tensor(SamplingParam, overwrite_kwargs={"optional": True}, defaults=None)
         )
-        self.outputs = (
-            Tensor(name="sentences", shape=(1,), dtype=bytes),
-            Tensor(name="tokens", shape=(-1,), dtype=bytes),
-            Tensor(name="logprob", shape=(-1,), dtype=np.float32),
-            Tensor(name="token_ids", shape=(-1,), dtype=np.int32),
-            Tensor(name="offsets", shape=(-1,), dtype=np.int32),
-        )
+        self.outputs = typedict2tensor(OutputType)
         self._outputs_dict = {output.name: output for output in self.outputs}
 
-    @fill_optionals(**dataclasses.asdict(ModelParameters()))
+    def _format_prompts(
+        self, tasks: typing.List[str], prompts: typing.List[str]
+    ) -> typing.List[typing.Union[str, typing.Dict[str, str]]]:
+        formatted_prompts = []
+        for task_name, prompt in zip(tasks, prompts):
+            task_template = self._model.task_templates[task_name]
+            formatted_prompts.append(
+                {
+                    **{"taskname": task_name},
+                    **dict(zip(task_template["prompt_template_fields"], [prompt])),
+                }
+            )
+        return formatted_prompts
+
     @batch
-    @group_by_values(*_PARAMETERS_NAMES)
-    @first_value(*_PARAMETERS_NAMES)
+    @group_by_values("tasks", *_INPUT_PARAMETERS_NAMES, pad_fn=ConstantPadder(0))
+    @first_value(*_INPUT_PARAMETERS_NAMES)
     def infer(self, **inputs: np.ndarray) -> typing.Dict[str, np.ndarray]:
         # Tell other ranks we're doing generate
         generate_num = 0
         choice = torch.cuda.LongTensor([generate_num])
         torch.distributed.broadcast(choice, 0)
 
-        sentences = inputs.pop("sentences").astype("bytes")
-        sentences = np.char.decode(sentences, encoding="utf-8")
-        sentences = np.squeeze(sentences, axis=-1).tolist()
+        def _str_ndarray2list(str_ndarray: np.ndarray) -> typing.List[str]:
+            str_ndarray = str_ndarray.astype("bytes")
+            str_ndarray = np.char.decode(str_ndarray, encoding="utf-8")
+            str_ndarray = str_ndarray.squeeze(axis=-1)
+            return str_ndarray.tolist()
+
+        tasks = _str_ndarray2list(inputs.pop("tasks"))
+        prompts = _str_ndarray2list(inputs.pop("prompts"))
+
+        length_params = LengthParam(**{k: v for k, v in inputs.items() if k in typing.get_type_hints(LengthParam)})
+        sampling_params = SamplingParam(
+            **{k: v for k, v in inputs.items() if k in typing.get_type_hints(SamplingParam)}
+        )
+
+        if tasks[0] == "text_generation":
+            generate_fn = self._text_generate_fn
+        else:
+            generate_fn = self._task_generate_fn
+            if generate_fn is None:
+                raise PyTritonInvalidOperationError(
+                    f"Model {self.model_name} does not support task {inputs['task']}. "
+                    "Only text_generation task is supported."
+                )
+            prompts = self._format_prompts(tasks, prompts)
+
         try:
-            output = generate(self._model, inputs=sentences, **inputs)
+            output: OutputType = generate_fn(
+                inputs=prompts,
+                length_params=length_params,
+                sampling_params=sampling_params,
+            )
         except RuntimeError as e:
             raise PyTritonUnrecoverableError("Fatal error occurred - no further inferences possible.") from e
 
         output = {
             output_name: cast_output(data, self._outputs_dict[output_name].dtype)
             for output_name, data in output.items()
-            if output_name in self._outputs_dict
         }
         return output

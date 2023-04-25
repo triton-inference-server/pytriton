@@ -17,6 +17,7 @@ import argparse
 import logging
 import re
 import signal
+import subprocess
 import sys
 import time
 
@@ -42,6 +43,15 @@ def verify_client_output(client_output):
     else:
         LOGGER.info(f'Found "{expected_pattern}" in client output')
 
+    expected_patterns = [r"positive", r"alarm_set", r"time\(seven am\)"]
+    for expected_pattern in expected_patterns:
+        output_match = re.search(expected_pattern, client_output, re.MULTILINE)
+        output_array = output_match.group(0) if output_match else None
+        if not output_array:
+            raise ValueError(f"Could not find {expected_pattern} in client output. Output: {client_output}")
+        else:
+            LOGGER.info(f'Found "{expected_pattern}" in client output')
+
 
 def main():
     parser = argparse.ArgumentParser(description="short_description")
@@ -55,20 +65,42 @@ def main():
         "examples/nemo_megatron_gpt_multinode/README.md", docker_image_with_name
     )
 
+    subprocess.run(["bash", "examples/nemo_megatron_gpt_multinode/train_prompt_learning_model.sh"])
+
     start_time = time.time()
     elapsed_s = 0
     wait_time_s = min(args.timeout_s, 1)
 
-    server_cmd = ["python", "examples/nemo_megatron_gpt_multinode/server.py"]
-    client_cmd = ["python", "examples/nemo_megatron_gpt_multinode/client.py", "--prompts", "1 2 3"]
+    server_cmd = [
+        "python",
+        "examples/nemo_megatron_gpt_multinode/server.py",
+        "--prompt-model-path",
+        "sentiment_intent_slot_p_tuning.nemo",
+        "--verbose",
+    ]
+    client_cmd = [
+        "python",
+        "examples/nemo_megatron_gpt_multinode/client.py",
+        "--prompts",
+        "1 2 3",
+        "sentiment|It estimates the operating profit to further improve from the third quarter.",
+        "intent_and_slot|set the alarm to seven am for work",
+    ]
 
     with ScriptThread(server_cmd, name="server") as server_thread:
         with ScriptThread(client_cmd, name="client") as client_thread:
             while server_thread.is_alive() and client_thread.is_alive() and elapsed_s < args.timeout_s:
                 client_thread.join(timeout=wait_time_s)
                 elapsed_s = time.time() - start_time
+            LOGGER.info(
+                "Interrupting client script process. server.alive=%s client.alive=%s elapsed_s=%s",
+                server_thread.is_alive(),
+                client_thread.is_alive(),
+                elapsed_s,
+            )
 
-        LOGGER.info("Interrupting server script process")
+        elapsed_s = time.time() - start_time
+        LOGGER.info("Interrupting server script process. elapsed_s=%s", elapsed_s)
         if server_thread.process:
             server_thread.process.send_signal(signal.SIGINT)
 

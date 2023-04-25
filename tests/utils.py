@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import contextlib
+import fcntl
 import logging
 import os
 import pathlib
@@ -26,20 +27,45 @@ DEFAULT_LOG_FORMAT = "%(asctime)s - %(levelname)8s - %(process)8d - %(threadName
 
 
 def _read_outputs(_process, _logger, _outputs):
+    # Set stdout and stderr file descriptors to non-blocking mode
     try:
-        (rds, _, _) = select.select([_process.stdout, _process.stderr], [], [], 1)
+        fcntl.fcntl(_process.stdout, fcntl.F_SETFL, os.O_NONBLOCK)
+        fcntl.fcntl(_process.stderr, fcntl.F_SETFL, os.O_NONBLOCK)
     except ValueError:  # when selecting on closed files
-        rds = []
-    while rds and _process.poll() is None:
-        for rd in rds:
-            line = rd.readline().decode("utf-8").rstrip()
-            if line:
-                _logger.info(line)
-                _outputs.append(line)
+        return
+
+    buffers = {_process.stdout: "", _process.stderr: ""}
+    rds = [_process.stdout, _process.stderr]
+    while rds:
         try:
-            (rds, _, _) = select.select([_process.stdout, _process.stderr], [], [], 1)
+            readable, _, _ = select.select(rds, [], [], 1)
         except ValueError:  # when selecting on closed files
-            rds = []
+            break
+
+        for rd in readable:
+            try:
+                data = os.read(rd.fileno(), 4096)
+                if not data:
+                    rds.remove(rd)
+                    continue
+
+                decoded_data = data.decode("utf-8")
+                buffers[rd] += decoded_data
+                lines = buffers[rd].splitlines(keepends=True)
+
+                if buffers[rd].endswith("\n"):
+                    complete_lines = lines
+                    buffers[rd] = ""
+                else:
+                    complete_lines = lines[:-1]
+                    buffers[rd] = lines[-1]
+
+                for line in complete_lines:
+                    line = line.rstrip()
+                    _logger.info(line)
+                    _outputs.append(line)
+            except OSError:  # Reading from an empty non-blocking file
+                pass
 
 
 class ScriptThread(threading.Thread):
@@ -99,7 +125,9 @@ class ScriptThread(threading.Thread):
             if self._process_spawned_or_spawn_error_flag:
                 self._process_spawned_or_spawn_error_flag.set()
             if self.process:
-                _read_outputs(self._process, self._logger, self._output)
+                while self.process.poll() is None:
+                    _read_outputs(self.process, self._logger, self._output)
+                _read_outputs(self.process, self._logger, self._output)
                 self.returncode = process.wait()  # pytype: disable=name-error
                 self._logger.info(f"{self.name} process finished with {self.returncode}")
 

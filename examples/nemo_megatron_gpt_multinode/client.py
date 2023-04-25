@@ -15,10 +15,32 @@
 """Client for BART classifier sample server."""
 import argparse
 import logging
+import typing
 
 import numpy as np
 
 from pytriton.client import ModelClient
+
+_AVAILABLE_TASKS = ["sentiment", "intent_and_slot", "text_generation"]
+_TASK_SEP = "|"
+
+
+def _parse_prompts(prompts_list) -> typing.List[typing.Tuple[str, str]]:
+    """
+    Parse prompts in the format of '[<task_name>:]<prompt>'.
+    Available tasks: {', '.join(_AVAILABLE_TASKS)}. If you don't specify a task name, the model will default to text generation.
+    """
+
+    def _parse_prompt(prompt_str: str) -> typing.Tuple[str, str]:
+        if _TASK_SEP in prompt_str:
+            task_name, value = prompt_str.split(_TASK_SEP, 1)
+            task_name = task_name.strip().lower()
+        else:
+            task_name = "text_generation"
+            value = prompt_str.strip()
+        return task_name, value
+
+    return [_parse_prompt(prompt_str) for prompt_str in prompts_list]
 
 
 def main():
@@ -45,9 +67,18 @@ def main():
     )
     parser.add_argument(
         "--prompts",
-        default=["Q: How are you?", "Q: How big is the universe?"],
+        default=[
+            "Q: How are you?",
+            "Q: How big is the universe?",
+            f"sentiment{_TASK_SEP}It estimates the operating profit to further improve from the third quarter.",
+            f"intent_and_slot{_TASK_SEP}What is the weather like today?",
+        ],
         nargs="+",
-        help="Prompts to form request",
+        help=(
+            f"Prompts should be in the format of '[<task_name>{_TASK_SEP}]<prompt>'. "
+            f"Available tasks: {', '.join(_AVAILABLE_TASKS)}. "
+            "If you don't specify a task name, the model will default to text generation."
+        ),
     )
     parser.add_argument(
         "--verbose",
@@ -62,9 +93,19 @@ def main():
     logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(name)s: %(message)s")
     logger = logging.getLogger("nemo.client")
 
-    sequences = np.array(args.prompts)[..., np.newaxis]
-    sequences = np.char.encode(sequences, "utf-8")
-    batch_size = len(sequences)
+    tasks_and_prompts = _parse_prompts(args.prompts)
+    tasks, prompts = tuple(zip(*tasks_and_prompts))
+    if not all(task in _AVAILABLE_TASKS for task in tasks):
+        raise ValueError(f"Unknown tasks: {set(tasks) - set(_AVAILABLE_TASKS)}")
+
+    batch_size = len(args.prompts)
+
+    def _str_list2numpy(str_list: typing.List[str]) -> np.ndarray:
+        str_ndarray = np.array(str_list)[..., np.newaxis]
+        return np.char.encode(str_ndarray, "utf-8")
+
+    tasks = _str_list2numpy(tasks)
+    prompts = _str_list2numpy(prompts)
 
     def _param(dtype, value):
         if bool(value):
@@ -75,23 +116,22 @@ def main():
     logger.info("================================")
     logger.info("Preparing the client")
     with ModelClient(args.url, "GPT", init_timeout_s=args.init_timeout_s) as client:
-        # parameters values taken from megatron_gpt_inference.yaml conf
-        # here is another set of parameters https://github.com/NVIDIA/NeMo/blob/main/examples/nlp/language_modeling/megatron_gpt_eval.py#L119
-
         logger.info("================================")
-        logger.info("Infer batch")
+        logger.info("Sent batch for inference:")
 
         result_dict = client.infer_batch(
-            sentences=sequences,
-            tokens_to_generate=_param(np.int32, args.output_len),
-            min_tokens_to_generate=_param(np.int32, 0),
-            all_probs=_param(np.bool_, False),
+            tasks=tasks,
+            prompts=prompts,
+            min_length=_param(np.int32, 0),
+            max_length=_param(np.int32, args.output_len),
+            use_greedy=_param(np.bool_, True),
             temperature=_param(np.float32, 1.0),
-            add_BOS=_param(np.bool_, True),
             top_k=_param(np.int32, 0),
-            top_p=_param(np.float32, 0.9),
-            greedy=_param(np.bool_, False),
-            repetition_penalty=_param(np.float32, 1.2),
+            top_p=_param(np.float32, 1.0),
+            repetition_penalty=_param(np.float32, 1.0),
+            add_BOS=_param(np.bool_, True),
+            all_probs=_param(np.bool_, False),
+            compute_logprob=_param(np.bool_, False),
         )
 
     sentences = np.char.decode(result_dict["sentences"].astype("bytes"), "utf-8")

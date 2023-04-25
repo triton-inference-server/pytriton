@@ -25,7 +25,11 @@ from pytriton.model_config import ModelConfig
 from pytriton.triton import Triton, TritonConfig
 
 from gpt import NemoGptCallable  # pytype: disable=import-error # isort:skip
-from helpers import download_and_load_model, setup_distributed_environment  # pytype: disable=import-error # isort:skip
+from helpers import (  # pytype: disable=import-error # isort:skip
+    download_hf_model,
+    load_model,
+    setup_distributed_environment,
+)
 
 if not torch.cuda.is_available():
     raise OSError("GPU is needed for the inference")
@@ -58,6 +62,11 @@ def main():
         help="Model repository id on HuggingFace Hub",
     )
     parser.add_argument(
+        "--model-filename",
+        help="Path to the model nemo file in HF hub. If not provided first on the list .nemo file will be used.",
+    )
+    parser.add_argument("--prompt-model-path", help="Path to the model prompt nemo file")
+    parser.add_argument(
         "--timeout",
         default=30,
         type=int,
@@ -89,11 +98,14 @@ def main():
         precision=16,
     )
 
-    model = download_and_load_model(args.model_repo_id, trainer)
+    model_path = download_hf_model(args.model_repo_id, args.model_filename)
+    model = load_model(model_path, trainer, prompt_learning_model_path=args.prompt_model_path)
+
     app_state = setup_distributed_environment(trainer)
     if app_state.global_rank == 0:
-        logger.info(f"Running server with rank {torch.distributed.get_rank()}")
+
         infer_callable = NemoGptCallable(model_name="GPT", model=model)
+
         triton_config = TritonConfig(http_address=ENDPOINT_BIND_ADDRESS, http_port=HTTP_PORT, log_verbose=4)
         with Triton(config=triton_config) as triton:
             triton.bind(
@@ -103,6 +115,7 @@ def main():
                 outputs=infer_callable.outputs,
                 config=ModelConfig(max_batch_size=128),
             )
+
             triton.serve()
     else:
         logger.info(f"Running worker with rank {torch.distributed.get_rank()}")
