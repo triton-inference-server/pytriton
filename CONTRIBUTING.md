@@ -42,8 +42,8 @@ Look through the GitHub issues for features. Anything tagged with "enhancement" 
 
 ### Write Documentation
 
-The pyTriton could always use more documentation, whether as part of
-the official pyTriton docs, in docstrings, or even on the web in blog posts,
+The PyTriton could always use more documentation, whether as part of
+the official PyTriton docs, in docstrings, or even on the web in blog posts,
 articles, and such.
 
 ### Submit Feedback
@@ -109,7 +109,7 @@ Ready to contribute? Here's how to set up the `PyTriton` for local development.
 2. Clone your fork locally:
 
 ```shell
-$ git clone git@github.com:your_name_here/triton-inference-server/pytriton.git
+$ git clone git@github.com:your_name_here/pytriton.git
 ```
 
 3. Install your local copy into a virtualenv. Assuming you have virtualenvwrapper installed, this is how you set up your fork for local development:
@@ -117,10 +117,29 @@ $ git clone git@github.com:your_name_here/triton-inference-server/pytriton.git
 ```shell
 $ mkvirtualenv pytriton
 $ cd pytriton/
+```
+
+If you do not use virtualenvwrapper package, you can initialize virtual environment using pure python command:
+
+```shell
+$ python -m venv pytriton
+$ cd pytriton/
+$ source bin/activate
+```
+Once the virtualenv has been activated install the development dependencies:
+
+```shell
 $ make install-dev
 ```
 
-4. Create a branch for local development:
+
+4. Extract Triton Server to your environment so you are able to debug PyTriton while serving some models on Triton:
+
+```shell
+$ make extract-triton
+```
+
+5. Create a branch for local development:
 
 ```shell
 $ git checkout -b name-of-your-bugfix-or-feature
@@ -128,7 +147,7 @@ $ git checkout -b name-of-your-bugfix-or-feature
 
 Now you can make your changes locally.
 
-5. When you're done making changes, check that your changes pass linters and the
+6. When you're done making changes, check that your changes pass linters and the
    tests, including testing other Python versions with tox:
 
 ```shell
@@ -136,7 +155,7 @@ $ make lint  # will run i.a. flake8 and pytype linters
 $ make test  # will run a test with on your current virtualenv
 ```
 
-6. Commit your changes and push your branch to GitHub:
+7. Commit your changes and push your branch to GitHub:
 
 ```shell
 $ git add .
@@ -144,7 +163,7 @@ $ git commit -s -m "Your detailed description of your changes."
 $ git push origin name-of-your-bugfix-or-feature
 ```
 
-7. Submit a pull request through the GitHub website.
+8. Submit a pull request through the GitHub website.
 
 ### Pull Request Guidelines
 
@@ -166,3 +185,13 @@ $ pytest tests.test_subset
 ## Documentation
 
 Add/update docstrings as defined in [Google Style Guide](https://github.com/google/styleguide/blob/gh-pages/pyguide.md#38-comments-and-docstrings).
+
+## Contributor License Agreement (CLA)
+
+PyTriton requires that all contributors (or their corporate entity) send
+a signed copy of the [Contributor License
+Agreement](https://github.com/NVIDIA/triton-inference-server/blob/master/Triton-CCLA-v1.pdf)
+to triton-cla@nvidia.com.
+
+*NOTE*: Contributors with no company affiliation can fill `N/A` in the
+`Corporation Name` and `Corporation Address` fields.
