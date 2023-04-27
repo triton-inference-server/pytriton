@@ -312,29 +312,30 @@ class Triton:
         """Run Triton Inference Server."""
         if not self._triton_server.is_alive():
             self._model_manager.create_models()
+            with self._cv:
+                self._stopped = False
+            LOGGER.debug("Starting Triton Inference")
             self._triton_server.register_on_exit(self._on_tritonserver_exit)
             atexit.register(self.stop)
-
-            with self._cv:
-                self._triton_server.start()
-                self._stopped = False
-
-            self._wait_for_models()
+            self._triton_server.start()
+        self._wait_for_models()
 
     def stop(self) -> None:
         """Stop Triton Inference Server."""
+        LOGGER.debug("Stopping Triton Inference server and proxy backends")
         with self._cv:
             if self._stopped:
+                LOGGER.debug("Triton Inference already stopped.")
                 return
-            LOGGER.debug("Stopping Triton Inference server and proxy backends")
-            self._triton_server.stop()
-            self._model_manager.clean()
-            self._workspace.clean()
             self._stopped = True
-            self._cv.notify_all()
-
-        LOGGER.debug("Stopped Triton Inference server and proxy backends")
+        self._triton_server.unregister_on_exit(self._on_tritonserver_exit)
         atexit.unregister(self.stop)
+        self._triton_server.stop()
+        self._model_manager.clean()
+        self._workspace.clean()
+        with self._cv:
+            self._cv.notify_all()
+        LOGGER.debug("Stopped Triton Inference server and proxy backends")
 
     def serve(self, monitoring_period_sec: int = MONITORING_PERIOD_SEC) -> None:
         """Run Triton Inference Server and lock thread for serving requests/response.
@@ -348,7 +349,7 @@ class Triton:
         with self._cv:
             while self.is_alive():
                 self._cv.wait(timeout=monitoring_period_sec)
-            self.stop()
+        self.stop()
 
     def is_alive(self) -> bool:
         """Verify is deployed models and server are alive.

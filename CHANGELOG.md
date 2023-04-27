@@ -22,6 +22,7 @@ limitations under the License.
   - Modified the function to avoid calling the inference callable on each individual sample when grouping by string/bytes input
   - Added `pad_fn` argument for easy padding and combining of the inference results
 - Fixed Triton binaries search
+- Remove workspace folder on pytriton.Triton shutdown
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 

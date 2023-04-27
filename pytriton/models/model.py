@@ -95,6 +95,8 @@ class Model:
         self.model_version = model_version
         self._inference_handlers = []
         self.zmq_context = zmq.Context()
+        self._observers_lock = threading.Lock()
+        self._inference_handlers_lock = threading.Lock()
 
         self.infer_functions = [inference_fn] if isinstance(inference_fn, Callable) else inference_fn
         if not isinstance(self.infer_functions, (Sequence, Callable)):
@@ -151,33 +153,38 @@ class Model:
 
     def setup(self) -> None:
         """Create deployments and bindings to Triton Inference Server."""
-        if not self._inference_handlers:
-            triton_model_config = self._get_triton_model_config()
-            for i, infer_function in enumerate(self.infer_functions):
-                self.triton_context.model_configs[infer_function] = copy.deepcopy(triton_model_config)
-                _inject_triton_context(self.triton_context, infer_function)
-                inference_handler = InferenceHandler(
-                    model_callable=infer_function,
-                    model_config=triton_model_config,
-                    shared_memory_socket=f"{self._shared_memory_socket}_{i}",
-                    zmq_context=self.zmq_context,
-                )
-                inference_handler.on_proxy_backend_event(self._on_proxy_backend_event)
-                inference_handler.start()
-                self._inference_handlers.append(inference_handler)
-            handshake_th = threading.Thread(target=self._model_proxy_handshake, daemon=True)
-            handshake_th.start()
+        with self._inference_handlers_lock:
+            if not self._inference_handlers:
+                triton_model_config = self._get_triton_model_config()
+                for i, infer_function in enumerate(self.infer_functions):
+                    self.triton_context.model_configs[infer_function] = copy.deepcopy(triton_model_config)
+                    _inject_triton_context(self.triton_context, infer_function)
+                    inference_handler = InferenceHandler(
+                        model_callable=infer_function,
+                        model_config=triton_model_config,
+                        shared_memory_socket=f"{self._shared_memory_socket}_{i}",
+                        zmq_context=self.zmq_context,
+                    )
+                    inference_handler.on_proxy_backend_event(self._on_proxy_backend_event)
+                    inference_handler.start()
+                    self._inference_handlers.append(inference_handler)
+                handshake_th = threading.Thread(target=self._model_proxy_handshake, daemon=True)
+                handshake_th.start()
 
     def clean(self) -> None:
         """Post unload actions to perform on model."""
+        with self._observers_lock:
+            LOGGER.debug("Clearing model events observers")
+            self._model_events_observers.clear()
         LOGGER.debug("Closing socket if needed")
         if self.zmq_context is not None:
             self.zmq_context.term()
         LOGGER.debug("Socket closed. Waiting for proxy backend to shut down")
-        for inference_handler in self._inference_handlers:
-            inference_handler.stop()
-        LOGGER.debug("All backends ")
-        self._inference_handlers.clear()
+        with self._inference_handlers_lock:
+            for inference_handler in self._inference_handlers:
+                inference_handler.stop()
+            LOGGER.debug("All backends ")
+            self._inference_handlers.clear()
 
     def is_alive(self) -> bool:
         """Validate if model is working on Triton.
@@ -187,12 +194,13 @@ class Model:
         Returns:
             True if model is working, False otherwise
         """
-        if not self._inference_handlers:
-            return False
-
-        for inference_handler in self._inference_handlers:
-            if not inference_handler.is_alive():
+        with self._inference_handlers_lock:
+            if not self._inference_handlers:
                 return False
+
+            for inference_handler in self._inference_handlers:
+                if not inference_handler.is_alive():
+                    return False
 
         return True
 
@@ -258,11 +266,13 @@ class Model:
         Args:
             model_event_handle_fn: function to be called when model events arises
         """
-        self._model_events_observers.append(model_event_handle_fn)
+        with self._observers_lock:
+            self._model_events_observers.append(model_event_handle_fn)
 
     def _notify_model_events_observers(self, event: ModelEvent, context: typing.Any):
-        for model_event_handle_fn in self._model_events_observers:
-            model_event_handle_fn(self, event, context)
+        with self._observers_lock:
+            for model_event_handle_fn in self._model_events_observers:
+                model_event_handle_fn(self, event, context)
 
     def _on_proxy_backend_event(
         self, proxy_backend: InferenceHandler, event: InferenceHandlerEvent, context: typing.Optional[typing.Any] = None

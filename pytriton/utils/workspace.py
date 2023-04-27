@@ -79,7 +79,7 @@ class Workspace:
         return True
 
     def clean(self) -> None:
-        """Clean workspace removing files and directories created inside.
+        """Clean workspace removing files and directories created inside including the workspace itself.
 
         Raises:
             OSError - when workspace after performing cleanup operation is still not empty.
@@ -96,3 +96,5 @@ class Workspace:
                 child.unlink()
         if not self.is_empty():
             raise OSError(f"Could not clean {self.path} workspace")
+        if self.path.exists():
+            self.path.rmdir()
