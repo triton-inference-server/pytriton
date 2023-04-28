@@ -17,6 +17,7 @@ import tempfile
 
 import pytest
 
+import pytriton.constants as constants
 from pytriton.utils.workspace import Workspace
 
 
@@ -66,5 +67,31 @@ def test_workspace_clean():
         assert not workspace.exists()
 
         # No exception should be raised at second clean
+        workspace.clean()
+        assert not workspace.exists()
+
+
+def test_tmp_workspace_exist_when_created():
+    with tempfile.TemporaryDirectory() as tempdir:
+        constants.PYTRITON_CACHE_DIR = pathlib.Path(tempdir)
+        workspace = Workspace()
+        assert workspace.exists()
+
+
+def test_tmp_workspace_not_exist_when_deleted():
+    with tempfile.TemporaryDirectory() as tempdir:
+        constants.PYTRITON_CACHE_DIR = pathlib.Path(tempdir)
+        workspace = Workspace()
+        assert workspace.exists()
+        p = workspace.path
+        del workspace
+        assert not p.exists()
+
+
+def test_tmp_workspace_not_exist_when_cleaned():
+    with tempfile.TemporaryDirectory() as tempdir:
+        constants.PYTRITON_CACHE_DIR = pathlib.Path(tempdir)
+        workspace = Workspace()
+        assert workspace.exists()
         workspace.clean()
         assert not workspace.exists()

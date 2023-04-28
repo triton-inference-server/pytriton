@@ -38,10 +38,11 @@ class Workspace:
         """
         if workspace_path is None:
             PYTRITON_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-            workspace_path = tempfile.TemporaryDirectory(dir=PYTRITON_CACHE_DIR, prefix="workspace_").name
-            self._workspace_path = pathlib.Path(workspace_path).resolve()
+            self._tmp_dir = tempfile.TemporaryDirectory(dir=PYTRITON_CACHE_DIR, prefix="workspace_")
+            self._workspace_path = pathlib.Path(self._tmp_dir.name).resolve()
             LOGGER.debug(f"Workspace path {self._workspace_path}")
         else:
+            self._tmp_dir = None
             self._workspace_path = pathlib.Path(workspace_path).resolve()
             LOGGER.debug(f"Workspace path {self._workspace_path}")
             self._workspace_path.mkdir(parents=True)
