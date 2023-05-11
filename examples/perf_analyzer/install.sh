@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+set -xe
+
 echo "Installing libb64-dev required by Perf Analyzer"
 apt-get update
 apt-get install -y libb64-dev

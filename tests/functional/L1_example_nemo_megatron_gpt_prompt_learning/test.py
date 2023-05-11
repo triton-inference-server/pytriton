@@ -17,7 +17,6 @@ import argparse
 import logging
 import re
 import signal
-import subprocess
 import sys
 import time
 
@@ -65,7 +64,12 @@ def main():
         "examples/nemo_megatron_gpt_multinode/README.md", docker_image_with_name
     )
 
-    subprocess.run(["bash", "examples/nemo_megatron_gpt_multinode/train_prompt_learning_model.sh"])
+    train_cmd = ["bash", "examples/nemo_megatron_gpt_multinode/train_prompt_learning_model.sh"]
+    with ScriptThread(train_cmd, name="train") as train_thread:
+        train_thread.join()
+
+    if train_thread.returncode != 0:
+        raise RuntimeError(f"Train thread returned {train_thread.returncode}")
 
     start_time = time.time()
     elapsed_s = 0

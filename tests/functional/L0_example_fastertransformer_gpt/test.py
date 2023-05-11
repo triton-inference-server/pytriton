@@ -18,7 +18,6 @@ import logging
 import os
 import re
 import signal
-import subprocess
 import sys
 import time
 
@@ -50,7 +49,12 @@ def main():
     os.environ["FT_REPO_DIR"] = "/workspace/FasterTransformer"
     os.environ["PYTHONPATH"] = f"/workspace/FasterTransformer:{os.environ.get('PYTHONPATH', '')}"
 
-    subprocess.run(["bash", "examples/fastertransformer_gpt_multinode/install.sh"])
+    install_cmd = ["bash", "examples/fastertransformer_gpt_multinode/install.sh"]
+    with ScriptThread(install_cmd, name="install") as install_thread:
+        install_thread.join()
+
+    if install_thread.returncode != 0:
+        raise RuntimeError(f"Install thread returned {install_thread.returncode}")
 
     start_time = time.time()
     elapsed_s = 0

@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+set -xe
 
-pip install --upgrade -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html jax[cuda]
+pip install --upgrade jax[cuda12_pip] -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 pip install --upgrade flax omegaconf sacrebleu SentencePiece tokenizers transformers>=4.26

@@ -12,5 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+set -xe
+
 pip install numpy
-pip install cupy-cuda115 --extra-index-url=https://pypi.ngc.nvidia.com
+pip install cupy-cuda12x --extra-index-url=https://pypi.ngc.nvidia.com

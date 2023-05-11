@@ -38,6 +38,7 @@ The list of example models deployments:
 - [NeMo Megatron GPT model with multi-node support](../examples/nemo_megatron_gpt_multinode)
 - [OPT JAX from HuggingFace with multi-node support](../examples/huggingface_opt_multinode_jax)
 - [ResNet50 PyTorch from HuggingFace](../examples/huggingface_resnet_pytorch)
+- [Stable Diffusion 1.5 from HuggingFace](../examples/huggingface_stable_diffusion)
 
 ## Profiling models
 
@@ -54,3 +55,4 @@ The following examples contain a guide on how to deploy them on a Kubernetes clu
 - [OPT JAX from HuggingFace with multi-node support](../examples/huggingface_opt_multinode_jax)
 - [NeMo Megatron GPT model with multi-node support](../examples/nemo_megatron_gpt_multinode)
 - [ResNet50 PyTorch from HuggingFace](../examples/huggingface_resnet_pytorch)
+- [Stable Diffusion 1.5 from HuggingFace](../examples/huggingface_stable_diffusion)

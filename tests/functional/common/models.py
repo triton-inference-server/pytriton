@@ -164,7 +164,7 @@ def _create_hf_jax_bert_fn() -> Callable:
             "pip",
             "install",
             "--upgrade",
-            "jax[cuda]",
+            "jax[cuda12_pip]",
             "-f",
             "https://storage.googleapis.com/jax-releases/jax_cuda_releases.html",
         ],

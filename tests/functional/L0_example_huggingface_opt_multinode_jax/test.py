@@ -17,7 +17,6 @@ import argparse
 import logging
 import re
 import signal
-import subprocess
 import sys
 import time
 
@@ -56,7 +55,12 @@ def main():
         "examples/huggingface_opt_multinode_jax//README.md", docker_image_with_name
     )
 
-    subprocess.run(["bash", "examples/huggingface_opt_multinode_jax/install.sh"])
+    install_cmd = ["bash", "examples/huggingface_opt_multinode_jax/install.sh"]
+    with ScriptThread(install_cmd, name="install") as install_thread:
+        install_thread.join()
+
+    if install_thread.returncode != 0:
+        raise RuntimeError(f"Install thread returned {install_thread.returncode}")
 
     start_time = time.time()
     elapsed_s = 0

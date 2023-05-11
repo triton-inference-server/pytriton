@@ -17,7 +17,6 @@ import argparse
 import logging
 import re
 import signal
-import subprocess
 import sys
 import time
 from multiprocessing.util import DEFAULT_LOGGING_FORMAT
@@ -60,7 +59,12 @@ def main():
     docker_image_with_name = METADATA["image_name"].format(TEST_CONTAINER_VERSION=get_current_container_version())
     verify_docker_image_in_readme_same_as_tested("examples/perf_analyzer/README.md", docker_image_with_name)
 
-    subprocess.run(["bash", "examples/perf_analyzer/install.sh"])
+    install_cmd = ["bash", "examples/perf_analyzer/install.sh"]
+    with ScriptThread(install_cmd, name="install") as install_thread:
+        install_thread.join()
+
+    if install_thread.returncode != 0:
+        raise RuntimeError(f"Install thread returned {install_thread.returncode}")
 
     start_time = time.time()
     elapsed_s = 0
