@@ -42,7 +42,7 @@ dependencies = [
     "sh ~= 1.14",
     "tritonclient[all]",
     "typing_inspect ~= 0.6.0",
-    "wrapt ~= 1.14",
+    "wrapt >= 1.11.0",
 ]
 
 [project.urls]
