@@ -20,11 +20,8 @@ limitations under the License.
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 
-- Version of external components used during testing:
-  - [Triton Inference Server](https://github.com/triton-inference-server/): 2.29.0
-  - Other component versions depend on the used framework and Triton Inference Server containers versions.
-    Refer to its [support matrix](https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html)
-    for a detailed summary.
+-
+- Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.33.0](https://github.com/triton-inference-server/server/releases/tag/v2.33.0)
 
 ## 0.1.5 (2023-05-12)
 

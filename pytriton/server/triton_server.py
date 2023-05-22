@@ -145,7 +145,7 @@ class TritonServer:
             tritonserver_cmd = sh.Command(tritonserver_cmd)
             tritonserver_cmd = tritonserver_cmd.bake(*rest)
 
-            tritonserver_args = self._server_config.to_cli_string().replace("=", " ").split()
+            tritonserver_args = self._server_config.to_args_list()
 
             def _preexec_fn():
                 PR_SET_PDEATHSIG = 1  # noqa

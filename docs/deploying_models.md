@@ -434,8 +434,10 @@ and [API spec](api.md)
 
 The Triton Inference Server provides functionality to use a cached response for the model. To use the response cache:
 
-- provide the `response_cache_byte_size` in `TritonConfig`
+- provide the `cache_config` in `TritonConfig`
 - set `response_cache=True` in `ModelConfig`
+
+More about response cache can be found in the [Triton Response Cache](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/response_cache.md) page.
 
 Example:
 
@@ -447,7 +449,7 @@ from pytriton.model_config import ModelConfig, Tensor
 from pytriton.triton import Triton, TritonConfig
 
 triton_config = TritonConfig(
-    response_cache_byte_size=1024 * 1024,  # 1 MB
+    cache_config=[f"local,size={1024 * 1024}"],  # 1 MB
 )
 
 @batch

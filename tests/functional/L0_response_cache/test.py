@@ -70,7 +70,7 @@ def main():
         grpc_port=find_free_port(),
         http_port=find_free_port(),
         metrics_port=find_free_port(),
-        response_cache_byte_size=1024 * 1024,  # 1 MB
+        cache_config=[f"local,size={1024 * 1024}"],  # 1 MB
     )
     LOGGER.debug(f"Using {triton_config}")
     with Triton(config=triton_config) as triton:

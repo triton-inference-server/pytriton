@@ -24,8 +24,10 @@ export TRITON_CONTAINER_ID=$(docker create --rm "${TRITON_CONTAINER}" bash -c "s
 docker start "${TRITON_CONTAINER_ID}"
 
 mkdir -p "${TARGET_DIR}"/backends
+mkdir -p "${TARGET_DIR}"/caches/local
 docker cp "${TRITON_CONTAINER_ID}":/opt/tritonserver/bin "${TARGET_DIR}"
 docker cp "${TRITON_CONTAINER_ID}":/opt/tritonserver/lib "${TARGET_DIR}/external_libs"
+docker cp "${TRITON_CONTAINER_ID}":/opt/tritonserver/caches/local/libtritoncache_local.so "${TARGET_DIR}/caches/local"
 docker cp "${TRITON_CONTAINER_ID}":/opt/tritonserver/backends/python "${TARGET_DIR}"/backends
 
 mkdir -p "${TARGET_DIR}"/external_libs
@@ -47,6 +49,7 @@ function extract_binary_dependencies() {
 
 extract_binary_dependencies /opt/tritonserver/bin/tritonserver
 extract_binary_dependencies /opt/tritonserver/external_libs/libtritonserver.so
+extract_binary_dependencies /opt/tritonserver/caches/local/libtritoncache_local.so
 extract_binary_dependencies /opt/tritonserver/backends/python/libtriton_python.so
 extract_binary_dependencies /opt/tritonserver/backends/python/triton_python_backend_stub
 

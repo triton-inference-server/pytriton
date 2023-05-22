@@ -32,6 +32,7 @@ class TritonServerConfig:
     An argument set to None will use the server default.
     """
 
+    # https://github.com/triton-inference-server/server/blob/main/src/command_line_parser.cc
     server_arg_keys = [
         # Server
         "id",
@@ -52,16 +53,19 @@ class TritonServerConfig:
         "disable-auto-complete-config",
         "strict-model-config",
         "strict-readiness",
-        # API Servers
+        # http options
         "allow-http",
+        "http-address",
         "http-port",
         "reuse-http-port",
-        "http-address",
+        "http-header-forward-pattern",
         "http-thread-count",
+        # grpc options
         "allow-grpc",
+        "grpc-address",
         "grpc-port",
         "reuse-grpc-port",
-        "grpc-address",
+        "grpc-header-forward-pattern",
         "grpc-infer-allocation-pool-size",
         "grpc-use-ssl",
         "grpc-use-ssl-mutual",
@@ -75,17 +79,13 @@ class TritonServerConfig:
         "grpc-http2-max-pings-without-data",
         "grpc-http2-min-recv-ping-interval-without-data",
         "grpc-http2-max-ping-strikes",
+        "grpc-restricted-protocol",
+        # metrics options
         "allow-metrics",
         "allow-gpu-metrics",
         "allow-cpu-metrics",
         "metrics-interval-ms",
         "metrics-port",
-        # Tracing
-        "trace-file",
-        "trace-level",
-        "trace-rate",
-        "trace-count",
-        "trace-log-frequency",
         # Model control
         "model-control-mode",
         "repository-poll-secs",
@@ -94,7 +94,6 @@ class TritonServerConfig:
         "pinned-memory-pool-byte-size",
         "cuda-memory-pool-byte-size",
         "min-supported-compute-capability",
-        "response-cache-byte-size",
         "buffer-manager-thread-count",
         # Backend config
         "backend-directory",
@@ -112,6 +111,10 @@ class TritonServerConfig:
         "vertex-ai-port",
         "vertex-ai-thread-count",
         "vertex-ai-default-model",
+        "metrics-config",
+        "trace-config",
+        "cache-config",
+        "cache-directory",
     ]
 
     def __init__(self):
@@ -145,7 +148,16 @@ class TritonServerConfig:
             The command consisting of all set arguments to the tritonserver.
             e.g. '--model-repository=/models --log-verbose=True'
         """
-        return " ".join([f"--{key}={val}" for key, val in self._server_args.items() if val])
+        cli_items = []
+        for key, val in self._server_args.items():
+            if val is None:
+                continue
+            if isinstance(val, (tuple, list)):
+                for sub_val in val:
+                    cli_items.append(f"--{key}={sub_val}")
+            else:
+                cli_items.append(f"--{key}={val}")
+        return " ".join(cli_items)
 
     def to_args_list(self) -> List:
         """Utility function to convert a cli string into a list of arguments.
@@ -214,3 +226,14 @@ class TritonServerConfig:
             raise PyTritonError(
                 f"The argument '{key}' to the Triton Inference " "Server is not supported by the pytriton."
             )
+
+    def __contains__(self, key) -> bool:
+        """Checks if an argument is defined in the TritonServerConfig.
+
+        Args:
+            key: The name of the attribute to check for definition in TritonServerConfig
+
+        Returns:
+            True if the argument is defined in the config, False otherwise
+        """
+        return key in self._server_args

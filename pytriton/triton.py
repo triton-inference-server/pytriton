@@ -40,7 +40,7 @@ import re
 import threading
 import threading as th
 import typing
-from typing import Callable, Dict, Optional, Sequence, Union
+from typing import Callable, Dict, List, Optional, Sequence, Union
 
 import typing_inspect
 
@@ -54,6 +54,7 @@ from pytriton.models.model import Model, ModelConfig, ModelEvent
 from pytriton.server.model_repository import TritonModelRepository
 from pytriton.server.triton_server import TritonServer
 from pytriton.server.triton_server_config import TritonServerConfig
+from pytriton.utils.dataclasses import kwonly_dataclass
 from pytriton.utils.distribution import get_libs_path, get_root_module_path
 from pytriton.utils.workspace import Workspace
 
@@ -68,6 +69,8 @@ MODEL_CONFIG_URL = f"{MODEL_URL}/config/"
 MODEL_INFER_URL = f"{MODEL_URL}/infer/"
 
 
+# see https://github.com/triton-inference-server/server/blob/main/src/command_line_parser.cc for more details
+@kwonly_dataclass
 @dataclasses.dataclass
 class TritonConfig:
     """Triton Inference Server configuration class for customization of server execution.
@@ -85,22 +88,25 @@ class TritonConfig:
         strict_readiness: If true /v2/health/ready endpoint indicates ready if the server is
             responsive and all models are available.
         allow_http: Allow the server to listen for HTTP requests.
-        http_port: The port for the server to listen on for HTTP requests.
-        http_address: The address for the http server to binds to.
+        http_address: The address for the http server to bind to. Default is 0.0.0.0.
+        http_port: The port for the server to listen on for HTTP requests. Default is 8000.
+        http_header_forward_pattern: The regular expression pattern
+            that will be used for forwarding HTTP headers as inference request parameters.
         http_thread_count: Number of threads handling HTTP requests.
         allow_grpc: Allow the server to listen for GRPC requests.
-        grpc_port: The port for the server to listen on for GRPC requests.
-        grpc_address: The address for the grpc server to binds to.
+        grpc_address: The address for the grpc server to binds to. Default is 0.0.0.0.
+        grpc_port: The port for the server to listen on for GRPC requests. Default is 8001.
+        grpc_header_forward_pattern: The regular expression pattern that will be used
+            for forwarding GRPC headers as inference request parameters.
         grpc_infer_allocation_pool_size: The maximum number of inference request/response objects
-            that remain allocated for reuse
-        grpc_use_ssl: Use SSL authentication for GRPC requests.
-        grpc_use_ssl_mutual: Use mutual SSL authentication for GRPC requests.
-        grpc_server_cert: Path to file holding PEM-encoded server certificate.
-            Ignored unless grpc_use_ssl is true.
-        grpc_server_key: Path to file holding PEM-encoded server key.
-            Ignored unless grpc_use_ssl is true.
-        grpc_root_cert: Path to file holding PEM-encoded root certificate.
-            Ignored unless grpc_use_ssl is true.
+            that remain allocated for reuse. As long as the number of in-flight requests doesn't exceed
+            this value there will be no allocation/deallocation of request/response objects.
+        grpc_use_ssl: Use SSL authentication for GRPC requests. Default is false.
+        grpc_use_ssl_mutual: Use mututal SSL authentication for GRPC requests.
+            This option will preempt grpc_use_ssl if it is also specified. Default is false.
+        grpc_server_cert: File holding PEM-encoded server certificate. Ignored unless grpc_use_ssl is true.
+        grpc_server_key: Path to file holding PEM-encoded server key. Ignored unless grpc_use_ssl is true.
+        grpc_root_cert: Path to file holding PEM-encoded root certificate. Ignored unless grpc_use_ssl is true.
         grpc_infer_response_compression_level: The compression level to be used while returning the inference
             response to the peer. Allowed values are none, low, medium and high. Default is none.
         grpc_keepalive_time: The period (in milliseconds) after which a keepalive ping is sent on the transport.
@@ -114,6 +120,11 @@ class TritonConfig:
             gRPC Core would expect between receiving successive pings.
         grpc_http2_max_ping_strikes: Maximum number of bad pings that the server will tolerate before sending
             an HTTP2 GOAWAY frame and closing the transport.
+        grpc_restricted_protocol: Specify restricted GRPC protocol setting.
+            The format of this flag is <protocols>,<key>=<value>.
+            Where <protocol> is a comma-separated list of protocols to be restricted.
+            <key> will be additional header key to be checked when a GRPC request
+            is received, and <value> is the value expected to be matched.
         allow_metrics: Allow the server to provide prometheus metrics.
         allow_gpu_metrics: Allow the server to provide GPU metrics.
         allow_cpu_metrics: Allow the server to provide CPU metrics.
@@ -127,12 +138,22 @@ class TritonConfig:
         vertex_ai_port: The port for the server to listen on for Vertex AI requests.
         vertex_ai_thread_count: Number of threads handling Vertex AI requests.
         vertex_ai_default_model: The name of the model to use for single-model inference requests.
-        trace_file: Set the file where trace output will be saved.
-        trace_level: Specify a trace level.
-        trace_rate: Set the trace sampling rate.
-        trace_count: Set the number of traces to be sampled.
-        trace_log_frequency: Set the trace log frequency.
-        response_cache_byte_size: The size in bytes to allocate for a request/response cache.
+        metrics_config: Specify a metrics-specific configuration setting.
+            The format of this flag is <setting>=<value>. It can be specified multiple times
+        trace_config: Specify global or trace mode specific configuration setting.
+            The format of this flag is <mode>,<setting>=<value>.
+            Where <mode> is either 'triton' or 'opentelemetry'. The default is 'triton'.
+            To specify global trace settings (level, rate, count, or mode), the format would be <setting>=<value>.
+            For 'triton' mode, the server will use Triton's Trace APIs.
+            For 'opentelemetry' mode, the server will use OpenTelemetry's APIs to generate,
+            collect and export traces for individual inference requests.
+        cache_config: Specify a cache-specific configuration setting.
+            The format of this flag is <cache_name>,<setting>=<value>.
+            Where <cache_name> is the name of the cache, such as 'local' or 'redis'.
+            Example: local,size=1048576 will configure a 'local' cache implementation
+            with a fixed buffer pool of size 1048576 bytes.
+        cache_directory: The global directory searched for cache shared libraries. Default is '/opt/tritonserver/caches'.
+            This directory is expected to contain a cache implementation as a shared library with the name 'libtritoncache.so'.
         buffer_manager_thread_count: The number of threads used to accelerate copies and other operations
             required to manage input and output tensor contents.
     """
@@ -145,12 +166,14 @@ class TritonConfig:
     exit_on_error: Optional[bool] = None
     strict_readiness: Optional[bool] = None
     allow_http: Optional[bool] = None
-    http_port: Optional[int] = None
     http_address: Optional[str] = None
+    http_port: Optional[int] = None
+    http_header_forward_pattern: Optional[str] = None
     http_thread_count: Optional[int] = None
     allow_grpc: Optional[bool] = None
-    grpc_port: Optional[int] = None
     grpc_address: Optional[str] = None
+    grpc_port: Optional[int] = None
+    grpc_header_forward_pattern: Optional[str] = None
     grpc_infer_allocation_pool_size: Optional[int] = None
     grpc_use_ssl: Optional[bool] = None
     grpc_use_ssl_mutual: Optional[bool] = None
@@ -177,12 +200,10 @@ class TritonConfig:
     vertex_ai_port: Optional[int] = None
     vertex_ai_thread_count: Optional[int] = None
     vertex_ai_default_model: Optional[str] = None
-    trace_file: Optional[pathlib.Path] = None
-    trace_level: Optional[str] = None
-    trace_rate: Optional[int] = None
-    trace_count: Optional[int] = None
-    trace_log_frequency: Optional[int] = None
-    response_cache_byte_size: Optional[int] = None
+    metrics_config: Optional[List[str]] = None
+    trace_config: Optional[List[str]] = None
+    cache_config: Optional[List[str]] = None
+    cache_directory: Optional[str] = None
     buffer_manager_thread_count: Optional[int] = None
 
     def __post_init__(self):
@@ -279,6 +300,8 @@ class Triton:
 
         self._triton_server_config["model_repository"] = model_repository.path.as_posix()
         self._triton_server_config["backend_directory"] = (TRITONSERVER_DIST_DIR / "backends").as_posix()
+        if "cache_directory" not in self._triton_server_config:
+            self._triton_server_config["cache_directory"] = (get_root_module_path() / "tritonserver/caches").as_posix()
 
         self._triton_server = TritonServer(
             path=(TRITONSERVER_DIST_DIR / "bin/tritonserver").as_posix(),

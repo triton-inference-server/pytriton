@@ -35,7 +35,6 @@ keywords = []
 license = {text = "Apache 2.0"}
 requires-python = ">=3.8,<4"
 dependencies = [
-    "dataclasses; python_version<'3.7'",
     "numpy ~= 1.21",
     "protobuf>=3.7.0",
     "pyzmq ~= 23.0",
