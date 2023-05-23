@@ -23,6 +23,7 @@ NVIDIA's [Triton Inference Server](https://github.com/triton-inference-server).
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
+- [Documentation](#documentation)
 - [How it works?](#how-it-works)
 - [Installation](#installation)
   - [Installing using pip](#installing-using-pip)
@@ -31,11 +32,16 @@ NVIDIA's [Triton Inference Server](https://github.com/triton-inference-server).
 - [Architecture](#architecture)
 - [Examples](#examples)
 - [Profiling model](#profiling-model)
-- [Documentation](#documentation)
 - [Version management](#version-management)
 - [Useful Links](#useful-links)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+## Documentation
+
+Read how to customize the Triton Inference Server, load models, deploy on clusters, and the API reference
+can be found in the [documentation](https://triton-inference-server.github.io/pytriton). The below sections provide
+brief information about the product and quick start guide.
 
 ## How it works?
 
@@ -290,10 +296,6 @@ used to profile models served through PyTriton. We have prepared an example of
 using the Perf Analyzer to profile the BART PyTorch model. The example code can be found
 in [examples/perf_analyzer](examples/perf_analyzer).
 
-## Documentation
-
-More information on how to customize the Triton Inference Server, load models, deploy on clusters, and the API reference
-can be found in the [documentation](https://triton-inference-server.github.io/pytriton).
 
 ## Version management
 

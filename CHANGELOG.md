@@ -18,6 +18,8 @@ limitations under the License.
 
 ## Unreleased
 
+- Display documentation link after models are loaded
+
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 
 - Version of external components used during testing:

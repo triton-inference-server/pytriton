@@ -189,7 +189,7 @@ triton.stop()
 ## What next?
 
 Read more about using PyTriton in the [Quick Start](quick_start.md), [Examples](examples.md) and
-find more options on how to configure Triton, models, and deployment on a cluster in the [Deploying Models](deploying_models.md)
+find more options on how to configure Triton, models, and deployment on a cluster in the [Deploying Models](initialization.md)
 section.
 
 The details about classes and methods can be found in the [API Reference](api.md) page.

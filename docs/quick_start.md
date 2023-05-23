@@ -113,7 +113,7 @@ moment, the model is available under the name `Linear` in the Triton server. The
 `localhost:8000/v2/models/Linear/infer`, which are passed to the `infer_fn` function.
 
 If you would like to use Triton in the background mode, use `run`. More about that can be found
-in the [Deploying Models](deploying_models.md) page.
+in the [Deploying Models](initialization.md) page.
 
 Once the `serve` or `run` method is called on the `Triton` object, the server status can be obtained using:
 
@@ -178,4 +178,4 @@ print(result_dict)
 
 The full example code can be found in [examples/linear_random_pytorch](../examples/linear_random_pytorch).
 
-More information about running the server and models can be found in [Deploying Models](deploying_models.md) page.
+More information about running the server and models can be found in [Deploying Models](initialization.md) page.
