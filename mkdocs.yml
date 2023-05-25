@@ -71,8 +71,14 @@ nav:
     - Installation: installation.md
     - Building binary package: building.md
   - Quick Start: quick_start.md
-  - Deploying Models: deploying_models.md
-  - Inference Callable Design: inference_callable.md
+  - Deploying Models:
+      - Triton Initialization: initialization.md
+      - Binding Model to Triton: binding_models.md
+      - Binding Configuration: binding_configuration.md
+      - Deploying in Clusters: deploying_in_clusters.md
+  - Inference Handling:
+      - Inference Callable: inference_callable.md
+      - Decorators: decorators.md
   - Examples: examples.md
   - API Reference: api.md
   - Changelog: CHANGELOG.md

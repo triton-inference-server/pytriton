@@ -463,6 +463,11 @@ class Triton:
             LOGGER.info(f"  Model config:   `GET  {MODEL_CONFIG_URL.format(model_name=model.model_name)}`")
             LOGGER.info(f"  Inference:      `POST {MODEL_INFER_URL.format(model_name=model.model_name)}`")
 
+        LOGGER.info(
+            """Read more about configuring and serving models in """
+            """documentation: https://triton-inference-server.github.io/pytriton."""
+        )
+
     @classmethod
     def _validate_model_name(cls, model_name: str) -> None:
         """Validate model name.

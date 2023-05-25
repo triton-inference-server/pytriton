@@ -71,7 +71,7 @@ If you choose to use the container, we recommend installing the
    nvcr.io/nvidia/nemo:22.07 bash
    ```
 
-   For more information on Docker or cluster deployments, see the [documentation](../../docs/deploying_models.md#deploying-in-cluster).
+   For more information on Docker or cluster deployments, see the [documentation](../../docs/deploying_in_clusters.md).
 
 2. In the recently started container, [install PyTriton](../../docs/installation.md):
 
@@ -108,7 +108,7 @@ The server script will:
 
 1. Ensure the model and tokenizer data are downloaded.
 2. Load the downloaded model and initialize the environment for it.
-3. Start the PyTriton server, on listening on [configured ports](../../docs/deploying_models.md#configuring-triton).
+3. Start the PyTriton server, on listening on [configured ports](../../docs/initialization.md).
 
    In this example, the HTTP endpoint will listen on port 8000. Due to [Docker port publishing](https://docs.docker.com/config/containers/container-networking/#published-ports), it should be accessible outside of the container.
 

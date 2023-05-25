@@ -58,7 +58,7 @@ Alternatively, you can set up your environment manually as in [model instruction
         nvidia/fastertransformer sleep 7d
     ```
 
-    For more information on docker/cluster deployments, see [documentation](../../docs/deploying_models.md#deploying-in-cluster).
+    For more information on docker/cluster deployments, see [documentation](../../docs/deploying_in_clusters.md).
 
 2. Install requirements required by example and [PyTriton](../../docs/installation.md):
     ```bash
@@ -95,7 +95,7 @@ Server script will:
 1. Downloads source model and tokenizer data
 2. Convert the source model to FasterTransformer format
 3. Load a FasterTransformer model and initialize an environment for it
-4. Start the PyTriton server listening on [configured ports](../../docs/deploying_models.md#configuring-triton).
+4. Start the PyTriton server listening on [configured ports](../../docs/initialization.md).
 
    In this example, the HTTP endpoint will listen on the 8000 port, and thanks to
    [Docker port publishing](https://docs.docker.com/config/containers/container-networking/#published-ports)
