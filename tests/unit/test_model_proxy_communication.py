@@ -26,6 +26,7 @@ import zmq
 
 from pytriton.model_config.generator import ModelConfigGenerator
 from pytriton.model_config.triton_model_config import TensorSpec, TritonModelConfig
+from pytriton.proxy.types import Request
 from pytriton.triton import TRITONSERVER_DIST_DIR
 
 LOGGER = logging.getLogger("tests.test_model_error_handling")
@@ -83,7 +84,7 @@ def test_model_throws_exception(tmp_path, mocker):
             backend_model = TritonPythonModel()
             backend_model.initialize(backend_initialization_args)
 
-            inputs = [{"input1": np.array([[1, 2, 3]], dtype=np.float32)}]
+            inputs = [Request({"input1": np.array([[1, 2, 3]], dtype=np.float32)}, {})]
 
             try:
                 result = backend_model._exec_requests(inputs, logger=Mock())

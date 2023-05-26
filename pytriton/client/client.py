@@ -62,6 +62,18 @@ def _verify_inputs_args(inputs, named_inputs):
         raise PyTritonClientValueError("Use either positional either keyword method arguments convention")
 
 
+def _verify_parameters(parameters_or_headers: Optional[Dict[str, Union[str, int, bool]]] = None):
+    if parameters_or_headers is None:
+        return
+    if not isinstance(parameters_or_headers, dict):
+        raise PyTritonClientValueError("Parameters and headers must be a dictionary")
+    for key, value in parameters_or_headers.items():
+        if not isinstance(key, str):
+            raise PyTritonClientValueError("Parameter/header key must be a string")
+        if not isinstance(value, (str, int, bool)):
+            raise PyTritonClientValueError("Parameter/header value must be a string, integer or boolean")
+
+
 class ModelClient:
     """Synchronous client for model deployed on the Triton Inference Server."""
 
@@ -171,7 +183,13 @@ class ModelClient:
             )
         return self._model_config
 
-    def infer_sample(self, *inputs, **named_inputs) -> Dict[str, np.ndarray]:
+    def infer_sample(
+        self,
+        *inputs,
+        parameters: Optional[Dict[str, Union[str, int, bool]]] = None,
+        headers: Optional[Dict[str, Union[str, int, bool]]] = None,
+        **named_inputs,
+    ) -> Dict[str, np.ndarray]:
         """Run synchronous inference on single data sample.
 
         Typical usage:
@@ -188,6 +206,8 @@ class ModelClient:
 
         Args:
             *inputs: inference inputs provided as positional arguments.
+            parameters: custom inference parameters.
+            headers: custom inference headers.
             **named_inputs: inference inputs provided as named arguments.
 
         Returns:
@@ -203,6 +223,8 @@ class ModelClient:
             PyTritonClientInferenceServerError: If error occurred on inference callable or Triton Inference Server side.
         """
         _verify_inputs_args(inputs, named_inputs)
+        _verify_parameters(parameters)
+        _verify_parameters(headers)
 
         model_supports_batching = self.model_config.max_batch_size > 0
         if model_supports_batching:
@@ -211,13 +233,19 @@ class ModelClient:
             elif named_inputs:
                 named_inputs = {name: data[np.newaxis, ...] for name, data in named_inputs.items()}
 
-        result = self._infer(inputs or named_inputs)
+        result = self._infer(inputs or named_inputs, parameters, headers)
         if model_supports_batching:
             result = {name: data[0] for name, data in result.items()}
 
         return result
 
-    def infer_batch(self, *inputs, **named_inputs) -> Dict[str, np.ndarray]:
+    def infer_batch(
+        self,
+        *inputs,
+        parameters: Optional[Dict[str, Union[str, int, bool]]] = None,
+        headers: Optional[Dict[str, Union[str, int, bool]]] = None,
+        **named_inputs,
+    ) -> Dict[str, np.ndarray]:
         """Run synchronous inference on batched data.
 
         Typical usage:
@@ -234,6 +262,8 @@ class ModelClient:
 
         Args:
             *inputs: inference inputs provided as positional arguments.
+            parameters: custom inference parameters.
+            headers: custom inference headers.
             **named_inputs: inference inputs provided as named arguments.
 
         Returns:
@@ -250,6 +280,8 @@ class ModelClient:
             PyTritonClientInferenceServerError: If error occurred on inference callable or Triton Inference Server side.
         """
         _verify_inputs_args(inputs, named_inputs)
+        _verify_parameters(parameters)
+        _verify_parameters(headers)
 
         model_supports_batching = self.model_config.max_batch_size > 0
         if not model_supports_batching:
@@ -257,7 +289,7 @@ class ModelClient:
                 f"Model {self.model_config.model_name} doesn't support batching - use infer_sample method instead"
             )
 
-        return self._infer(inputs or named_inputs)
+        return self._infer(inputs or named_inputs, parameters, headers)
 
     def _monkey_patch_client(self):
         """Monkey patch InferenceServerClient to catch error in __del__."""
@@ -293,7 +325,7 @@ class ModelClient:
         timeout_s = max(0.0, should_finish_before_s - time.time())
         self._model_config = get_model_config(self._client, self._model_name, self._model_version, timeout_s=timeout_s)
 
-    def _infer(self, inputs: _IOType) -> Dict[str, np.ndarray]:
+    def _infer(self, inputs: _IOType, parameters, headers) -> Dict[str, np.ndarray]:
         if self._model_ready:
             self._wait_and_init_model_config(self._init_timeout_s)
 
@@ -305,13 +337,13 @@ class ModelClient:
         for input_name, input_data in inputs.items():
             if input_data.dtype == object and not isinstance(input_data.reshape(-1)[0], bytes):
                 raise RuntimeError(
-                    f"Numpy array for '{input_name}' input with dtype=object should contain encoded strings \
+                    f"Numpy array for {input_name!r} input with dtype=object should contain encoded strings \
                     \\(e.g. into utf-8\\). Element type: {type(input_data.reshape(-1)[0])}"
                 )
             if input_data.dtype.type == np.str_:
                 raise RuntimeError(
                     "Unicode inputs are not supported. "
-                    f"Encode numpy array for '{input_name}' input (ex. with np.char.encode(array, 'utf-8'))."
+                    f"Encode numpy array for {input_name!r} input (ex. with np.char.encode(array, 'utf-8'))."
                 )
             triton_dtype = tritonclient.utils.np_to_triton_dtype(input_data.dtype)
             infer_input = self._triton_client_lib.InferInput(input_name, input_data.shape, triton_dtype)
@@ -327,8 +359,10 @@ class ModelClient:
                 model_name=self._model_name,
                 model_version=self._model_version or "",
                 inputs=inputs_wrapped,
+                headers=headers,
                 outputs=outputs_wrapped,
                 request_id=str(next(self._request_id_generator)),
+                parameters=parameters,
             )
         except tritonclient.utils.InferenceServerException as e:
             raise PyTritonClientInferenceServerError(

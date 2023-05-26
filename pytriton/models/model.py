@@ -142,14 +142,12 @@ class Model:
         model_version_catalog.mkdir(exist_ok=True, parents=True)
 
         proxy_path = pathlib.Path(__file__).parent.parent / "proxy"
-        src_model_file_path = proxy_path / "model.py"
-        src_communication_file_path = proxy_path / "communication.py"
 
-        dst_model_file_path = model_version_catalog / "model.py"
-        dst_communication_file_path = model_version_catalog / "communication.py"
-
-        shutil.copy(src_model_file_path, dst_model_file_path)
-        shutil.copy(src_communication_file_path, dst_communication_file_path)
+        files_to_copy = ["model.py", "communication.py", "types.py"]
+        for file in files_to_copy:
+            src_file_path = proxy_path / file
+            dst_file_path = model_version_catalog / file
+            shutil.copy(src_file_path, dst_file_path)
 
     def setup(self) -> None:
         """Create deployments and bindings to Triton Inference Server."""

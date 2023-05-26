@@ -19,8 +19,9 @@ import numpy as np
 import zmq
 
 from pytriton.model_config.triton_model_config import TensorSpec, TritonModelConfig
-from pytriton.proxy.communication import Request, ShmManager
+from pytriton.proxy.communication import InferenceHandlerRequest, MetaRequestResponse, ShmManager
 from pytriton.proxy.inference_handler import InferenceHandler
+from pytriton.proxy.types import Request
 
 LOGGER = logging.getLogger("tests.unit.test_proxy")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s: %(message)s")
@@ -56,8 +57,8 @@ def test_proxy_throws_exception_when_infer_func_returns_non_supported_type(tmp_p
 
     shm_manager = ShmManager()
 
-    inputs = [{"input1": input1, "input2": input2}]
-    inputs_infos = shm_manager.to_shm(inputs)
+    inputs = [Request({"input1": input1, "input2": input2}, {})]
+    inputs_infos = shm_manager.to_shm(inputs, lambda data, req: MetaRequestResponse(data, req.parameters))
 
     try:
 
@@ -67,7 +68,9 @@ def test_proxy_throws_exception_when_infer_func_returns_non_supported_type(tmp_p
         zmq_context = zmq.Context()
         proxy = InferenceHandler(_infer_fn, MY_MODEL_CONFIG, f"ipc://{tmp_path}/my", zmq_context)
         spy_send = _patch_inference_handler__recv_send(
-            mocker, proxy, Request(inputs=inputs_infos, memory_name=shm_manager.memory_name()).as_bytes()
+            mocker,
+            proxy,
+            InferenceHandlerRequest(requests=inputs_infos, memory_name=shm_manager.memory_name()).as_bytes(),
         )
         proxy.start()
 
@@ -97,8 +100,8 @@ def test_proxy_throws_exception_when_infer_func_returns_non_supported_output_ite
 
     shm_manager = ShmManager()
 
-    inputs = [{"input1": input1, "input2": input2}]
-    inputs_infos = shm_manager.to_shm(inputs)
+    inputs = [Request(data={"input1": input1, "input2": input2}, parameters={})]
+    inputs_infos = shm_manager.to_shm(inputs, lambda data, req: MetaRequestResponse(data, req.parameters))
 
     zmq_context = None
     proxy = None
@@ -111,7 +114,9 @@ def test_proxy_throws_exception_when_infer_func_returns_non_supported_output_ite
         zmq_context = zmq.Context()
         proxy = InferenceHandler(_infer_fn, MY_MODEL_CONFIG, f"ipc://{tmp_path}/my", zmq_context)
         spy_send = _patch_inference_handler__recv_send(
-            mocker, proxy, Request(inputs=inputs_infos, memory_name=shm_manager.memory_name()).as_bytes()
+            mocker,
+            proxy,
+            InferenceHandlerRequest(requests=inputs_infos, memory_name=shm_manager.memory_name()).as_bytes(),
         )
         proxy.start()
 

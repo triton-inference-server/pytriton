@@ -18,11 +18,22 @@ limitations under the License.
 
 ## Unreleased
 
+- Add support for using custom HTTP/gRPC requests headers and parameters.
+  - This change breaks the backward compatibility of inference function signature
+    (now undecorated inference function accepts list of Request instances instead
+    of list of dictionaries - Request class contains data for inputs and parameters
+    for combined parameters and headers).
+    Current non-decorated inference function signature is:
+    ```python
+    def infer_fn(requests: List[Request]) -> List[Dict[str, np.ndarray]]:
+        ...
+    ```
+    For details see [docs/infrence_callable.md](docs/infrence_callable.md).
+  - See [docs/custom_params.md](docs/custom_params.md) for more details.
 - Display documentation link after models are loaded
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 
--
 - Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.33.0](https://github.com/triton-inference-server/server/releases/tag/v2.33.0)
 
 ## 0.1.5 (2023-05-12)

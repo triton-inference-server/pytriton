@@ -41,23 +41,24 @@ from pytriton.exceptions import PyTritonBadParameterError, PyTritonRuntimeError,
 from pytriton.model_config import DynamicBatcher
 from pytriton.model_config.triton_model_config import TensorSpec, TritonModelConfig
 from pytriton.models.model import _inject_triton_context
+from pytriton.proxy.types import Request
 from tests.unit.utils import verify_equalness_of_dicts_with_ndarray
 
 input_requests = [
-    {"b": np.array([[1, 2]]), "a": np.array([[1, 9]])},
-    {"b": np.array([[3, 4]])},
-    {"b": np.array([[7, 5], [8, 6]]), "a": np.array([[1, 1], [1, 1]])},
-    {"b": np.array([[1, 2], [1, 2]]), "a": np.array([[2, 4], [2, 4]])},
-    {"b": np.array([[1, 2], [1, 2], [9, 9]]), "a": np.array([[1, 1], [1, 1], [1, 1]])},
-    {"a": np.array([[1, 1], [1, 1], [1, 1]])},
+    Request({"b": np.array([[1, 2]]), "a": np.array([[1, 9]])}, {}),
+    Request({"b": np.array([[3, 4]])}, {}),
+    Request({"b": np.array([[7, 5], [8, 6]]), "a": np.array([[1, 1], [1, 1]])}, {}),
+    Request({"b": np.array([[1, 2], [1, 2]]), "a": np.array([[2, 4], [2, 4]])}, {}),
+    Request({"b": np.array([[1, 2], [1, 2], [9, 9]]), "a": np.array([[1, 1], [1, 1], [1, 1]])}, {}),
+    Request({"a": np.array([[1, 1], [1, 1], [1, 1]])}, {}),
 ]
 
-input_requests_for_sample = [{"b": np.array([[7, 5], [8, 6]]), "a": np.array([[1], [1]])}]
+input_requests_for_sample = [Request({"b": np.array([[7, 5], [8, 6]]), "a": np.array([[1], [1]])}, {})]
 
 input_requests_for_batching = [
-    {"b": np.array([[7, 5], [8, 6]]), "a": np.array([[1], [1]])},
-    {"b": np.array([[1, 2], [1, 2], [11, 12]]), "a": np.array([[1], [1], [1]])},
-    {"b": np.array([[1, 2]]), "a": np.array([[1]])},
+    Request({"b": np.array([[7, 5], [8, 6]]), "a": np.array([[1], [1]])}, {}),
+    Request({"b": np.array([[1, 2], [1, 2], [11, 12]]), "a": np.array([[1], [1], [1]])}, {}),
+    Request({"b": np.array([[1, 2]]), "a": np.array([[1]])}, {}),
 ]
 
 input_batch_with_params = {"b": np.array([[1, 2], [1, 2], [9, 9]]), "a": np.array([[1], [1], [1]])}
@@ -853,8 +854,8 @@ def test_fill_optionals_for_not_batching_models():
     )
 
     inputs = [
-        {"a": np.array([1, 9]), "b": np.array([1, 2])},
-        {"b": np.array([3, 4])},
+        Request({"a": np.array([1, 9]), "b": np.array([1, 2])}, {}),
+        Request({"b": np.array([3, 4])}, {}),
     ]
     expected_results = [
         {"a": np.array([1, 9]), "b": np.array([1, 2])},

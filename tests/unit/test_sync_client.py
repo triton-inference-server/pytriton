@@ -79,6 +79,14 @@ ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG = TritonModelConfig(
 _GRPC_LOCALHOST_URL = "grpc://localhost:8001"
 _HTTP_LOCALHOST_URL = "http://localhost:8000"
 
+EXPECTED_KWARGS_DEFAULT = {
+    "model_name": ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
+    "model_version": "",
+    "request_id": "0",
+    "parameters": None,
+    "headers": None,
+}
+
 
 def _patch_grpc_client__server_up_and_ready(mocker):
     mocker.patch.object(tritonclient.grpc.InferenceServerClient, "is_server_ready").return_value = True
@@ -232,13 +240,18 @@ def test_sync_grpc_client_infer_sample_returns_expected_result_when_positional_a
         result = client.infer_sample(a, b)
 
         called_kwargs = mock_infer.call_args.kwargs
-        expected_kwargs = {
-            "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
-            "model_version": "",
-            "request_id": "0",
-            "inputs": {"a": a, "b": b},
-            "outputs": list(expected_result),
-        }
+        expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
+        expected_kwargs.update(
+            {
+                "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
+                "model_version": "",
+                "request_id": "0",
+                "inputs": {"a": a, "b": b},
+                "outputs": list(expected_result),
+                "parameters": None,
+                "headers": None,
+            }
+        )
         assert all(
             called_kwargs.get(arg_name) == arg_value
             for arg_name, arg_value in expected_kwargs.items()
@@ -270,14 +283,15 @@ def test_sync_grpc_client_infer_sample_returns_expected_result_when_infer_on_mod
         result = client.infer_sample(**inputs_dict)
 
         called_kwargs = mock_infer.call_args.kwargs
-        expected_kwargs = {
-            "model_name": ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
-            "model_version": "",
-            "request_id": "0",
-            # expect to send data with additional batch axis
-            "inputs": {name: data[np.newaxis, ...] for name, data in inputs_dict.items()},
-            "outputs": list(expected_result),
-        }
+        expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
+        expected_kwargs.update(
+            {
+                "model_name": ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
+                # expect to send data with additional batch axis
+                "inputs": {name: data[np.newaxis, ...] for name, data in inputs_dict.items()},
+                "outputs": list(expected_result),
+            }
+        )
         assert all(
             called_kwargs.get(arg_name) == arg_value
             for arg_name, arg_value in expected_kwargs.items()
@@ -308,13 +322,14 @@ def test_sync_grpc_client_infer_sample_returns_expected_result_when_named_args_a
         result = client.infer_sample(**inputs_dict)
 
         called_kwargs = mock_infer.call_args.kwargs
-        expected_kwargs = {
-            "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
-            "model_version": "",
-            "request_id": "0",
-            "inputs": inputs_dict,
-            "outputs": list(expected_result),
-        }
+        expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
+        expected_kwargs.update(
+            {
+                "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
+                "inputs": inputs_dict,
+                "outputs": list(expected_result),
+            }
+        )
         assert all(
             called_kwargs.get(arg_name) == arg_value
             for arg_name, arg_value in expected_kwargs.items()
@@ -343,13 +358,13 @@ def test_sync_grpc_client_infer_batch_returns_expected_result_when_positional_ar
         result = client.infer_batch(a, b)
 
         called_kwargs = mock_infer.call_args.kwargs
-        expected_kwargs = {
-            "model_name": ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
-            "model_version": "",
-            "request_id": "0",
-            "inputs": {"a": a, "b": b},
-            "outputs": list(expected_result),
-        }
+        expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
+        expected_kwargs.update(
+            {
+                "inputs": {"a": a, "b": b},
+                "outputs": list(expected_result),
+            }
+        )
         assert all(
             called_kwargs.get(arg_name) == arg_value
             for arg_name, arg_value in expected_kwargs.items()
@@ -380,13 +395,13 @@ def test_sync_grpc_client_infer_batch_returns_expected_result_when_named_args_ar
         result = client.infer_batch(**inputs_dict)
 
         called_kwargs = mock_infer.call_args.kwargs
-        expected_kwargs = {
-            "model_name": ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
-            "model_version": "",
-            "request_id": "0",
-            "inputs": inputs_dict,
-            "outputs": list(expected_result),
-        }
+        expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
+        expected_kwargs.update(
+            {
+                "inputs": inputs_dict,
+                "outputs": list(expected_result),
+            }
+        )
         assert all(
             called_kwargs.get(arg_name) == arg_value
             for arg_name, arg_value in expected_kwargs.items()
@@ -530,14 +545,14 @@ def test_sync_http_client_infer_sample_returns_expected_result_when_infer_on_mod
         result = client.infer_sample(a, b)
 
         called_kwargs = mock_infer.call_args.kwargs
-        expected_kwargs = {
-            "model_name": ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
-            "model_version": "",
-            "request_id": "0",
-            # expect to send data with additional batch axis
-            "inputs": {"a": a[np.newaxis, ...], "b": b[np.newaxis, ...]},
-            "outputs": list(expected_result),
-        }
+        expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
+        expected_kwargs.update(
+            {
+                # expect to send data with additional batch axis
+                "inputs": {"a": a[np.newaxis, ...], "b": b[np.newaxis, ...]},
+                "outputs": list(expected_result),
+            }
+        )
         assert all(
             called_kwargs.get(arg_name) == arg_value
             for arg_name, arg_value in expected_kwargs.items()
@@ -566,13 +581,14 @@ def test_sync_http_client_infer_sample_returns_expected_result_when_positional_a
         result = client.infer_sample(a, b)
 
         called_kwargs = mock_infer.call_args.kwargs
-        expected_kwargs = {
-            "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
-            "model_version": "",
-            "request_id": "0",
-            "inputs": {"a": a, "b": b},
-            "outputs": list(expected_result),
-        }
+        expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
+        expected_kwargs.update(
+            {
+                "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
+                "inputs": {"a": a, "b": b},
+                "outputs": list(expected_result),
+            }
+        )
         assert all(
             called_kwargs.get(arg_name) == arg_value
             for arg_name, arg_value in expected_kwargs.items()
@@ -603,13 +619,14 @@ def test_sync_http_client_infer_sample_returns_expected_result_when_named_args_a
         result = client.infer_sample(**inputs_dict)
 
         called_kwargs = mock_infer.call_args.kwargs
-        expected_kwargs = {
-            "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
-            "model_version": "",
-            "request_id": "0",
-            "inputs": inputs_dict,
-            "outputs": list(expected_result),
-        }
+        expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
+        expected_kwargs.update(
+            {
+                "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
+                "inputs": inputs_dict,
+                "outputs": list(expected_result),
+            }
+        )
         assert all(
             called_kwargs.get(arg_name) == arg_value
             for arg_name, arg_value in expected_kwargs.items()
@@ -638,13 +655,13 @@ def test_sync_http_client_infer_batch_returns_expected_result_when_positional_ar
         result = client.infer_batch(a, b)
 
         called_kwargs = mock_infer.call_args.kwargs
-        expected_kwargs = {
-            "model_name": ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
-            "model_version": "",
-            "request_id": "0",
-            "inputs": {"a": a, "b": b},
-            "outputs": list(expected_result),
-        }
+        expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
+        expected_kwargs.update(
+            {
+                "inputs": {"a": a, "b": b},
+                "outputs": list(expected_result),
+            }
+        )
         assert all(
             called_kwargs.get(arg_name) == arg_value
             for arg_name, arg_value in expected_kwargs.items()
@@ -675,13 +692,13 @@ def test_sync_http_client_infer_batch_returns_expected_result_when_named_args_ar
         result = client.infer_batch(**inputs_dict)
 
         called_kwargs = mock_infer.call_args.kwargs
-        expected_kwargs = {
-            "model_name": ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
-            "model_version": "",
-            "request_id": "0",
-            "inputs": inputs_dict,
-            "outputs": list(expected_result),
-        }
+        expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
+        expected_kwargs.update(
+            {
+                "inputs": inputs_dict,
+                "outputs": list(expected_result),
+            }
+        )
         assert all(
             called_kwargs.get(arg_name) == arg_value
             for arg_name, arg_value in expected_kwargs.items()

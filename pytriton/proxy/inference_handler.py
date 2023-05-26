@@ -39,7 +39,13 @@ import zmq  # pytype: disable=import-error
 
 from pytriton.exceptions import PyTritonUnrecoverableError
 from pytriton.model_config.triton_model_config import TritonModelConfig
-from pytriton.proxy.communication import Request, Response, ShmManager
+from pytriton.proxy.communication import (
+    InferenceHandlerRequest,
+    InferenceHandlerResponse,
+    MetaRequestResponse,
+    ShmManager,
+)
+from pytriton.proxy.types import Request, Response
 
 LOGGER = logging.getLogger(__name__)
 
@@ -97,10 +103,14 @@ class InferenceHandler(th.Thread):
             while not self.stopped:
                 LOGGER.debug(f"Waiting for requests from proxy model for {self._model_config.model_name}.")
                 request_payload = self.socket.recv()
-                request = Request.from_bytes(request_payload)
+                request = InferenceHandlerRequest.from_bytes(request_payload)
 
                 LOGGER.debug(f"Preparing inputs for {self._model_config.model_name}.")
-                inputs = self.shm_request_manager.from_shm(request.inputs, request.memory_name)
+                inputs = self.shm_request_manager.from_shm(
+                    request.requests,
+                    request.memory_name,
+                    lambda data, req: Request(data=data, parameters=req.parameters),
+                )
 
                 try:
                     LOGGER.debug(f"Processing inference callback for {self._model_config.model_name}.")
@@ -109,14 +119,19 @@ class InferenceHandler(th.Thread):
                     LOGGER.debug(f"Validating outputs for {self._model_config.model_name}.")
                     self._validate_outputs(outputs)
 
-                    output_tensor_infos = self.shm_response_manager.to_shm(outputs)
+                    outputs = [Response(data=output) for output in outputs]
 
-                    response = Response(
-                        outputs=output_tensor_infos, memory_name=self.shm_response_manager.memory_name()
+                    output_tensor_infos = self.shm_response_manager.to_shm(
+                        outputs,
+                        lambda data, _resp: MetaRequestResponse(data=data),
+                    )
+
+                    response = InferenceHandlerResponse(
+                        responses=output_tensor_infos, memory_name=self.shm_response_manager.memory_name()
                     )
                 except PyTritonUnrecoverableError:
                     error = traceback.format_exc()
-                    response = Response(error=error)
+                    response = InferenceHandlerResponse(error=error)
                     LOGGER.error(
                         "Unrecoverable error thrown during calling model callable. "
                         "Shutting down Triton Inference Server. "
@@ -126,7 +141,7 @@ class InferenceHandler(th.Thread):
                     self._notify_proxy_backend_observers(InferenceHandlerEvent.UNRECOVERABLE_ERROR, error)
                 except Exception:
                     error = traceback.format_exc()
-                    response = Response(error=error)
+                    response = InferenceHandlerResponse(error=error)
                     LOGGER.error(f"Error occurred during calling model callable: {error}")
 
                 LOGGER.debug(f"Send response to proxy model for {self._model_config.model_name}.")

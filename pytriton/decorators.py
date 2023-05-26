@@ -192,7 +192,7 @@ def batch(wrapped, instance, args, kwargs):
 
     inputs = {}
     for model_input in input_names:
-        concatenated_input_data = np.concatenate([req_dict[model_input] for req_dict in req_list])
+        concatenated_input_data = np.concatenate([req[model_input] for req in req_list])
         inputs[model_input] = concatenated_input_data
 
     args = args[1:]

@@ -21,6 +21,7 @@ from pytriton.model_config.tensor import Tensor
 from pytriton.model_config.triton_model_config import TensorSpec
 from pytriton.models.manager import ModelManager
 from pytriton.models.model import Model, ModelConfig
+from pytriton.proxy.types import Request
 from pytriton.server.model_repository import TritonModelRepository
 from pytriton.utils.workspace import Workspace
 
@@ -468,9 +469,9 @@ def test_triton_context_injection():
             manager.add_model(model3)
             manager.create_models()
 
-            input_requests1 = [{"variable1": np.array([[7, 5], [8, 6]])}]
-            input_requests2 = [{"variable2": np.array([[1, 2], [1, 2], [11, 12]])}]
-            input_requests3 = [{"variable3": np.array([[1, 2]])}]
+            input_requests1 = [Request({"variable1": np.array([[7, 5], [8, 6]])}, {})]
+            input_requests2 = [Request({"variable2": np.array([[1, 2], [1, 2], [11, 12]])}, {})]
+            input_requests3 = [Request({"variable3": np.array([[1, 2]])}, {})]
 
             def assert_inputs_properly_mapped_to_outputs(expected_out_name, outputs, input_request_arr):
                 assert len(outputs) == 1

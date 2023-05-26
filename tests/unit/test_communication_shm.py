@@ -14,7 +14,8 @@
 
 import numpy as np
 
-from pytriton.proxy.communication import ShmManager
+from pytriton.proxy.communication import MetaRequestResponse, ShmManager
+from pytriton.proxy.types import Request
 
 
 def assert_equal_list_of_dicts(a, b):
@@ -31,12 +32,14 @@ def test_numpy_to_from_shm(mocker):
     shm_manager_read = ShmManager()
 
     a = [
-        {"a": np.zeros((10, 10), dtype=np.float32), "b": np.array([b"foo", b"longer_bar"])},
-        {"a": np.array(["foo", "longer_bar"]), "c": np.array([b"foo", b"longer_bar"], dtype=object)},
+        Request({"a": np.zeros((10, 10), dtype=np.float32), "b": np.array([b"foo", b"longer_bar"])}, {"aaa": 1}),
+        Request(
+            {"a": np.array(["foo", "longer_bar"]), "c": np.array([b"foo", b"longer_bar"], dtype=object)}, {"ccc": 3}
+        ),
     ]
 
-    wrapped_a = shm_manager.to_shm(a)
-    b = shm_manager_read.from_shm(wrapped_a, shm_manager.memory_name())
+    wrapped_a = shm_manager.to_shm(a, lambda data, req: MetaRequestResponse(data, req.parameters))
+    b = shm_manager_read.from_shm(wrapped_a, shm_manager.memory_name(), lambda data, req: Request(data, req.parameters))
 
     assert_equal_list_of_dicts(a, b)
 
@@ -49,27 +52,27 @@ def test_numpy_to_from_shm(mocker):
 
 
 def test_expand_shared_memory(mocker):
-    a = [{"a": np.arange(10, dtype=np.float32)}]
-    a_larger = [{"a": np.arange(100, dtype=np.float32)}]
-    a_smaller = [{"a": np.arange(100, dtype=np.int16)}]
+    a = [Request({"a": np.arange(10, dtype=np.float32)})]
+    a_larger = [Request({"a": np.arange(100, dtype=np.float32)})]
+    a_smaller = [Request({"a": np.arange(100, dtype=np.int16)})]
 
     shm_manager = ShmManager()
     shm_manager_read = ShmManager()
 
     spy_dispose = mocker.spy(shm_manager, "dispose")
 
-    wrapped_a = shm_manager.to_shm(a)
-    b = shm_manager_read.from_shm(wrapped_a, shm_manager.memory_name())
+    wrapped_a = shm_manager.to_shm(a, lambda data, req: MetaRequestResponse(data, req.parameters))
+    b = shm_manager_read.from_shm(wrapped_a, shm_manager.memory_name(), lambda data, req: Request(data, req.parameters))
     assert_equal_list_of_dicts(a, b)
     spy_dispose.assert_not_called()
 
-    wrapped_a = shm_manager.to_shm(a_larger)
-    b = shm_manager_read.from_shm(wrapped_a, shm_manager.memory_name())
+    wrapped_a = shm_manager.to_shm(a_larger, lambda data, req: MetaRequestResponse(data, req.parameters))
+    b = shm_manager_read.from_shm(wrapped_a, shm_manager.memory_name(), lambda data, req: Request(data, req.parameters))
     assert_equal_list_of_dicts(a_larger, b)
     spy_dispose.assert_called_once()
 
-    wrapped_a = shm_manager.to_shm(a_smaller)
-    b = shm_manager_read.from_shm(wrapped_a, shm_manager.memory_name())
+    wrapped_a = shm_manager.to_shm(a_smaller, lambda data, req: MetaRequestResponse(data, req.parameters))
+    b = shm_manager_read.from_shm(wrapped_a, shm_manager.memory_name(), lambda data, req: Request(data, req.parameters))
     assert_equal_list_of_dicts(a_smaller, b)
     spy_dispose.assert_called_once()
 

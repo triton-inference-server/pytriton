@@ -39,6 +39,7 @@ The list of example models deployments:
 - [OPT JAX from HuggingFace with multi-node support](../examples/huggingface_opt_multinode_jax)
 - [ResNet50 PyTorch from HuggingFace](../examples/huggingface_resnet_pytorch)
 - [Stable Diffusion 1.5 from HuggingFace](../examples/huggingface_stable_diffusion)
+- [Using custom HTTP/gRPC headers and parameters](../examples/use_parameters_and_headers)
 
 ## Profiling models
 

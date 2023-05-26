@@ -79,6 +79,8 @@ nav:
   - Inference Handling:
       - Inference Callable: inference_callable.md
       - Decorators: decorators.md
+      - Custom parameters/headers: custom_params.md
+      - Example with downloaded input data: downloaded_input_data.md
   - Examples: examples.md
   - API Reference: api.md
   - Changelog: CHANGELOG.md

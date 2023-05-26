@@ -32,19 +32,20 @@ Below, we show the difference between decorated and undecorated functions bound 
 ```python
 import numpy as np
 from pytriton.decorators import batch
+from pytriton.proxy.types import Request
 
 # Sample input data with 2 requests - each with 2 inputs
 input_data = [
-    {'in1': np.array([[1, 1]]), 'in2': np.array([[2, 2]])},
-    {'in1': np.array([[1, 2]]), 'in2': np.array([[2, 3]])}
+     Request({'in1': np.array([[1, 1]]), 'in2': np.array([[2, 2]])}),
+     Request({'in1': np.array([[1, 2]]), 'in2': np.array([[2, 3]])})
 ]
 
 
 def undecorated_identity_fn(requests):
     print(requests)
     # As expected, requests = [
-    #     {'in1': np.array([[1, 1]]), 'in2': np.array([[2, 2]])},
-    #     {'in1': np.array([[1, 2]]), 'in2': np.array([[2, 3]])},
+    #     Request({'in1': np.array([[1, 1]]), 'in2': np.array([[2, 2]])}),
+    #     Request({'in1': np.array([[1, 2]]), 'in2': np.array([[2, 3]])}),
     # ]
     results = requests
     return results

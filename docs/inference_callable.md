@@ -20,18 +20,24 @@ This document provides guidelines for creating an inference callable for PyTrito
 handling inference requests.
 
 The inference callable is an entry point for handling inference requests. The interface of the inference callable
-assumes it receives a list of requests as dictionaries, where each dictionary represents one request mapping model input
+assumes it receives a list of requests with input dictionaries, where each dictionary represents one request mapping model input
 names to NumPy ndarrays.
+Requests contain also custom HTTP/gRPC headers and parameters in parameters dictionary.
 
 ## Function
 
-The simples inference callable is a function that implement the interface to handle request and responses:
+The simples inference callable is a function that implement the interface to handle request and responses.
+Request class contains following fields:
+- data - for inputs (stored as dictionary, but can be also accessed with request dict interface e.g. request["input_name"])
+- parameters - for combined parameters and HTTP/gRPC headers
+For more information about parameters and headers see [here](custom_params.md).
 
  ```python
  import numpy as np
  from typing import Dict, List
+ from pytriton.proxy.types import Request
 
- def infer_fn(requests: List[Dict[str, np.ndarray]]) -> List[Dict[str, np.ndarray]]:
+ def infer_fn(requests: List[Request]) -> List[Dict[str, np.ndarray]]:
      ...
  ```
 
@@ -45,10 +51,11 @@ control over the order of initialized objects or models.
  ```python
  import numpy as np
  from typing import Dict, List
+ from pytriton.proxy.types import Request
 
  class InferCallable:
 
-     def __call__(self, requests: List[Dict[str, np.ndarray]]) -> List[Dict[str, np.ndarray]]:
+     def __call__(self, requests: List[Request]) -> List[Dict[str, np.ndarray]]:
         ...
  ```
 

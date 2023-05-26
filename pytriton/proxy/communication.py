@@ -20,13 +20,14 @@ import dataclasses
 import json
 import struct
 from multiprocessing.shared_memory import SharedMemory
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
-
 # copy from
 # https://github.com/triton-inference-server/python_backend/blob/main/src/resources/triton_python_backend_utils.py
+
+
 def _serialize_byte_tensor(input_tensor):
     """Serializes a bytes tensor into a flat numpy array of length prepended bytes.
 
@@ -109,25 +110,38 @@ class TensorInfo:
 
 
 @dataclasses.dataclass
-class Request:
+class MetaRequestResponse:
+    """Data class for storing input/output data and parameters."""
+
+    data: Dict[str, TensorInfo]
+    parameters: Optional[Dict[str, Union[str, int, bool]]] = None
+
+
+@dataclasses.dataclass
+class InferenceHandlerRequest:
     """Object transferred from proxy backend to callback handler containing input data."""
 
-    inputs: List[Dict[str, TensorInfo]]
+    requests: List[MetaRequestResponse]
     memory_name: str
 
     @classmethod
-    def from_bytes(cls, content: bytes) -> "Request":
+    def from_bytes(cls, content: bytes) -> "InferenceHandlerRequest":
         """Reconstruct Request object from bytes.
 
         Args:
             content: bytes to parse
         """
         request_dict = json.loads(content)
-        request_list = request_dict["inputs"]
+        request_list = request_dict["requests"]
 
         return cls(
-            inputs=[
-                {input_name: TensorInfo(**tensor_info) for input_name, tensor_info in req_dict.items()}
+            requests=[
+                MetaRequestResponse(
+                    data={
+                        input_name: TensorInfo(**tensor_info) for input_name, tensor_info in req_dict["data"].items()
+                    },
+                    parameters=req_dict["parameters"],
+                )
                 for req_dict in request_list
             ],
             memory_name=request_dict["memory_name"],
@@ -136,37 +150,36 @@ class Request:
     def as_bytes(self) -> bytes:
         """Serializes Request object to bytes."""
         request_dict = {
-            "inputs": [
-                {input_name: dataclasses.asdict(tensor_info) for input_name, tensor_info in req_dict.items()}
-                for req_dict in self.inputs
-            ],
+            "requests": [dataclasses.asdict(req) for req in self.requests],
             "memory_name": self.memory_name,
         }
         return json.dumps(request_dict).encode("utf-8")
 
 
 @dataclasses.dataclass
-class Response:
+class InferenceHandlerResponse:
     """Object transferred from callback handler containing output data."""
 
-    outputs: Optional[List[Dict[str, TensorInfo]]] = None
+    responses: Optional[List[MetaRequestResponse]] = None
     error: Optional[str] = None
     memory_name: Optional[str] = None
 
     @classmethod
-    def from_bytes(cls, content: bytes) -> "Response":
+    def from_bytes(cls, content: bytes) -> "InferenceHandlerResponse":
         """Reconstruct Response object from bytes.
 
         Args:
             content: bytes to parse
         """
         response_dict = json.loads(content)
-        outputs = response_dict.get("outputs", [])
+        responses = response_dict.get("responses", [])
         memory_name = response_dict.get("memory_name", None)
         return cls(
-            outputs=[
-                {output_name: TensorInfo(**tensor_info) for output_name, tensor_info in resp_dict.items()}
-                for resp_dict in outputs
+            responses=[
+                MetaRequestResponse(
+                    {output_name: TensorInfo(**tensor_info) for output_name, tensor_info in resp_dict.items()}
+                )
+                for resp_dict in responses
             ],
             error=response_dict.get("error"),
             memory_name=memory_name,
@@ -175,10 +188,10 @@ class Response:
     def as_bytes(self) -> bytes:
         """Serializes Response object to bytes."""
         result = {"error": self.error, "memory_name": self.memory_name}
-        if self.outputs:
-            result["outputs"] = [
-                {output_name: dataclasses.asdict(tensor_info) for output_name, tensor_info in resp_dict.items()}
-                for resp_dict in self.outputs
+        if self.responses:
+            result["responses"] = [
+                {output_name: dataclasses.asdict(tensor_info) for output_name, tensor_info in resp_dict.data.items()}
+                for resp_dict in self.responses
             ]
         return json.dumps(result).encode("utf-8")
 
@@ -201,11 +214,11 @@ class ShmManager:
 
         self._memory_index = 0
 
-    def _calc_required_buffer(self, array_dicts: List[Dict[str, np.ndarray]]) -> int:
+    def _calc_required_buffer(self, requests_or_responses: List) -> int:
         self._serialized_arrays.clear()
         required_buffer_size_sum = 0
-        for index, input_dict in enumerate(array_dicts):
-            for input_name, np_array in input_dict.items():
+        for index, request_or_response in enumerate(requests_or_responses):
+            for input_name, np_array in request_or_response.data.items():
                 if np_array.dtype == np.object_ or np_array.dtype.type == np.bytes_:
                     serialized_np_array = _serialize_byte_tensor(np_array)
                     required_buffer_size = len(serialized_np_array)
@@ -229,29 +242,40 @@ class ShmManager:
         """Returns name of shared memory buffer."""
         return self._shm_buffer.name if self._shm_buffer else None
 
-    def to_shm(self, array_dicts: List[Dict[str, np.ndarray]]) -> List[Dict[str, TensorInfo]]:
+    def to_shm(self, requests_or_responses: List, factory: Callable) -> List:
         """Serialize list of requests or responses to shared memory.
 
         Args:
-            array_dicts: input list of request dicts for serialization
+            requests_or_responses: input list of requests or reponses for serialization
+            factory: function to create output request or response object
+
         Returns:
-            coresponding structure where each numpy array is replaced with TensorInfo description
+            corresponding structure where each numpy array is replaced with TensorInfo description
         """
         self._serialized_arrays.clear()
-        required_buffer_size_sum = self._calc_required_buffer(array_dicts)
+        required_buffer_size_sum = self._calc_required_buffer(requests_or_responses)
         self._init_buffer(required_buffer_size_sum)
 
         return [
-            {input_name: self._wrap_array(req_index, input_name, input_dict[input_name]) for input_name in input_dict}
-            for req_index, input_dict in enumerate(array_dicts)
+            factory(
+                {
+                    input_name: self._wrap_array(req_res_index, input_name, req_resp.data[input_name])
+                    for input_name in req_resp.data
+                },
+                req_resp,
+            )
+            for req_res_index, req_resp in enumerate(requests_or_responses)
         ]
 
-    def from_shm(self, infos_dict_list: List[Dict[str, TensorInfo]], memory_name: str) -> List[Dict[str, np.ndarray]]:
+    def from_shm(
+        self, requests_or_responses: List[MetaRequestResponse], memory_name: str, output_factory: Callable
+    ) -> List:
         """Deserialize list of requests or responses from shared memory.
 
         Args:
-            infos_dict_list: input list of request dicts of TensorInfo for deserialization
+            requests_or_responses: input list of meta requests/reponses (with TensorInfo) for deserialization
             memory_name: share memory buffer name
+            output_factory: type of return list elements
 
         Returns:
             list of request dicts deserialized from shared memory
@@ -262,23 +286,25 @@ class ShmManager:
             self._shm_buffer = SharedMemory(memory_name, create=False)
 
         results = [
-            {input_name: self.as_np_array(info) for input_name, info in req_dict.items()}
-            for req_dict in infos_dict_list
+            output_factory({input_name: self.as_np_array(info) for input_name, info in req_resp.data.items()}, req_resp)
+            for req_resp in requests_or_responses
         ]
         return results
 
-    def _wrap_array(self, req_index: int, input_name: str, np_array: np.ndarray) -> TensorInfo:
+    def _wrap_array(self, req_resp_index: int, input_name: str, np_array: np.ndarray) -> TensorInfo:
         """Copies numpy array data to shared memory.
 
         Reuse shared memory if possible. Reallocates shared memory if needed.
 
         Args:
-            req_index: request index
+            req_resp_index: request or reponse index
             input_name: input name
             np_array: source numpy array
         """
         if np_array.dtype == np.object_ or np_array.dtype.type == np.bytes_:
-            serialized_np_array = self._serialized_arrays[(req_index, input_name)]  # _serialize_byte_tensor(np_array)
+            serialized_np_array = self._serialized_arrays[
+                (req_resp_index, input_name)
+            ]  # _serialize_byte_tensor(np_array)
             required_buffer_size = len(serialized_np_array)
             buf, buf_range = self._get_buffer_for_write(required_buffer_size)
             buf[:required_buffer_size] = serialized_np_array

@@ -21,7 +21,8 @@ import traceback
 import triton_python_backend_utils as pb_utils  # pytype: disable=import-error
 import zmq  # pytype: disable=import-error
 
-from .communication import Request, Response, ShmManager
+from .communication import InferenceHandlerRequest, InferenceHandlerResponse, MetaRequestResponse, ShmManager
+from .types import Request, Response
 
 
 class TritonPythonModel:
@@ -104,15 +105,15 @@ class TritonPythonModel:
                 input_tensor = pb_utils.get_input_tensor_by_name(request, model_input["name"])
                 if input_tensor is not None:
                     request_dict[model_input["name"]] = input_tensor.as_numpy()
-            inputs.append(request_dict)
+            inputs.append(Request(data=request_dict, parameters=json.loads(request.parameters())))
 
         # input_idx, merged_batch_size, ...
         output_array = self._exec_requests(inputs, logger)
 
         responses = []
-        for out_dict in output_array:
+        for resp in output_array:
             output_tensors = []
-            for output_name, output in out_dict.items():
+            for output_name, output in resp.items():
                 if output_name in self.model_outputs_dict:
                     dtype = pb_utils.triton_string_to_numpy(self.model_outputs_dict[output_name]["data_type"])
                     output = output.astype(dtype)
@@ -165,17 +166,21 @@ class TritonPythonModel:
         try:
 
             logger.log_verbose("Copying inputs to shared memory.")
-            input_tensor_infos = self.shm_request_manager.to_shm(inputs)
+            input_tensor_infos = self.shm_request_manager.to_shm(
+                inputs, lambda data, req: MetaRequestResponse(data=data, parameters=req.parameters)
+            )
 
             logger.log_verbose("Sending request to socket.")
-            request = Request(inputs=input_tensor_infos, memory_name=self.shm_request_manager.memory_name())
+            request = InferenceHandlerRequest(
+                requests=input_tensor_infos, memory_name=self.shm_request_manager.memory_name()
+            )
             self.socket.send(request.as_bytes())
 
             logger.log_verbose("Waiting for response.")
             response_payload = self.socket.recv()
-            response = Response.from_bytes(response_payload)
+            response = InferenceHandlerResponse.from_bytes(response_payload)
 
-            logger.log_verbose(f"Response: {response.outputs}")
+            logger.log_verbose(f"Response: {response.responses}")
 
             logger.log_verbose("Response obtained.")
 
@@ -184,7 +189,9 @@ class TritonPythonModel:
 
             logger.log_verbose("Preparing output arrays.")
 
-            output_array = self.shm_response_manager.from_shm(response.outputs, response.memory_name)
+            output_array = self.shm_response_manager.from_shm(
+                response.responses, response.memory_name, lambda data, _resp: Response(data)
+            )
 
             logger.log_verbose(f"Array: {output_array}")
 
