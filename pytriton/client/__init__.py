@@ -13,4 +13,5 @@
 # limitations under the License.
 # noqa: D104
 
+from .client import FuturesModelClient  # noqa: F401
 from .client import ModelClient  # noqa: F401

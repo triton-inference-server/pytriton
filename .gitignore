@@ -11,8 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# Created by https://www.toptal.com/developers/gitignore/api/pycharm+all,visualstudiocode,python,direnv
-# Edit at https://www.toptal.com/developers/gitignore?templates=pycharm+all,visualstudiocode,python,direnv
+# Created by https://www.toptal.com/developers/gitignore/api/pycharm+all,visualstudiocode,python,direnv,vim
+# Edit at https://www.toptal.com/developers/gitignore?templates=pycharm+all,visualstudiocode,python,direnv,vim
 
 ### direnv ###
 .direnv
@@ -268,6 +268,37 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+### Python Patch ###
+# Poetry local configuration file - https://python-poetry.org/docs/configuration/#local-configuration
+poetry.toml
+
+# ruff
+.ruff_cache/
+
+# LSP config files
+pyrightconfig.json
+
+### Vim ###
+# Swap
+[._]*.s[a-v][a-z]
+!*.svg  # comment out if you don't need vector files
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+# Session
+Session.vim
+Sessionx.vim
+
+# Temporary
+.netrwhist
+*~
+# Auto-generated tag files
+tags
+# Persistent undo
+[._]*.un~
+
 ### VisualStudioCode ###
 .vscode/*
 !.vscode/settings.json
@@ -287,15 +318,18 @@ cython_debug/
 .history
 .ionide
 
+# End of https://www.toptal.com/developers/gitignore/api/pycharm+all,visualstudiocode,python,direnv,vim
+pytriton/tritonserver
+docs/CHANGELOG.md
+docs/CONTRIBUTING.md
+docs/LICENSE.md
+docs/examples.md
+
 # Support for Project snippet scope
 .vscode/*.code-snippets
 
 # Ignore code-workspaces
 *.code-workspace
 
-# End of https://www.toptal.com/developers/gitignore/api/pycharm+all,visualstudiocode,python,direnv
-pytriton/tritonserver
-docs/CHANGELOG.md
-docs/CONTRIBUTING.md
-docs/LICENSE.md
-docs/examples.md
+# Ignore .vscode folder
+.vscode

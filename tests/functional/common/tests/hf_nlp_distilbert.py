@@ -19,8 +19,7 @@ import logging
 import pathlib
 import tempfile
 import textwrap
-import threading
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import FIRST_COMPLETED, wait
 from typing import Callable, List
 
 import numpy as np
@@ -35,7 +34,7 @@ logger = logging.getLogger(__package__)
 def huggingface_distilbert(test_time_s: int, init_timeout_s: int, batch_size: int, sequence_length: int, verbose: bool):
     import tensorflow  # pytype: disable=import-error
 
-    from pytriton.client import ModelClient
+    from pytriton.client import FuturesModelClient
     from pytriton.triton import Triton, TritonConfig
     from tests.utils import find_free_port
 
@@ -75,35 +74,46 @@ def huggingface_distilbert(test_time_s: int, init_timeout_s: int, batch_size: in
                 )
                 triton.run()
 
-                def infer_model():
-                    thread_id = threading.get_ident()
-                    url = f"http://localhost:{triton_config.http_port}"
-                    with ModelClient(url, model_spec.name, init_timeout_s=init_timeout_s) as client:
+                # Send requests
+                url = f"http://localhost:{triton_config.http_port}"
+                with FuturesModelClient(url, model_spec.name, max_workers=batch_size) as client:
+                    # Wait for model
+                    client.is_model_ready(init_timeout_s).result()
 
-                        import time
+                    import time
 
-                        should_stop_at_s = time.time() + test_time_s
-                        for idx, data_tensor in enumerate(dataset):
+                    should_stop_at_s = time.time() + test_time_s
+
+                    def requests_generator():
+                        for data_tensor in dataset:
                             input_ids = data_tensor["input_ids"].numpy()
                             attention_mask = data_tensor["attention_mask"].numpy()
-                            logger.debug(f"Request send from {thread_id}")
+                            for _ in range(batch_size):
+                                yield {"input_ids": input_ids, "attention_mask": attention_mask}
 
-                            result = client.infer_batch(input_ids=input_ids, attention_mask=attention_mask)
-                            if idx > 0 and idx % 10 == 0:
-                                time_left_s = max(should_stop_at_s - time.time(), 0.0)
-                                logger.debug(
-                                    f"[{thread_id}] Processed {idx} batches time left: {time_left_s:0.1f}s \n."
-                                    f"Result: {len(result)}."
-                                )
+                    requests = requests_generator()
 
-                                if time_left_s <= 0:
-                                    break
+                    number_of_processed_requests = 0
 
-                infer_threads = [infer_model] * batch_size
-                with ThreadPoolExecutor() as executor:
-                    running_tasks = [executor.submit(infer_task) for infer_task in infer_threads]
-                    for running_task in running_tasks:
-                        running_task.result()
+                    not_done = {*()}
+                    for request in requests:
+                        result_future = client.infer_batch(**request)
+                        not_done.add(result_future)
+                        if len(not_done) > batch_size:
+                            done, not_done = wait(not_done, return_when=FIRST_COMPLETED)
+                            if len(done) > 0:
+                                future = done.pop()
+                                result = future.result()
+                                number_of_processed_requests += len(done)
+                                if number_of_processed_requests > 0 and number_of_processed_requests % 10 == 0:
+                                    time_left_s = max(should_stop_at_s - time.time(), 0.0)
+                                    logger.debug(
+                                        f"Processed {number_of_processed_requests} batches time left: {time_left_s:0.1f}s \n."
+                                        f"Result: {len(result)}."
+                                    )
+                        time_left_s = max(should_stop_at_s - time.time(), 0.0)
+                        if time_left_s <= 0:
+                            break
 
         finally:
             if triton_log_path.exists():

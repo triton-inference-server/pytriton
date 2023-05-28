@@ -31,6 +31,10 @@ import itertools
 import logging
 import time
 import urllib.parse
+from concurrent.futures import Future, ThreadPoolExecutor
+from copy import deepcopy as copy_deepcopy
+from threading import Lock
+from threading import get_ident as threading_get_ident
 from typing import Dict, Optional, Tuple, Union
 
 import gevent
@@ -377,3 +381,201 @@ class ModelClient:
             outputs = {output.name: response.as_numpy(output.name) for output in response.get_response().outputs}
 
         return outputs
+
+
+class FuturesModelClient:
+    """A client for model deployed on the Triton Inference Server using concurrent.futures.
+
+    This client allows asynchronous inference requests using a thread pool executor.
+
+    Attributes:
+        url (str): The Triton Inference Server url, e.g. 'grpc://localhost:8001'.
+        model_name (str): The name of the model to interact with.
+        model_version (str or None): The version of the model to interact with.
+            If None, the latest version will be used.
+        max_workers (int or None): The maximum number of threads that can be used to execute
+            the given calls. If None, the default value will be used.
+        deep_copy (bool): If True, the input data will be deep copied before used at worker thread.
+
+    Examples:
+        >>> with FuturesModelClient("localhost", "BERT") as client
+        ...     result = client.infer_sample(input1_sample, input2_sample)
+        ...     # do something else
+        ...     print(result.result())
+    """
+
+    def __init__(
+        self,
+        url: str,
+        model_name: str,
+        model_version: Optional[str] = None,
+        *,
+        max_workers: Optional[int] = None,
+        deep_copy: bool = False,
+    ):
+        """Initializes the FuturesModelClient for a given model."""
+        self._url = url
+        self._model_name = model_name
+        self._model_version = model_version
+        self._thread_pool_executor = ThreadPoolExecutor(max_workers=max_workers)
+        self._do_deep_copy = deep_copy
+        self._lock = Lock()
+        self._thread_clients = {}
+        # It is done to check url correctness
+        # self._release_client(self._aquire_client(lazy_init=True))
+
+    def __enter__(self):
+        """Create context for use FuturesModelClient as a context manager."""
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """Close resources used by FuturesModelClient when exiting from context."""
+        self.close()
+
+    def close(self, wait=True, *, cancel_futures=False):
+        """Close resources used by FuturesModelClient."""
+        _LOGGER.debug("Closing FuturesModelClient.")
+        if cancel_futures:
+            # Cancel futures argument was introduced from Python version 3.9
+            self._thread_pool_executor.shutdown(
+                wait=wait, cancel_futures=cancel_futures
+            )  # pytype: disable=wrong-keyword-args
+        self._thread_pool_executor.shutdown(wait=wait)
+        with self._lock:
+            for client in self._thread_clients.values():
+                client.close()
+
+    def is_model_ready(self, timeout_s: float = 30.0) -> Future:
+        """Returns future, which is set to True, when model is ready.
+
+        Args:
+            timeout_s: timeout to server and model get into readiness state.
+
+        """
+        return self._thread_pool_executor.submit(lambda: self._is_model_ready(timeout_s))
+
+    def model_config(self):
+        """Obtain configuration of model deployed on the Triton Inference Server.
+
+        Also creates future, which waits for server to get into readiness state.
+        """
+        return self._thread_pool_executor.submit(lambda: self._model_config())
+
+    def infer_sample(self, *inputs, **named_inputs) -> Future:
+        """Run asynchronous inference on single data sample.
+
+        Typical usage:
+
+            with FuturesModelClient("localhost", "BERT") as client
+                future = client.infer_sample(input1_sample, input2_sample)
+                # do something else
+                print(future.result())
+
+        Inference inputs can be provided either as positional or keyword arguments:
+
+            future = client.infer_sample(input1, input2)
+            future = client.infer_sample(a=input1, b=input2)
+
+        Mixing of argument passing conventions is not supported and will raise PyTritonClientRuntimeError.
+
+        Args:
+            *inputs: inference inputs provided as positional arguments.
+            **named_inputs: inference inputs provided as named arguments.
+
+        Returns:
+            Future with dictionary with inference results, where dictionary keys are output names.
+
+        """
+        inputs_copy, named_inputs_copy = self._deep_copy(inputs, named_inputs)
+
+        return self._thread_pool_executor.submit(
+            lambda: self._infer_sample(*inputs_copy, **named_inputs_copy),
+        )
+
+    def infer_batch(self, *inputs, **named_inputs) -> Future:
+        """Run asynchronous inference on batched data.
+
+        Typical usage:
+
+            with FuturesModelClient("localhost", "BERT") as client
+                future = client.infer_batch(input1_sample, input2_sample)
+                # do something else
+                print(future.result())
+
+        Inference inputs can be provided either as positional or keyword arguments:
+
+            future = client.infer_batch(input1, input2)
+            future = client.infer_batch(a=input1, b=input2)
+
+        Mixing of argument passing conventions is not supported and will raise PyTritonClientValueError.
+
+        Args:
+            *inputs: inference inputs provided as positional arguments.
+            **named_inputs: inference inputs provided as named arguments.
+
+        Returns:
+            Future
+
+        """
+        inputs_copy, named_inputs_copy = self._deep_copy(inputs, named_inputs)
+        return self._thread_pool_executor.submit(lambda: self._infer_batch(*inputs_copy, **named_inputs_copy))
+
+    def _aquire_client(self, lazy_init: bool = False):
+        """Aquire client from pool or create new one if pool is empty."""
+        client = None
+        thread_id = threading_get_ident()
+        with self._lock:
+            if thread_id in self._thread_clients:
+                client = self._thread_clients[thread_id]
+        if client is None:
+            client = ModelClient(self._url, self._model_name, self._model_version, lazy_init=lazy_init)
+        return client
+
+    def _release_client(self, client):
+        """Release client back to pool."""
+        thread_id = threading_get_ident()
+        with self._lock:
+            self._thread_clients[thread_id] = client
+
+    def _is_model_ready(self, timeout_s: float = 30.0):
+        """Returns future, which is set to True, when model is ready.
+
+        Args:
+            timeout_s: timeout to server and model get into readiness state.
+
+        """
+        client = self._aquire_client(lazy_init=True)
+        ret = client.wait_for_model(timeout_s)
+        self._release_client(client)
+        return ret
+
+    def _model_config(self):
+        """Obtain configuration of model deployed on the Triton Inference Server."""
+        client = self._aquire_client()
+        ret = client.model_config()
+        self._release_client(client)
+        return ret
+
+    def _infer_sample(self, *inputs, **named_inputs) -> Dict[str, np.ndarray]:
+        """Run inference on single data sample."""
+        client = self._aquire_client()
+        ret = client.infer_sample(*inputs, **named_inputs)
+        self._release_client(client)
+        return ret
+
+    def _infer_batch(self, *inputs, **named_inputs) -> Dict[str, np.ndarray]:
+        """Run inference on batched data."""
+        client = self._aquire_client()
+        ret = client.infer_batch(*inputs, **named_inputs)
+        self._release_client(client)
+        return ret
+
+    def _deep_copy(self, inputs, named_inputs):
+        """Perform deep copy of inputs if deep_copy flag is set."""
+        if self._do_deep_copy:
+            inputs_copy = [copy_deepcopy(input_tensor) for input_tensor in inputs]
+            named_inputs_copy = {key: copy_deepcopy(value) for key, value in named_inputs.items()}
+        else:
+            inputs_copy = inputs
+            named_inputs_copy = named_inputs
+        return inputs_copy, named_inputs_copy
