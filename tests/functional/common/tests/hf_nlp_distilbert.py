@@ -78,7 +78,7 @@ def huggingface_distilbert(test_time_s: int, init_timeout_s: int, batch_size: in
                 url = f"http://localhost:{triton_config.http_port}"
                 with FuturesModelClient(url, model_spec.name, max_workers=batch_size) as client:
                     # Wait for model
-                    client.is_model_ready(init_timeout_s).result()
+                    client.wait_for_model(init_timeout_s).result()
 
                     import time
 

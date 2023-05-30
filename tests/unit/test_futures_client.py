@@ -13,6 +13,7 @@
 # limitations under the License.
 import json
 import logging
+import sys
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
@@ -101,13 +102,13 @@ def _patch_grpc_client__model_up_and_ready(mocker, model_config: TritonModelConf
     mock_get_model_config.return_value = response_dict
 
 
-def test_futures_client_is_model_ready_raises_error_when_invalid_url_provided():
+def test_wait_for_model_raise_error_when_invalid_url_provided():
     with pytest.raises(PyTritonClientUrlParseError, match="Could not parse url"):
         client = FuturesModelClient(["localhost:8001"], "dummy")  # pytype: disable=wrong-arg-types
-        client.is_model_ready().result()
+        client.wait_for_model().result()
 
 
-def test_futures_client_waits_sync_client_starts_stops_threads(mocker):
+def test_wait_for_model_passes_timeout_to_client(mocker):
     _patch_grpc_client__server_up_and_ready(mocker)
     _patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
 
@@ -122,7 +123,7 @@ def test_futures_client_waits_sync_client_starts_stops_threads(mocker):
         str(ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_version),
         max_workers=1,
     ) as client:
-        future = client.is_model_ready(15)
+        future = client.wait_for_model(15)
         result = future.result()
         assert result is True
     spy_client_close.assert_called_once()
@@ -131,12 +132,12 @@ def test_futures_client_waits_sync_client_starts_stops_threads(mocker):
     spy_thread_pool_executor_submit.assert_called_once()
 
 
-def test_futures_client_passes_all_arguments_to_sync_client_init(mocker):
+def test_init_passes_max_workers_to_thread_pool_executor(mocker):
     _patch_grpc_client__server_up_and_ready(mocker)
     _patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
 
     # Disable sync client exit
-    mocker.patch.object(ModelClient, ModelClient.__exit__.__name__)
+    mock_client = mocker.patch.object(ModelClient, ModelClient.__exit__.__name__)
     mock_threads_init = mocker.patch.object(ThreadPoolExecutor, "__init__", autospec=True)
     mock_threads_init.return_value = None
     # Disable thread pool executor shutdown
@@ -149,16 +150,21 @@ def test_futures_client_passes_all_arguments_to_sync_client_init(mocker):
     )
 
     mock_threads_init.assert_called_once_with(client._thread_pool_executor, max_workers=2)
+    mock_client.assert_not_called()
 
 
-def test_futures_grpc_client_infer_raises_error_when_mixed_args_convention_used(mocker):
+def test_infer_raises_error_when_mixed_args_convention_used(mocker):
     _patch_grpc_client__server_up_and_ready(mocker)
     _patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
 
     a = np.array([1], dtype=np.float32)
     b = np.array([1], dtype=np.float32)
 
-    with FuturesModelClient(_GRPC_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
+    init_t_timeout_s = 15.0
+
+    with FuturesModelClient(
+        _GRPC_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name, init_timeout_s=init_t_timeout_s
+    ) as client:
         with pytest.raises(
             PyTritonClientValueError,
             match="Use either positional either keyword method arguments convention",
@@ -174,7 +180,82 @@ def test_futures_grpc_client_infer_raises_error_when_mixed_args_convention_used(
             client.infer_batch(a, b=b).result()
 
 
-def test_futures_grpc_client_infer_sample_list_passed_arguments_returns_arguments(mocker):
+def test_infer_sample_returns_values_creates_client(mocker):
+    _patch_grpc_client__server_up_and_ready(mocker)
+    _patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
+
+    a = np.array([1], dtype=np.float32)
+    b = np.array([2], dtype=np.float32)
+    c = np.array([3], dtype=np.float32)
+
+    init_t_timeout_s = 15.0
+
+    mock_client_wait_for_model = mocker.patch.object(ModelClient, ModelClient._wait_and_init_model_config.__name__)
+    mock_client_infer_sample = mocker.patch.object(ModelClient, ModelClient.infer_sample.__name__)
+    mock_thread_pool_executor_shutdown = mocker.patch.object(ThreadPoolExecutor, ThreadPoolExecutor.shutdown.__name__)
+
+    mock_client_infer_sample.return_value = c
+    with FuturesModelClient(
+        _GRPC_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name, init_timeout_s=init_t_timeout_s
+    ) as client:
+        result = client.infer_sample(a=a, b=b).result()
+    mock_client_wait_for_model.assert_called_once_with(init_t_timeout_s)
+    mock_client_infer_sample.assert_called_once_with(parameters=None, headers=None, a=a, b=b)
+    # Check the Python version and use different assertions for cancel_futures
+    mock_thread_pool_executor_shutdown.assert_called_once_with(wait=True)
+    assert result == c
+
+
+def test_infer_sample_returns_values_creates_client_close_wait(mocker):
+    _patch_grpc_client__server_up_and_ready(mocker)
+    _patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
+
+    a = np.array([1], dtype=np.float32)
+    b = np.array([2], dtype=np.float32)
+    c = np.array([3], dtype=np.float32)
+
+    mock_client_infer_sample = mocker.patch.object(ModelClient, ModelClient.infer_sample.__name__)
+    mock_thread_pool_executor_shutdown = mocker.patch.object(ThreadPoolExecutor, ThreadPoolExecutor.shutdown.__name__)
+
+    # Prevent exit from closing the client
+    mocker.patch.object(FuturesModelClient, FuturesModelClient.__exit__.__name__)
+
+    mock_client_infer_sample.return_value = c
+    client = FuturesModelClient(_GRPC_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name)
+    result = client.infer_sample(a, b).result()
+    client.close(wait=True, cancel_futures=True)
+    mock_client_infer_sample.assert_called_once_with(a, b, parameters=None, headers=None)
+    # Check the Python version and use different assertions for cancel_futures
+    if sys.version_info >= (3, 9):
+        mock_thread_pool_executor_shutdown.assert_called_once_with(wait=True, cancel_futures=True)
+    else:
+        mock_thread_pool_executor_shutdown.assert_called_once_with(wait=True)
+    assert result == c
+
+
+def test_infer_batch_returns_values_creates_client(mocker):
+    _patch_grpc_client__server_up_and_ready(mocker)
+    _patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
+
+    a = np.array([1], dtype=np.float32)
+    b = np.array([2], dtype=np.float32)
+    c = np.array([3], dtype=np.float32)
+
+    init_t_timeout_s = 15.0
+
+    mock_client_infer_batch = mocker.patch.object(ModelClient, ModelClient.infer_batch.__name__)
+    mock_client_infer_batch.return_value = c
+    with FuturesModelClient(
+        _GRPC_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name, init_timeout_s=init_t_timeout_s
+    ) as client:
+        result = client.infer_batch(a=a, b=b).result()
+        model_config = client.model_config().result()
+    mock_client_infer_batch.assert_called_once_with(parameters=None, headers=None, a=a, b=b)
+    assert model_config.model_name == ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name
+    assert result == c
+
+
+def test_infer_sample_list_passed_arguments_returns_arguments(mocker):
     _patch_grpc_client__server_up_and_ready(mocker)
     _patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
 
@@ -188,10 +269,10 @@ def test_futures_grpc_client_infer_sample_list_passed_arguments_returns_argument
 
         return_value = client.infer_sample(a, b).result()
         assert return_value == ret
-        patch_client_infer_sample.assert_called_once_with(a, b)
+        patch_client_infer_sample.assert_called_once_with(a, b, parameters=None, headers=None)
 
 
-def test_futures_grpc_client_infer_sample_dict_passed_arguments_returns_arguments(mocker):
+def test_infer_sample_dict_passed_arguments_returns_arguments(mocker):
     _patch_grpc_client__server_up_and_ready(mocker)
     _patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
 
@@ -205,10 +286,10 @@ def test_futures_grpc_client_infer_sample_dict_passed_arguments_returns_argument
 
         return_value = client.infer_sample(a=a, b=b).result()
         assert return_value == ret
-        patch_client_infer_sample.assert_called_once_with(a=a, b=b)
+        patch_client_infer_sample.assert_called_once_with(a=a, b=b, parameters=None, headers=None)
 
 
-def test_futures_grpc_client_infer_batch_list_passed_arguments_returns_arguments(mocker):
+def test_infer_batch_list_passed_arguments_returns_arguments(mocker):
     _patch_grpc_client__server_up_and_ready(mocker)
     _patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
 
@@ -221,10 +302,10 @@ def test_futures_grpc_client_infer_batch_list_passed_arguments_returns_arguments
     with FuturesModelClient(_GRPC_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
         return_value = client.infer_batch(a, b).result()
         assert return_value == ret
-        patch_client_infer_batch.assert_called_once_with(a, b)
+        patch_client_infer_batch.assert_called_once_with(a, b, parameters=None, headers=None)
 
 
-def test_futures_grpc_client_infer_batch_dict_passed_arguments_returns_arguments(mocker):
+def test_infer_batch_dict_passed_arguments_returns_arguments(mocker):
     _patch_grpc_client__server_up_and_ready(mocker)
     _patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
 
@@ -238,4 +319,4 @@ def test_futures_grpc_client_infer_batch_dict_passed_arguments_returns_arguments
 
         return_value = client.infer_batch(a=a, b=b).result()
         assert return_value == ret
-        patch_client_infer_batch.assert_called_once_with(a=a, b=b)
+        patch_client_infer_batch.assert_called_once_with(parameters=None, headers=None, a=a, b=b)

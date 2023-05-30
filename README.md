@@ -252,6 +252,8 @@ print(result_dict)
 
 The full example code can be found in [examples/linear_random_pytorch](examples/linear_random_pytorch).
 
+You can learn more about client usage in the [Clients](docs/clients.md) document.
+
 More information about running the server and models can be found
 in [Deploying Models](https://triton-inference-server.github.io/pytriton/latest/deploying_models/) page of documentation.
 
