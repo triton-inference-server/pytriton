@@ -27,9 +27,8 @@ import filelock
 # pytype: disable=import-error
 import jax
 import numpy as np
-from jax.experimental import PartitionSpec
-from jax.experimental.maps import Mesh
 from jax.experimental.pjit import pjit
+from jax.sharding import Mesh, PartitionSpec
 from opt_utils import MODEL_PARALLEL, get_model, get_params_spec, get_tokenizer, greedy_search, shard_params
 
 from pytriton.decorators import batch

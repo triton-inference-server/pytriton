@@ -14,5 +14,5 @@
 # limitations under the License.
 set -xe
 
-pip install --upgrade jax[cuda12_pip] -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+pip install --upgrade jax[cuda12_pip]>=0.4.1 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 pip install --upgrade flax omegaconf sacrebleu SentencePiece tokenizers transformers>=4.26

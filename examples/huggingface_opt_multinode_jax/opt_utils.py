@@ -24,11 +24,8 @@ import numpy as np
 from flax.core.frozen_dict import freeze, unfreeze
 from flax.traverse_util import flatten_dict, unflatten_dict
 from jax import device_put
-
-# from jax import device_put
-from jax.experimental import PartitionSpec
-from jax.experimental.maps import Mesh
 from jax.experimental.pjit import pjit
+from jax.sharding import Mesh, PartitionSpec
 from modeling_flax_opt import FlaxOPTForCausalLM
 from transformers import AutoConfig, AutoTokenizer, FlaxLogitsProcessorList, FlaxMinLengthLogitsProcessor
 
