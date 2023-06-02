@@ -236,4 +236,6 @@ class TritonServerConfig:
         Returns:
             True if the argument is defined in the config, False otherwise
         """
-        return key in self._server_args
+        kebab_cased_key = key.strip().replace("_", "-")
+        value = self._server_args.get(kebab_cased_key, None)
+        return value is not None

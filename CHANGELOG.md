@@ -18,7 +18,7 @@ limitations under the License.
 
 ## Unreleased
 
--
+- Fixed handling `TritonConfig.cache_directory` option - the directory was always overwritten with the default value.
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 
