@@ -325,11 +325,6 @@ docs/CONTRIBUTING.md
 docs/LICENSE.md
 docs/examples.md
 
-# Support for Project snippet scope
-.vscode/*.code-snippets
-
-# Ignore code-workspaces
-*.code-workspace
-
-# Ignore .vscode folder
+### VisualStudioCode+all ##
 .vscode
+.devcontainer
