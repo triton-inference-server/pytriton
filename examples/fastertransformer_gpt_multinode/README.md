@@ -35,9 +35,9 @@ The easiest way to run this example is to run it on a docker image built with Do
 all required components to run an inference with FasterTransformer.
 
 ```shell
-git clone https://github.com/NVIDIA/FasterTransformer
+git clone --branch v5.3 https://github.com/NVIDIA/FasterTransformer
 cd FasterTransformer
-docker build -f docker/Dockerfile.torch -t nvidia/fastertransformer .
+docker build --build-arg DOCKER_VERSION=22.11 -f docker/Dockerfile.torch -t nvidia/fastertransformer .
 ```
 
 Alternatively, you can set up your environment manually as in [model instruction](https://github.com/NVIDIA/FasterTransformer/blob/main/docs/gpt_guide.md#requirements).
