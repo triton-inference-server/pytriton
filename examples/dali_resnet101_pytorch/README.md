@@ -119,8 +119,8 @@ The `client.py` script accepts extra options, listed below:
 
 Original image:
 
-![](images/orig0.jpg)
+![](test_video/orig0.jpg)
 
 Segmented image:
 
-![](images/segm0.jpg)
+![](test_video/segm0.jpg)
