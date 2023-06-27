@@ -29,6 +29,7 @@ from tests.utils import (
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 METADATA = {
     "image_name": "nvcr.io/nvidia/tensorflow:{TEST_CONTAINER_VERSION}-tf2-py3",
+    "increase_shared_memory": True,
 }
 
 

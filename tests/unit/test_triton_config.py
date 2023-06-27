@@ -13,8 +13,9 @@
 # limitations under the License.
 import pytest
 
+from pytriton.server.python_backend_config import PythonBackendConfig
 from pytriton.server.triton_server_config import TritonServerConfig
-from pytriton.triton import TritonConfig
+from pytriton.triton import INITIAL_BACKEND_SHM_SIZE, TritonConfig
 
 
 def test_triton_config_raise_with_positional_args():
@@ -29,8 +30,22 @@ def test_triton_config_serialization_handles_lists():
     for name, value in config.to_dict().items():
         if name not in TritonServerConfig.allowed_keys() or value is None:
             continue
+
         triton_server_config[name] = value
 
     cli = triton_server_config.to_cli_string()
     assert "--cache-config=local,size=1048576" in cli
     assert "--cache-config=redis,size=1048576" in cli
+
+
+def test_triton_config_serialize_backend_configuration():
+    config = PythonBackendConfig()
+    config["shm_default_byte_size"] = INITIAL_BACKEND_SHM_SIZE
+    cli_backend = config.to_cli_string()
+    assert f"python,shm-default-byte-size={INITIAL_BACKEND_SHM_SIZE}" == cli_backend
+
+    triton_server_config = TritonServerConfig()
+    triton_server_config["backend-config"] = cli_backend
+    cli = triton_server_config.to_cli_string()
+
+    assert f"--backend-config=python,shm-default-byte-size={INITIAL_BACKEND_SHM_SIZE}" == cli

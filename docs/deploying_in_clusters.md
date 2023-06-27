@@ -64,8 +64,12 @@ containers:
 ## Configuring shared memory
 
 The connection between Python callbacks and the Triton Inference Server uses shared memory to pass data between the
-processes. In the Docker container, the default amount of shared memory is 64MB, which may not be enough to pass input and
-output data of the model. To increase the available shared memory size, pass an additional flag to the `docker run` command.
+processes. In the Docker container, the default amount of shared memory is `64MB`, which may not be enough to pass input and
+output data of the model. The PyTriton initialize `16MB` of shared memory for `Proxy Backend` at start to pass
+input/output tensors between processes. The additional memory is allocated dynamically. In case of failure, the size
+of available shared memory might need to be increased.
+
+To increase the available shared memory size, pass an additional flag to the `docker run` command.
 An example of increasing the shared memory size to 8GB:
 
 <!--pytest.mark.skip-->

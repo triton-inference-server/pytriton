@@ -20,6 +20,7 @@ limitations under the License.
 
 - Fixed handling `TritonConfig.cache_directory` option - the directory was always overwritten with the default value.
 - Fixed tritonclient dependency - PyTriton need tritonclient supporting http headers and parameters
+- Improved shared memory usage to match 64MB limit (default value for Docker, Kubernetes) reducing the initial size for PyTriton Proxy Backend.
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 

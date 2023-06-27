@@ -17,7 +17,11 @@ from unittest.mock import PropertyMock
 import pytest
 
 from pytriton.exceptions import PyTritonValidationError
-from pytriton.triton import Triton, TritonConfig
+from pytriton.triton import GROWTH_BACKEND_SHM_SIZE, INITIAL_BACKEND_SHM_SIZE, Triton, TritonConfig
+
+EXPECTED_BACKEND_ARGS = (
+    f"python,shm-default-byte-size={INITIAL_BACKEND_SHM_SIZE},shm-growth-byte-size={GROWTH_BACKEND_SHM_SIZE}"
+)
 
 
 def test_triton_server_created_with_default_arguments():
@@ -25,6 +29,7 @@ def test_triton_server_created_with_default_arguments():
 
     assert triton._triton_server_config["model_repository"] is not None
     assert triton._triton_server_config["backend_directory"] is not None
+    assert triton._triton_server_config["backend_config"] == EXPECTED_BACKEND_ARGS
 
 
 def test_triton_server_created_with_custom_arguments():
@@ -35,6 +40,7 @@ def test_triton_server_created_with_custom_arguments():
     assert triton._triton_server_config["model_repository"] == "/tmp"
     assert triton._triton_server_config["allow_metrics"] is False
     assert triton._triton_server_config["backend_directory"] is not None
+    assert triton._triton_server_config["backend_config"] == EXPECTED_BACKEND_ARGS
 
 
 def test_triton_server_created_with_custom_arguments_and_env_variables(mocker):
@@ -54,6 +60,8 @@ def test_triton_server_created_with_custom_arguments_and_env_variables(mocker):
     assert triton._triton_server_config["grpc_port"] == 8080
     assert triton._triton_server_config["allow_metrics"] is False
     assert triton._triton_server_config["backend_directory"] is not None
+    assert triton._triton_server_config["backend_config"] is not None
+    assert triton._triton_server_config["backend_config"] == EXPECTED_BACKEND_ARGS
 
 
 def test_triton_bind_model_name_verification():

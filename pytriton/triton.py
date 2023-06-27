@@ -52,6 +52,7 @@ from pytriton.model_config.tensor import Tensor
 from pytriton.models.manager import ModelManager
 from pytriton.models.model import Model, ModelConfig, ModelEvent
 from pytriton.server.model_repository import TritonModelRepository
+from pytriton.server.python_backend_config import PythonBackendConfig
 from pytriton.server.triton_server import TritonServer
 from pytriton.server.triton_server_config import TritonServerConfig
 from pytriton.utils.dataclasses import kwonly_dataclass
@@ -62,6 +63,8 @@ LOGGER = logging.getLogger(__name__)
 
 TRITONSERVER_DIST_DIR = get_root_module_path() / "tritonserver"
 MONITORING_PERIOD_SEC = 10
+INITIAL_BACKEND_SHM_SIZE = 4194304  # 4MB, Python Backend default is 64MB, but is automatically increased
+GROWTH_BACKEND_SHM_SIZE = 1048576  # 1MB, Python Backend default is 64MB
 
 MODEL_URL = "/v2/models/{model_name}"
 MODEL_READY_URL = f"{MODEL_URL}/ready/"
@@ -292,11 +295,25 @@ class Triton:
 
         self._triton_server_config = TritonServerConfig()
         config_data = self._config.to_dict()
+
+        self._python_backend_config = PythonBackendConfig()
+        backend_config_data = {
+            "shm_default_byte_size": INITIAL_BACKEND_SHM_SIZE,
+            "shm-growth-byte-size": GROWTH_BACKEND_SHM_SIZE,
+        }
+        for name, value in backend_config_data.items():
+            if name not in PythonBackendConfig.allowed_keys() or value is None:
+                continue
+
+            self._python_backend_config[name] = value
+
         for name, value in config_data.items():
             if name not in TritonServerConfig.allowed_keys() or value is None:
                 continue
 
             self._triton_server_config[name] = value
+
+        self._triton_server_config["backend_config"] = self._python_backend_config.to_cli_string()
 
         self._triton_server_config["model_repository"] = model_repository.path.as_posix()
         self._triton_server_config["backend_directory"] = (TRITONSERVER_DIST_DIR / "backends").as_posix()
