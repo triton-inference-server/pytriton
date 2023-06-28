@@ -18,6 +18,12 @@ limitations under the License.
 
 ## Unreleased
 
+[//]: <> (put here on external component update with short summary what change or link to changelog)
+
+- Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.33.0](https://github.com/triton-inference-server/server/releases/tag/v2.33.0)
+
+## 0.2.1 (2023-06-28)
+
 - Fixed handling `TritonConfig.cache_directory` option - the directory was always overwritten with the default value.
 - Fixed tritonclient dependency - PyTriton need tritonclient supporting http headers and parameters
 - Improved shared memory usage to match 64MB limit (default value for Docker, Kubernetes) reducing the initial size for PyTriton Proxy Backend.
