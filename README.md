@@ -119,8 +119,7 @@ import torch
 model = torch.nn.Linear(2, 3).to("cuda").eval()
 ```
 
-In the second step create an inference callback as a function. The function as an argument obtain the HTTP/gRPC
-request data in the form of a numpy. The expected return object is also a numpy array.
+In the second step, create an inference callable as a function. The function obtains the HTTP/gRPC request data as an argument, which should be in the form of a NumPy array. The expected return object should also be a NumPy array. You can define an inference callable as a function that uses the `@batch` decorator from PyTriton. This decorator converts the input request into a more suitable format that can be directly passed to the model. You can read more about [decorators here](decorators.md).
 
 Example implementation:
 
@@ -129,6 +128,7 @@ Example implementation:
 ```python
 import numpy as np
 from pytriton.decorators import batch
+
 
 @batch
 def infer_fn(**inputs: np.ndarray):
@@ -139,7 +139,7 @@ def infer_fn(**inputs: np.ndarray):
     return [output1_batch]
 ```
 
-In the next step, create the connection between the model and Triton Inference Server using the bind method:
+In the next step, you can create the binding between the inference callable and Triton Inference Server using the `bind` method from pyTriton. This method takes the model name, the inference callable, the inputs and outputs tensors, and an optional model configuration object.
 
 <!--pytest-codeblocks:cont-->
 
@@ -147,7 +147,7 @@ In the next step, create the connection between the model and Triton Inference S
 from pytriton.model_config import ModelConfig, Tensor
 from pytriton.triton import Triton
 
-# Connecting inference callback with Triton Inference Server
+# Connecting inference callable with Triton Inference Server
 with Triton() as triton:
     # Load model into Triton Inference Server
     triton.bind(
