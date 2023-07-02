@@ -185,7 +185,7 @@ moment, the model is available under the name `Linear` in the Triton server. The
 `localhost:8000/v2/models/Linear/infer`, which are passed to the `infer_fn` function.
 
 If you would like to use Triton in the background mode, use `run`. More about that can be found
-in the [Deploying Models](https://triton-inference-server.github.io/pytriton/latest/deploying_models) page.
+in the [Deploying Models](https://triton-inference-server.github.io/pytriton/0.2.1/initialization/) page.
 
 Once the `serve` or `run` method is called on the `Triton` object, the server status can be obtained using:
 
