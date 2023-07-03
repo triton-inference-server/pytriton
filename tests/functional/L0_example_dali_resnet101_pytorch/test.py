@@ -28,7 +28,7 @@ from tests.utils import (
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 METADATA = {
     "image_name": "nvcr.io/nvidia/pytorch:{TEST_CONTAINER_VERSION}-py3",
-    "increase_shared_memory": True,
+    "shared_memory_size_mb": 256,
 }
 
 
