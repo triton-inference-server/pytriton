@@ -40,12 +40,12 @@ import zmq  # pytype: disable=import-error
 from pytriton.exceptions import PyTritonUnrecoverableError
 from pytriton.model_config.triton_model_config import TritonModelConfig
 from pytriton.proxy.communication import (
-    InferenceHandlerRequest,
-    InferenceHandlerResponse,
+    InferenceHandlerRequests,
+    InferenceHandlerResponses,
     MetaRequestResponse,
     ShmManager,
 )
-from pytriton.proxy.types import Request, Response
+from pytriton.proxy.types import Request
 
 LOGGER = logging.getLogger(__name__)
 
@@ -96,42 +96,57 @@ class InferenceHandler(th.Thread):
     def run(self) -> None:
         """Start the InferenceHandler communication."""
         self.socket = self.zmq_context.socket(zmq.REP)
+        model_name = self._model_config.model_name
         try:
             LOGGER.debug(f"Binding IPC socket at {self.shared_memory_socket}.")
             self.socket.bind(self.shared_memory_socket)
 
             while not self.stopped:
-                LOGGER.debug(f"Waiting for requests from proxy model for {self._model_config.model_name}.")
+                LOGGER.debug(f"Waiting for requests from proxy model for {model_name}.")
                 request_payload = self.socket.recv()
-                request = InferenceHandlerRequest.from_bytes(request_payload)
+                requests = InferenceHandlerRequests.from_bytes(request_payload).requests
 
-                LOGGER.debug(f"Preparing inputs for {self._model_config.model_name}.")
-                inputs = self.shm_request_manager.from_shm(
-                    request.requests,
-                    request.memory_name,
-                    lambda data, req: Request(data=data, parameters=req.parameters),
-                )
+                LOGGER.debug(f"Preparing inputs for {model_name}.")
+                inputs = [
+                    Request(
+                        data={
+                            input_name: self.shm_request_manager.get(tensor_id)
+                            for input_name, tensor_id in request.data.items()
+                        },
+                        parameters=request.parameters,
+                    )
+                    for request in requests
+                ]
 
                 try:
-                    LOGGER.debug(f"Processing inference callback for {self._model_config.model_name}.")
-                    outputs = self._model_callable(inputs)
+                    LOGGER.debug(f"Processing inference callback for {model_name}.")
+                    responses = self._model_callable(inputs)
 
-                    LOGGER.debug(f"Validating outputs for {self._model_config.model_name}.")
-                    self._validate_outputs(outputs)
+                    LOGGER.debug(f"Validating outputs for {model_name}.")
+                    self._validate_outputs(responses)
 
-                    outputs = [Response(data=output) for output in outputs]
-
-                    output_tensor_infos = self.shm_response_manager.to_shm(
-                        outputs,
-                        lambda data, _resp: MetaRequestResponse(data=data),
+                    # to avoid reallocation need to declare required size of the buffer here
+                    LOGGER.debug(f"Copying outputs to shared memory for {model_name}.")
+                    required_size_bytes = sum(
+                        self.shm_response_manager.calc_serialized_size(output_data)
+                        for response in responses
+                        for output_data in response.values()
                     )
-
-                    response = InferenceHandlerResponse(
-                        responses=output_tensor_infos, memory_name=self.shm_response_manager.memory_name()
+                    self.shm_response_manager.reset_buffer(required_size_bytes)
+                    responses = InferenceHandlerResponses(
+                        responses=[
+                            MetaRequestResponse(
+                                data={
+                                    output_name: str(self.shm_response_manager.append(np_array))
+                                    for output_name, np_array in response.items()
+                                }
+                            )
+                            for response in responses
+                        ]
                     )
                 except PyTritonUnrecoverableError:
                     error = traceback.format_exc()
-                    response = InferenceHandlerResponse(error=error)
+                    responses = InferenceHandlerResponses(error=error)
                     LOGGER.error(
                         "Unrecoverable error thrown during calling model callable. "
                         "Shutting down Triton Inference Server. "
@@ -141,11 +156,11 @@ class InferenceHandler(th.Thread):
                     self._notify_proxy_backend_observers(InferenceHandlerEvent.UNRECOVERABLE_ERROR, error)
                 except Exception:
                     error = traceback.format_exc()
-                    response = InferenceHandlerResponse(error=error)
+                    responses = InferenceHandlerResponses(error=error)
                     LOGGER.error(f"Error occurred during calling model callable: {error}")
 
-                LOGGER.debug(f"Send response to proxy model for {self._model_config.model_name}.")
-                self.socket.send(response.as_bytes())
+                LOGGER.debug(f"Send response to proxy model for {model_name}.")
+                self.socket.send(responses.as_bytes())
         except zmq.error.ContextTerminated:
             LOGGER.info("Context was terminated. InferenceHandler will be closed.")
         except Exception as exception:
@@ -174,6 +189,22 @@ class InferenceHandler(th.Thread):
                     raise ValueError("Not all keys returned by model callable are string")
                 if not isinstance(value, np.ndarray):
                     raise ValueError("Not all values returned by model callable are numpy arrays")
+                else:
+                    allowed_kind = "biufOSU"
+                    if value.dtype.kind not in allowed_kind:
+                        raise ValueError(
+                            f"Only bool, numeric, string, unicode and object arrays are supported by Triton (dtype.kind: {allowed_kind}). "
+                            f"Returned {key} has {value.dtype.kind} dtype.kind."
+                        )
+                    if value.dtype.kind == "O":
+                        if isinstance(value.item(0), str):
+                            raise ValueError(
+                                "Use string/byte-string instead of object for passing string in NumPy array."
+                            )
+                        elif not isinstance(value.item(0), bytes):
+                            raise ValueError(
+                                f"Only bytes as objects dtype are supported by PyTriton. Returned {key} has {type(value.item(0))} type."
+                            )
 
     def stop(self) -> None:
         """Stop the InferenceHandler communication."""

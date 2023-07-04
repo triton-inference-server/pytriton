@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,11 +17,12 @@ This file is automatically copied during deployment on Triton.
 """
 import json
 import traceback
+import typing
 
 import triton_python_backend_utils as pb_utils  # pytype: disable=import-error
 import zmq  # pytype: disable=import-error
 
-from .communication import InferenceHandlerRequest, InferenceHandlerResponse, MetaRequestResponse, ShmManager
+from .communication import InferenceHandlerRequests, InferenceHandlerResponses, MetaRequestResponse, ShmManager
 from .types import Request, Response
 
 
@@ -77,53 +78,47 @@ class TritonPythonModel:
             msg = traceback.format_exc()
             raise pb_utils.TritonModelException(f"Model initialize error: {msg}")  # pytype: disable=module-attr
 
-    def execute(self, requests):
+    def execute(self, triton_requests):
         """Triton Inference Server Python Backend API method.
 
-        Method concatenate requests data into single batch and sends to backend client.
-        Depending on the batching configuration (e.g. Dynamic Batching) used,
-        `requests` may contain multiple requests.
-
         Args:
-            requests: A list of pb_utils.InferenceRequest
+            triton_requests: A list of pb_utils.InferenceRequest
 
         Returns:
-            A list of pb_utils.InferenceResponse. The length of this list is the same as `requests`
+            A list of pb_utils.InferenceResponse. The length of this list is the same as `triton_requests`
         """
-        if not self.model_supports_batching and len(requests) > 1:
+        if not self.model_supports_batching and len(triton_requests) > 1:
             raise RuntimeError(
                 "Code assumes that Triton doesn't put multiple requests when model doesn't support batching"
             )
         logger = pb_utils.Logger  # pytype: disable=module-attr
         logger.log_verbose("Collecting input data from request.")
-        # input_idx, merged_batch_size, ...
-        inputs = []
 
-        for request in requests:
-            request_dict = {}
+        requests = []
+        for triton_request in triton_requests:
+            request = {}
             for model_input in self.model_inputs:
-                input_tensor = pb_utils.get_input_tensor_by_name(request, model_input["name"])
+                input_tensor = pb_utils.get_input_tensor_by_name(triton_request, model_input["name"])
                 if input_tensor is not None:
-                    request_dict[model_input["name"]] = input_tensor.as_numpy()
-            inputs.append(Request(data=request_dict, parameters=json.loads(request.parameters())))
+                    request[model_input["name"]] = input_tensor.as_numpy()
+            requests.append(Request(data=request, parameters=json.loads(triton_request.parameters())))
 
-        # input_idx, merged_batch_size, ...
-        output_array = self._exec_requests(inputs, logger)
+        responses = self._exec_requests(requests, logger)
 
-        responses = []
-        for resp in output_array:
+        triton_responses = []
+        for response in responses:
             output_tensors = []
-            for output_name, output in resp.items():
+            for output_name, output_array in response.items():
                 if output_name in self.model_outputs_dict:
                     dtype = pb_utils.triton_string_to_numpy(self.model_outputs_dict[output_name]["data_type"])
-                    output = output.astype(dtype)
-                tensor = pb_utils.Tensor(output_name, output)  # pytype: disable=module-attr
-                output_tensors.append(tensor)
+                    output_array = output_array.astype(dtype)
+                output_tensor = pb_utils.Tensor(output_name, output_array)  # pytype: disable=module-attr
+                output_tensors.append(output_tensor)
 
             response = pb_utils.InferenceResponse(output_tensors=output_tensors)  # pytype: disable=module-attr
-            responses.append(response)
+            triton_responses.append(response)
 
-        return responses
+        return triton_responses
 
     def finalize(self) -> None:
         """Finalize the model cleaning the buffers."""
@@ -161,39 +156,52 @@ class TritonPythonModel:
         handshake_socket.close()
         return instance_shared_memory_socket
 
-    def _exec_requests(self, inputs, logger):
+    def _exec_requests(self, requests: typing.List[Request], logger) -> typing.List[Response]:
         logger.log_verbose("Execute batch processing.")
         try:
-
+            # to avoid reallocation need to declare required size of the buffer here
             logger.log_verbose("Copying inputs to shared memory.")
-            input_tensor_infos = self.shm_request_manager.to_shm(
-                inputs, lambda data, req: MetaRequestResponse(data=data, parameters=req.parameters)
+            required_size_bytes = sum(
+                self.shm_request_manager.calc_serialized_size(input_data)
+                for request in requests
+                for input_data in request.values()
             )
-
+            self.shm_request_manager.reset_buffer(required_size_bytes)
+            meta_requests = InferenceHandlerRequests(
+                requests=[
+                    MetaRequestResponse(
+                        data={
+                            input_name: self.shm_request_manager.append(input_data)
+                            for input_name, input_data in request.items()
+                        },
+                        parameters=request.parameters,
+                    )
+                    for request in requests
+                ]
+            )
             logger.log_verbose("Sending request to socket.")
-            request = InferenceHandlerRequest(
-                requests=input_tensor_infos, memory_name=self.shm_request_manager.memory_name()
-            )
-            self.socket.send(request.as_bytes())
+            self.socket.send(meta_requests.as_bytes())
 
             logger.log_verbose("Waiting for response.")
-            response_payload = self.socket.recv()
-            response = InferenceHandlerResponse.from_bytes(response_payload)
+            responses_payload = self.socket.recv()
+            meta_responses = InferenceHandlerResponses.from_bytes(responses_payload)
 
-            logger.log_verbose(f"Response: {response.responses}")
-
-            logger.log_verbose("Response obtained.")
-
-            if response.error:
-                raise pb_utils.TritonModelException(response.error)  # pytype: disable=module-attr
+            logger.log_verbose(f"Response: {meta_responses.responses}")
+            if meta_responses.error:
+                raise pb_utils.TritonModelException(meta_responses.error)  # pytype: disable=module-attr
 
             logger.log_verbose("Preparing output arrays.")
+            responses = [
+                Response(
+                    data={
+                        output_name: self.shm_response_manager.get(output_id)
+                        for output_name, output_id in response.data.items()
+                    }
+                )
+                for response in meta_responses.responses
+            ]
 
-            output_array = self.shm_response_manager.from_shm(
-                response.responses, response.memory_name, lambda data, _resp: Response(data)
-            )
-
-            logger.log_verbose(f"Array: {output_array}")
+            logger.log_verbose("Obtained response from shared memory")
 
         except pb_utils.TritonModelException:  # pytype: disable=module-attr
             raise
@@ -201,4 +209,4 @@ class TritonPythonModel:
             msg = traceback.format_exc()
             raise pb_utils.TritonModelException(f"Model execute error: {msg}")  # pytype: disable=module-attr
 
-        return output_array
+        return responses

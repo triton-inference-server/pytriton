@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,67 +14,47 @@
 
 import numpy as np
 
-from pytriton.proxy.communication import MetaRequestResponse, ShmManager
-from pytriton.proxy.types import Request
+from pytriton.proxy.communication import ShmManager
 
 
-def assert_equal_list_of_dicts(a, b):
-    assert len(a) == len(b)
-    for a_elem, b_elem in zip(a, b):
-        assert a_elem.keys() == b_elem.keys()
-        for key in a_elem:
-            np.testing.assert_equal(a_elem[key], b_elem[key])
-
-
-def test_numpy_to_from_shm(mocker):
-    # floating-point
-    shm_manager = ShmManager()
+def test_shm_manager_append_get(mocker):
+    shm_manager_write = ShmManager()
     shm_manager_read = ShmManager()
 
-    a = [
-        Request({"a": np.zeros((10, 10), dtype=np.float32), "b": np.array([b"foo", b"longer_bar"])}, {"aaa": 1}),
-        Request(
-            {"a": np.array(["foo", "longer_bar"]), "c": np.array([b"foo", b"longer_bar"], dtype=object)}, {"ccc": 3}
-        ),
-    ]
+    a = np.zeros((10, 10), dtype=np.float32)
+    b = np.array([b"foo", b"longer_bar"])
+    c = np.array([b"foo", b"longer_bar"], dtype=object)
+    required_buffer_size = sum(shm_manager_write.calc_serialized_size(tensor) for tensor in [a, b, c])
+    shm_manager_write.reset_buffer(required_buffer_size)
+    a_id = shm_manager_write.append(a)
+    b_id = shm_manager_write.append(b)
+    c_id = shm_manager_write.append(c)
 
-    wrapped_a = shm_manager.to_shm(a, lambda data, req: MetaRequestResponse(data, req.parameters))
-    b = shm_manager_read.from_shm(wrapped_a, shm_manager.memory_name(), lambda data, req: Request(data, req.parameters))
+    a_retrieved = shm_manager_read.get(a_id)
+    b_retrieved = shm_manager_read.get(b_id)
+    c_retrieved = shm_manager_read.get(c_id)
 
-    assert_equal_list_of_dicts(a, b)
+    np.testing.assert_equal(a, a_retrieved)
+    np.testing.assert_equal(b, b_retrieved)
+    np.testing.assert_equal(c, c_retrieved)
 
-    spy_a_close = mocker.spy(shm_manager._shm_buffer, "close")
-    spy_a_unlink = mocker.spy(shm_manager._shm_buffer, "unlink")
+    spy_close = mocker.spy(shm_manager_write._shm_buffer, "close")
+    spy_unlink = mocker.spy(shm_manager_write._shm_buffer, "unlink")
 
-    shm_manager.dispose()
-    spy_a_close.assert_called_once()
-    spy_a_unlink.assert_called_once()
+    shm_manager_write.dispose()
+    shm_manager_read.dispose()
+
+    spy_close.assert_called_once()
+    spy_unlink.assert_called_once()
 
 
 def test_expand_shared_memory(mocker):
-    a = [Request({"a": np.arange(10, dtype=np.float32)})]
-    a_larger = [Request({"a": np.arange(100, dtype=np.float32)})]
-    a_smaller = [Request({"a": np.arange(100, dtype=np.int16)})]
-
     shm_manager = ShmManager()
-    shm_manager_read = ShmManager()
 
     spy_dispose = mocker.spy(shm_manager, "dispose")
 
-    wrapped_a = shm_manager.to_shm(a, lambda data, req: MetaRequestResponse(data, req.parameters))
-    b = shm_manager_read.from_shm(wrapped_a, shm_manager.memory_name(), lambda data, req: Request(data, req.parameters))
-    assert_equal_list_of_dicts(a, b)
+    shm_manager.reset_buffer(100)
+    shm_manager.reset_buffer(10)
     spy_dispose.assert_not_called()
-
-    wrapped_a = shm_manager.to_shm(a_larger, lambda data, req: MetaRequestResponse(data, req.parameters))
-    b = shm_manager_read.from_shm(wrapped_a, shm_manager.memory_name(), lambda data, req: Request(data, req.parameters))
-    assert_equal_list_of_dicts(a_larger, b)
+    shm_manager.reset_buffer(200)
     spy_dispose.assert_called_once()
-
-    wrapped_a = shm_manager.to_shm(a_smaller, lambda data, req: MetaRequestResponse(data, req.parameters))
-    b = shm_manager_read.from_shm(wrapped_a, shm_manager.memory_name(), lambda data, req: Request(data, req.parameters))
-    assert_equal_list_of_dicts(a_smaller, b)
-    spy_dispose.assert_called_once()
-
-    shm_manager.dispose()
-    shm_manager_read.dispose()
