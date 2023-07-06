@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,13 +35,14 @@ import site
 import sys
 import threading
 import traceback
-from typing import Callable, Dict, Optional, Sequence, Union
+from typing import Callable, Dict, Literal, Optional, Sequence, Union
 
 from pytriton.constants import (
     DEFAULT_GRPC_PORT,
     DEFAULT_HTTP_PORT,
     DEFAULT_METRICS_PORT,
     PYTRITON_CACHE_DIR,
+    TRITON_LOCAL_IP,
     TRITON_PYTHON_BACKEND_INTERPRETER_DIRNAME,
 )
 from pytriton.utils.logging import silence_3rd_party_loggers
@@ -223,17 +224,28 @@ class TritonServer:
         """
         return self._tritonserver_logs
 
-    def get_ports(self) -> Dict:
-        """Expose port of running inference server.
+    def get_endpoint(self, endpoint: Literal["http", "grpc", "metrics"]) -> str:
+        """Get endpoint url.
+
+        Args:
+            endpoint: endpoint name
 
         Returns:
-            Dict with server ports for protocol and endpoints
+            endpoint url in form of {protocol}://{host}:{port}
         """
-        return {
+        protocols = {"http": "http", "grpc": "grpc", "metrics": "http"}
+        addresses = {
+            "http": self._server_config["http-address"] or TRITON_LOCAL_IP,
+            "grpc": self._server_config["grpc-address"] or TRITON_LOCAL_IP,
+            "metrics": self._server_config["metrics-address"] or self._server_config["http-address"] or TRITON_LOCAL_IP,
+        }
+        ports = {
             "http": self._server_config["http-port"] or DEFAULT_HTTP_PORT,
             "grpc": self._server_config["grpc-port"] or DEFAULT_GRPC_PORT,
             "metrics": self._server_config["metrics-port"] or DEFAULT_METRICS_PORT,
         }
+
+        return f"{protocols[endpoint]}://{addresses[endpoint]}:{ports[endpoint]}"
 
     def _record_logs(self, line: Union[bytes, str]) -> None:
         """Record logs obtained from server process. If verbose logging enabled, print the log into STDOUT.

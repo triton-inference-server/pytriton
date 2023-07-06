@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -45,7 +45,6 @@ from typing import Callable, Dict, List, Optional, Sequence, Union
 import typing_inspect
 
 from pytriton.client import ModelClient
-from pytriton.constants import DEFAULT_GRPC_PORT, DEFAULT_HTTP_PORT, TRITON_LOCAL_URL
 from pytriton.decorators import TritonContext
 from pytriton.exceptions import PyTritonValidationError
 from pytriton.model_config.tensor import Tensor
@@ -133,6 +132,7 @@ class TritonConfig:
         allow_cpu_metrics: Allow the server to provide CPU metrics.
         metrics_interval_ms: Metrics will be collected once every <metrics-interval-ms> milliseconds.
         metrics_port: The port reporting prometheus metrics.
+        metrics_address: The address for the metrics server to bind to. Default is the same as http_address.
         allow_sagemaker: Allow the server to listen for Sagemaker requests.
         sagemaker_port: The port for the server to listen on for Sagemaker requests.
         sagemaker_safe_port_range: Set the allowed port range for endpoints other than the SageMaker endpoints.
@@ -195,6 +195,7 @@ class TritonConfig:
     allow_cpu_metrics: Optional[bool] = None
     metrics_interval_ms: Optional[int] = None
     metrics_port: Optional[int] = None
+    metrics_address: Optional[str] = None
     allow_sagemaker: Optional[bool] = None
     sagemaker_port: Optional[int] = None
     sagemaker_safe_port_range: Optional[str] = None
@@ -461,15 +462,8 @@ class Triton:
 
     def _wait_for_models(self) -> None:
         """Log loaded models in console to show the available endpoints."""
-        if self._config.allow_http in [True, None]:
-            protocol = "http"
-            port = self._config.http_port or DEFAULT_HTTP_PORT
-        else:
-            protocol = "grpc"
-            port = self._config.grpc_port or DEFAULT_GRPC_PORT
-
-        server_url = f"{protocol}://{TRITON_LOCAL_URL}:{port}"
-
+        endpoint = "http" if self._config.allow_http in [True, None] else "grpc"
+        server_url = self._triton_server.get_endpoint(endpoint)
         for model in self._model_manager.models:
             with ModelClient(
                 url=server_url, model_name=model.model_name, model_version=str(model.model_version)

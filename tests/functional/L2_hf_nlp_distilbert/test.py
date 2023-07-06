@@ -22,7 +22,7 @@ import random
 logger = logging.getLogger(__package__)
 METADATA = {
     "image_name": "nvcr.io/nvidia/tensorflow:{TEST_CONTAINER_VERSION}-tf2-py3",
-    "increase_shared_memory": True,
+    "shared_memory_size_mb": 512,
 }
 
 

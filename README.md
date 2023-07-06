@@ -59,6 +59,7 @@ Before installing the library, ensure that you meet the following requirements:
 
 - An operating system with glibc >= 2.31. Triton Inference Server and PyTriton have only been rigorously tested on Ubuntu 20.04.
   Other supported operating systems include Ubuntu 20.04+, Debian 11+, Rocky Linux 9+, and Red Hat Universal Base Image 9+.
+  - to check your glibc version, run `ldd --version`
 - Python version >= 3.8. If you are using Python 3.9+, see the section "[Installation on Python 3.9+](https://triton-inference-server.github.io/pytriton/latest/installation#installation-on-python-39)" for additional steps.
 - pip >= 20.3
 
@@ -85,6 +86,14 @@ You can install the package from [pypi.org](https://pypi.org/project/nvidia-pytr
 ```shell
 pip install -U nvidia-pytriton
 ```
+
+**Important**: The `pip` version must be at least 20.3. To upgrade an older version of pip, run:
+
+```shell
+pip install -U pip
+```
+
+More details about installation can be found in the [documentation](https://triton-inference-server.github.io/pytriton/latest/installation/).
 
 **Important**: The Triton Inference Server binary is installed as part of the PyTriton package.
 
@@ -119,8 +128,7 @@ import torch
 model = torch.nn.Linear(2, 3).to("cuda").eval()
 ```
 
-In the second step create an inference callback as a function. The function as an argument obtain the HTTP/gRPC
-request data in the form of a numpy. The expected return object is also a numpy array.
+In the second step, create an inference callable as a function. The function obtains the HTTP/gRPC request data as an argument, which should be in the form of a NumPy array. The expected return object should also be a NumPy array. You can define an inference callable as a function that uses the `@batch` decorator from PyTriton. This decorator converts the input request into a more suitable format that can be directly passed to the model. You can read more about [decorators here](decorators.md).
 
 Example implementation:
 
@@ -129,6 +137,7 @@ Example implementation:
 ```python
 import numpy as np
 from pytriton.decorators import batch
+
 
 @batch
 def infer_fn(**inputs: np.ndarray):
@@ -139,7 +148,7 @@ def infer_fn(**inputs: np.ndarray):
     return [output1_batch]
 ```
 
-In the next step, create the connection between the model and Triton Inference Server using the bind method:
+In the next step, you can create the binding between the inference callable and Triton Inference Server using the `bind` method from pyTriton. This method takes the model name, the inference callable, the inputs and outputs tensors, and an optional model configuration object.
 
 <!--pytest-codeblocks:cont-->
 
@@ -147,7 +156,7 @@ In the next step, create the connection between the model and Triton Inference S
 from pytriton.model_config import ModelConfig, Tensor
 from pytriton.triton import Triton
 
-# Connecting inference callback with Triton Inference Server
+# Connecting inference callable with Triton Inference Server
 with Triton() as triton:
     # Load model into Triton Inference Server
     triton.bind(
@@ -252,7 +261,7 @@ print(result_dict)
 
 The full example code can be found in [examples/linear_random_pytorch](examples/linear_random_pytorch).
 
-You can learn more about client usage in the [Clients](docs/clients.md) document.
+You can learn more about client usage in the [Clients](https://triton-inference-server.github.io/pytriton/latest/clients/) document.
 
 More information about running the server and models can be found
 in [Deploying Models](https://triton-inference-server.github.io/pytriton/latest/deploying_models/) page of documentation.

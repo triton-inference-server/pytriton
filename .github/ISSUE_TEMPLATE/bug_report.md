@@ -73,7 +73,9 @@ If an error is raised, please paste the full traceback of the exception.
 **Environment**
 
 - OS/container version: [e.g., container nvcr.io/nvidia/pytorch:23.02-py3 / virtual machine with Ubuntu 22.04]
+  - glibc version: [e.g., 2.31; can be checked with `ldd --version`]
 - Python interpreter distribution and version: [e.g., CPython 3.8 / conda 4.7.12 with Python 3.8 environment]
+- pip version: [e.g., 23.1.2]
 - PyTriton version: [e.g., 0.1.4 / custom build from source at commit ______]
 - Deployment details: [e.g., multi-node multi-GPU setup on GKE / multi-GPU single-node setup in Jupyter Notebook]
 
