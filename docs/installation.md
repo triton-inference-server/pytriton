@@ -25,6 +25,7 @@ Before installing the library, ensure that you meet the following requirements:
 
 - An operating system with glibc >= 2.31. Triton Inference Server and PyTriton have only been rigorously tested on Ubuntu 20.04.
   Other supported operating systems include Ubuntu 20.04+, Debian 11+, Rocky Linux 9+, and Red Hat Universal Base Image 9+.
+  - to check your glibc version, run `ldd --version`
 - Python version >= 3.8. If you are using Python 3.9+, see the section "[Installation on Python 3.9+](#installation-on-python-39)" for additional steps.
 - pip >= 20.3
 
@@ -40,7 +41,21 @@ You can install the package from [pypi.org](https://pypi.org/project/nvidia-pytr
 pip install -U nvidia-pytriton
 ```
 
-**Important**: The Triton Inference Server binary is installed as part of the PyTriton package.
+!!! note "pip version"
+
+    The `pip` version must be at least 20.3. This is the first version of pip that supports the PEP-600 compliant `manylinux` platform tags used by PyTriton.
+
+    To upgrade an older version of pip, run:
+
+    ```shell
+    pip install -U pip
+    ```
+
+    [pip might install the pip package in the user site directory](https://github.com/pypa/pip/issues/1668). If it is your case, make sure that the `$HOME/.local/bin` is in your `$PATH` environment variable.
+
+!!! note "Triton Inference Server binaries"
+
+    The Triton Inference Server binaries are installed as part of the PyTriton package.
 
 ## Installation on Python 3.9+
 

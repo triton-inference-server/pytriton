@@ -42,6 +42,9 @@ The package can be installed from `pypi`_ using:
 
     pip install -U nvidia-pytriton
 
+More details about installation can be found in the `documentation`_.
+
+.. _documentation: https://triton-inference-server.github.io/pytriton/latest/installation/
 
 Example
 ---------
