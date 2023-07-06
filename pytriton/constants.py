@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import pathlib
 DEFAULT_HTTP_PORT = 8000
 DEFAULT_GRPC_PORT = 8001
 DEFAULT_METRICS_PORT = 8002
-TRITON_LOCAL_URL = "127.0.0.1"
+TRITON_LOCAL_IP = "127.0.0.1"
 TRITON_CONTEXT_FIELD_NAME = "triton_context"
 PYTRITON_CACHE_DIR = pathlib.Path.home() / ".cache" / "pytriton"
 TRITON_PYTHON_BACKEND_INTERPRETER_DIRNAME = "python_backend_interpreter"
