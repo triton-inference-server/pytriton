@@ -36,5 +36,5 @@ class ModelConfig:
 
     batching: bool = True
     max_batch_size: int = 4
-    batcher: DynamicBatcher = DynamicBatcher()
+    batcher: DynamicBatcher = dataclasses.field(default_factory=DynamicBatcher)
     response_cache: bool = False
