@@ -29,6 +29,7 @@ Mixing of argument passing conventions is not supported and will raise PyTritonC
 
 import itertools
 import logging
+import socket
 import sys
 import threading
 import time
@@ -45,6 +46,7 @@ import tritonclient.utils
 from pytriton.client.exceptions import (
     PyTritonClientInferenceServerError,
     PyTritonClientModelDoesntSupportBatchingError,
+    PyTritonClientTimeoutError,
     PyTritonClientUrlParseError,
     PyTritonClientValueError,
 )
@@ -54,6 +56,7 @@ from pytriton.constants import DEFAULT_GRPC_PORT, DEFAULT_HTTP_PORT
 _LOGGER = logging.getLogger(__name__)
 
 _DEFAULT_INIT_TIMEOUT_S = _DEFAULT_WAIT_FOR_MODEL_TIMEOUT_S
+_DEFAULT_INFERENCE_TIMEOUT_S = 60.0
 _DEFAULT_ASYNC_INIT_TIMEOUT_S = 30.0
 
 _IOType = Union[Tuple[np.ndarray, ...], Dict[str, np.ndarray]]
@@ -89,6 +92,7 @@ class ModelClient:
         *,
         lazy_init: bool = True,
         init_timeout_s: float = _DEFAULT_INIT_TIMEOUT_S,
+        inference_timeout_s: Optional[float] = _DEFAULT_INFERENCE_TIMEOUT_S,
     ):
         """Inits ModelClient for given model deployed on the Triton Inference Server.
 
@@ -111,7 +115,11 @@ class ModelClient:
                 If model_version is None inference on latest model will be performed.
                 The latest versions of the model are numerically the greatest version numbers.
             lazy_init: if initialization should be performed just before sending first request to inference server.
-            init_timeout_s: timeout for server and model being ready.
+            init_timeout_s: timeout for maximum waiting time in loop, which sends retry requests ask if model is ready. It is applied at initialization time only when `lazy_init` argument is False. Default is to do retry loop at first inference.
+            inference_timeout_s: timeout in seconds for the model inference process.
+                If non passed default 60 seconds timeout will be used.
+                For HTTP client it is not only inference timeout but any client request timeout
+                - get model config, is model loaded. For GRPC client it is only inference timeout.
 
         Raises:
             PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
@@ -126,6 +134,7 @@ class ModelClient:
         if not parsed_url.scheme or parsed_url.scheme.lower() not in ["grpc", "http"]:
             _LOGGER.debug(f"Adding http scheme to {url}")
             parsed_url = urllib.parse.urlparse(f"http://{url}")
+        self._scheme = parsed_url.scheme.lower()
 
         port = parsed_url.port or {"grpc": DEFAULT_GRPC_PORT, "http": DEFAULT_HTTP_PORT}[parsed_url.scheme.lower()]
         self._url = f"{parsed_url.hostname}:{port}"
@@ -139,10 +148,14 @@ class ModelClient:
         # This is needed because we are closing client in __exit__ method or in close method.
         # (InferenceClient uses gevent library which does not support closing twice from different threads)
         self._monkey_patch_client()
-        self._client = self._triton_client_lib.InferenceServerClient(self._url)
+
+        self._init_timeout_s = init_timeout_s
+        self._inference_timeout_s = inference_timeout_s
+
+        kwargs = self._get_init_extra_args()
+        self._client = self._triton_client_lib.InferenceServerClient(self._url, **kwargs)
 
         self._request_id_generator = itertools.count(0)
-        self._init_timeout_s = init_timeout_s
         self._model_config = None
         self._model_ready = None
         self._lazy_init = lazy_init
@@ -174,7 +187,22 @@ class ModelClient:
             PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
             KeyboardInterrupt: If hosting process receives SIGINT
         """
-        wait_for_model_ready(self._client, self._model_name, self._model_version, timeout_s=timeout_s)
+        wait_for_model_ready(
+            self._client,
+            self._model_name,
+            self._model_version,
+            init_timeout_s=timeout_s,
+            # Tritonclient doesn't support timeout yet
+            # grpc_network_timeout_s=self._inference_timeout_s,
+        )
+
+    @property
+    def is_batching_supported(self):
+        """Checks if model supports batching.
+
+        Also waits for server to get into readiness state.
+        """
+        return self.model_config.max_batch_size > 0
 
     @property
     def model_config(self):
@@ -183,8 +211,13 @@ class ModelClient:
         Also waits for server to get into readiness state.
         """
         if not self._model_config:
+            kwargs = self._get_model_config_extra_args()
             self._model_config = get_model_config(
-                self._client, self._model_name, self._model_version, timeout_s=self._init_timeout_s
+                self._client,
+                self._model_name,
+                self._model_version,
+                init_timeout_s=self._init_timeout_s,
+                **kwargs,
             )
         return self._model_config
 
@@ -222,24 +255,23 @@ class ModelClient:
             PyTritonClientValueError: if mixing of positional and named arguments passing detected.
             PyTritonClientTimeoutError:
                 in case of first method call, `lazy_init` argument is False
-                and wait time for server and model being ready exceeds `init_timeout_s`
-                or inference time exceeds `timeout_s`.
+                and wait time for server and model being ready exceeds `init_timeout_s` or
+                inference time exceeds `inference_timeout_s` passed to `__init__`.
             PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
-            PyTritonClientInferenceServerError: If error occurred on inference callable or Triton Inference Server side.
+            PyTritonClientInferenceServerError: If error occurred on inference callable or Triton Inference Server side,
         """
         _verify_inputs_args(inputs, named_inputs)
         _verify_parameters(parameters)
         _verify_parameters(headers)
 
-        model_supports_batching = self.model_config.max_batch_size > 0
-        if model_supports_batching:
+        if self.is_batching_supported:
             if inputs:
                 inputs = tuple(data[np.newaxis, ...] for data in inputs)
             elif named_inputs:
                 named_inputs = {name: data[np.newaxis, ...] for name, data in named_inputs.items()}
 
         result = self._infer(inputs or named_inputs, parameters, headers)
-        if model_supports_batching:
+        if self.is_batching_supported:
             result = {name: data[0] for name, data in result.items()}
 
         return result
@@ -278,18 +310,17 @@ class ModelClient:
             PyTritonClientValueError: if mixing of positional and named arguments passing detected.
             PyTritonClientTimeoutError:
                 in case of first method call, `lazy_init` argument is False
-                and wait time for server and model being ready exceeds `init_timeout_s`
-                or inference time exceeds `timeout_s`.
-            PyTritonClientModelDoesntSupportBatchingError: if model doesn't support batching.
+                and wait time for server and model being ready exceeds `init_timeout_s` or
+                inference time exceeds `inference_timeout_s` passed to `__init__`.
             PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
-            PyTritonClientInferenceServerError: If error occurred on inference callable or Triton Inference Server side.
+            PyTritonClientInferenceServerError:
+                If error occurred on inference callable or Triton Inference Server side,
         """
         _verify_inputs_args(inputs, named_inputs)
         _verify_parameters(parameters)
         _verify_parameters(headers)
 
-        model_supports_batching = self.model_config.max_batch_size > 0
-        if not model_supports_batching:
+        if not self.is_batching_supported:
             raise PyTritonClientModelDoesntSupportBatchingError(
                 f"Model {self.model_config.model_name} doesn't support batching - use infer_sample method instead"
             )
@@ -328,9 +359,17 @@ class ModelClient:
         self.wait_for_model(init_timeout_s)
         self._model_ready = True
         timeout_s = max(0.0, should_finish_before_s - time.time())
-        self._model_config = get_model_config(self._client, self._model_name, self._model_version, timeout_s=timeout_s)
+        kwargs = self._get_model_config_extra_args()
+        self._model_config = get_model_config(
+            self._client,
+            self._model_name,
+            self._model_version,
+            init_timeout_s=timeout_s,
+            **kwargs,
+        )
 
     def _infer(self, inputs: _IOType, parameters, headers) -> Dict[str, np.ndarray]:
+
         if self._model_ready:
             self._wait_and_init_model_config(self._init_timeout_s)
 
@@ -360,6 +399,8 @@ class ModelClient:
         ]
 
         try:
+            kwargs = self._get_infer_extra_args()
+            _LOGGER.debug("Sending inference request to Triton Inference Server")
             response = self._client.infer(
                 model_name=self._model_name,
                 model_version=self._model_version or "",
@@ -368,11 +409,23 @@ class ModelClient:
                 outputs=outputs_wrapped,
                 request_id=str(next(self._request_id_generator)),
                 parameters=parameters,
+                **kwargs,
             )
         except tritonclient.utils.InferenceServerException as e:
-            raise PyTritonClientInferenceServerError(
-                f"Error occurred on Triton Inference Server side:\n {e.message()}"
-            ) from e
+            if (
+                "Deadline Exceeded" in e.message()
+            ):  # tritonclient.grpc raises execption with message Deadline Exceeded for timeout
+                message = f"Timeout occurred during inference request. Timeout: {self._inference_timeout_s} s Message: {e.message()}"
+                _LOGGER.error(message)
+                raise PyTritonClientTimeoutError(message) from e
+            else:  # both clients raise tritonclient.utils.InferenceServerException for erros at server side
+                message = f"Error occurred during inference request. Message: {e.message()}"
+                _LOGGER.error(message)
+                raise PyTritonClientInferenceServerError(message) from e
+        except socket.timeout as e:  # tritonclient.http raises socket.timeout for timeout
+            message = f"Timeout occurred during inference request. Timeout: {self._inference_timeout_s} s Message: {e}"
+            _LOGGER.error(message)
+            raise PyTritonClientTimeoutError(message) from e
 
         if isinstance(response, tritonclient.http.InferResult):
             outputs = {
@@ -382,6 +435,48 @@ class ModelClient:
             outputs = {output.name: response.as_numpy(output.name) for output in response.get_response().outputs}
 
         return outputs
+
+    def _get_infer_extra_args(self):
+        if self._scheme == "http":
+            return {}
+        # For the GRPC protocol, the timeout is passed to the infer method as client_timeout
+        # This timeout applies to the whole inference process and each network request
+
+        # The ``infer`` supports also timeout argument for both GRPC and HTTP.
+        # It is applied at server side and supported only for dynamic batching.
+        # However, it is not used here yet and planned for future release
+        kwargs = {"client_timeout": self._inference_timeout_s}
+        return kwargs
+
+    def _get_init_extra_args(self):
+        #  The inference timeout is used for both the HTTP and the GRPC protocols. However,
+        #  the way the timeout is passed to the client differs depending on the protocol.
+        #  For the HTTP protocol, the timeout is set in the ``__init__`` method as ``network_timeout``
+        #  and ``connection_timeout``. For the GRPC protocol, the timeout
+        #  is passed to the infer method as ``client_timeout``.
+        #  Both protocols support timeouts correctly and will raise an exception
+        #  if the network request or the inference process takes longer than the timeout.
+        #  This is a design choice of the underlying tritonclient library.
+
+        if self._scheme != "http":
+            return {}
+
+        kwargs = {
+            # This value sets the maximum time allowed for each network request in both model loading and inference process
+            "network_timeout": self._inference_timeout_s,
+            # This value sets the maximum time allowed for establishing a connection to the server.
+            # We use the inference timeout here instead of the init timeout because the init timeout
+            # is meant for waiting for the model to be ready. The connection timeout should be shorter
+            # than the init timeout because it only checks if connection is established (e.g. correct port)
+            "connection_timeout": self._inference_timeout_s,
+        }
+        return kwargs
+
+    def _get_model_config_extra_args(self):
+        # For the GRPC protocol, the timeout must be passed to the each request as client_timeout
+        # model_config doesn't yet support timeout but it is planned for the future
+        # grpc_network_timeout_s will be used for model_config
+        return {}
 
 
 class FuturesModelClient:
@@ -406,6 +501,7 @@ class FuturesModelClient:
         *,
         max_workers: Optional[int] = None,
         init_timeout_s: float = _DEFAULT_ASYNC_INIT_TIMEOUT_S,
+        inference_timeout_s: Optional[float] = _DEFAULT_INFERENCE_TIMEOUT_S,
     ):
         """Initializes the FuturesModelClient for a given model.
 
@@ -418,6 +514,10 @@ class FuturesModelClient:
                 the given calls. If None, the default value will be used.
             init_timeout_s (float): The timeout for server and model being ready.
                 If None, the default value will be used.
+            inference_timeout_s: timeout in seconds for the model inference process.
+                If non passed default 60 seconds timeout will be used.
+                For HTTP client it is not only inference timeout but any client request timeout
+                - get model config, is model loaded. For GRPC client it is only inference timeout.
         """
         self._url = url
         self._model_name = model_name
@@ -426,6 +526,7 @@ class FuturesModelClient:
         self._lock = threading.Lock()
         self._thread_clients = {}
         self._init_timeout_s = init_timeout_s
+        self._inference_timeout_s = inference_timeout_s
 
     def __enter__(self):
         """Create context for use FuturesModelClient as a context manager."""
@@ -564,6 +665,7 @@ class FuturesModelClient:
                     self._model_version,
                     lazy_init=lazy_init,
                     init_timeout_s=self._init_timeout_s,
+                    inference_timeout_s=self._inference_timeout_s,
                 )
                 self._thread_clients[thread_id] = client
             else:

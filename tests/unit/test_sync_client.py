@@ -79,12 +79,18 @@ ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG = TritonModelConfig(
 _GRPC_LOCALHOST_URL = "grpc://localhost:8001"
 _HTTP_LOCALHOST_URL = "http://localhost:8000"
 
-EXPECTED_KWARGS_DEFAULT = {
+
+EXPECTED_KWARGS_HTTP_DEFAULT = {
     "model_name": ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
     "model_version": "",
     "request_id": "0",
     "parameters": None,
     "headers": None,
+}  # Network timeout is passed to __init__ for client and applied to all network requests for HTTP sync client
+
+EXPECTED_KWARGS_GRPC_DEFAULT = {
+    **dict(EXPECTED_KWARGS_HTTP_DEFAULT.items()),
+    "client_timeout": 60.0,  # Network timeout shall be passed always for GRPC sync client
 }
 
 
@@ -171,7 +177,14 @@ def test_sync_grpc_client_init_obtain_expected_model_config_when_lazy_init_is_di
     client = ModelClient("grpc://localhost:8001", ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name, lazy_init=False)
 
     spy_client_init.assert_called_once_with(client._client, "localhost:8001")
-    spy_get_model_config.assert_called_once_with(ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name, "", as_json=True)
+
+    spy_get_model_config.assert_called_once_with(
+        ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
+        "",
+        as_json=True,
+        # FIXME: GRPC client get_model_config doesn't support client_timeout parameter
+        # client_timeout=60.0,
+    )
     assert client.model_config == ADD_SUB_WITH_BATCHING_MODEL_CONFIG
 
 
@@ -240,7 +253,7 @@ def test_sync_grpc_client_infer_sample_returns_expected_result_when_positional_a
         result = client.infer_sample(a, b)
 
         called_kwargs = mock_infer.call_args.kwargs
-        expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
+        expected_kwargs = dict(EXPECTED_KWARGS_GRPC_DEFAULT)
         expected_kwargs.update(
             {
                 "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
@@ -252,12 +265,11 @@ def test_sync_grpc_client_infer_sample_returns_expected_result_when_positional_a
                 "headers": None,
             }
         )
-        assert all(
-            called_kwargs.get(arg_name) == arg_value
-            for arg_name, arg_value in expected_kwargs.items()
-            if arg_name not in ["inputs", "outputs"]  # inputs and outputs requires manual verification
-        )
-        assert not [key for key in called_kwargs if key not in list(expected_kwargs)]  # no additional kwargs
+        for arg_name, arg_value in expected_kwargs.items():
+            if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
+                assert called_kwargs.get(arg_name) == arg_value
+        for key in called_kwargs:
+            assert key in expected_kwargs
         assert [output.name() for output in called_kwargs.get("outputs")] == list(expected_kwargs["outputs"])
         inputs_called_arg = {i.name(): extract_array_from_grpc_infer_input(i) for i in called_kwargs.get("inputs")}
         verify_equalness_of_dicts_with_ndarray(inputs_called_arg, expected_kwargs["inputs"])
@@ -283,7 +295,7 @@ def test_sync_grpc_client_infer_sample_returns_expected_result_when_infer_on_mod
         result = client.infer_sample(**inputs_dict)
 
         called_kwargs = mock_infer.call_args.kwargs
-        expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
+        expected_kwargs = dict(EXPECTED_KWARGS_GRPC_DEFAULT)
         expected_kwargs.update(
             {
                 "model_name": ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
@@ -292,12 +304,11 @@ def test_sync_grpc_client_infer_sample_returns_expected_result_when_infer_on_mod
                 "outputs": list(expected_result),
             }
         )
-        assert all(
-            called_kwargs.get(arg_name) == arg_value
-            for arg_name, arg_value in expected_kwargs.items()
-            if arg_name not in ["inputs", "outputs"]  # inputs and outputs requires manual verification
-        )
-        assert not [key for key in called_kwargs if key not in list(expected_kwargs)]  # no additional kwargs
+        for arg_name, arg_value in expected_kwargs.items():
+            if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
+                assert called_kwargs.get(arg_name) == arg_value
+        for key in called_kwargs:
+            assert key in expected_kwargs
         assert [output.name() for output in called_kwargs.get("outputs")] == list(expected_kwargs["outputs"])
         inputs_called_arg = {i.name(): extract_array_from_grpc_infer_input(i) for i in called_kwargs.get("inputs")}
         verify_equalness_of_dicts_with_ndarray(inputs_called_arg, expected_kwargs["inputs"])
@@ -322,7 +333,7 @@ def test_sync_grpc_client_infer_sample_returns_expected_result_when_named_args_a
         result = client.infer_sample(**inputs_dict)
 
         called_kwargs = mock_infer.call_args.kwargs
-        expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
+        expected_kwargs = dict(EXPECTED_KWARGS_GRPC_DEFAULT)
         expected_kwargs.update(
             {
                 "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
@@ -330,12 +341,11 @@ def test_sync_grpc_client_infer_sample_returns_expected_result_when_named_args_a
                 "outputs": list(expected_result),
             }
         )
-        assert all(
-            called_kwargs.get(arg_name) == arg_value
-            for arg_name, arg_value in expected_kwargs.items()
-            if arg_name not in ["inputs", "outputs"]  # inputs and outputs requires manual verification
-        )
-        assert not [key for key in called_kwargs if key not in list(expected_kwargs)]  # no additional kwargs
+        for arg_name, arg_value in expected_kwargs.items():
+            if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
+                assert called_kwargs.get(arg_name) == arg_value
+        for key in called_kwargs:
+            assert key in expected_kwargs
         assert [output.name() for output in called_kwargs.get("outputs")] == list(expected_kwargs["outputs"])
         inputs_called_arg = {i.name(): extract_array_from_grpc_infer_input(i) for i in called_kwargs.get("inputs")}
         verify_equalness_of_dicts_with_ndarray(inputs_called_arg, expected_kwargs["inputs"])
@@ -358,19 +368,18 @@ def test_sync_grpc_client_infer_batch_returns_expected_result_when_positional_ar
         result = client.infer_batch(a, b)
 
         called_kwargs = mock_infer.call_args.kwargs
-        expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
+        expected_kwargs = dict(EXPECTED_KWARGS_GRPC_DEFAULT)
         expected_kwargs.update(
             {
                 "inputs": {"a": a, "b": b},
                 "outputs": list(expected_result),
             }
         )
-        assert all(
-            called_kwargs.get(arg_name) == arg_value
-            for arg_name, arg_value in expected_kwargs.items()
-            if arg_name not in ["inputs", "outputs"]  # inputs and outputs requires manual verification
-        )
-        assert not [key for key in called_kwargs if key not in list(expected_kwargs)]  # no additional kwargs
+        for arg_name, arg_value in expected_kwargs.items():
+            if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
+                assert called_kwargs.get(arg_name) == arg_value
+        for key in called_kwargs:
+            assert key in expected_kwargs
         assert [output.name() for output in called_kwargs.get("outputs")] == list(expected_kwargs["outputs"])
         inputs_called_arg = {i.name(): extract_array_from_grpc_infer_input(i) for i in called_kwargs.get("inputs")}
         verify_equalness_of_dicts_with_ndarray(inputs_called_arg, expected_kwargs["inputs"])
@@ -395,19 +404,18 @@ def test_sync_grpc_client_infer_batch_returns_expected_result_when_named_args_ar
         result = client.infer_batch(**inputs_dict)
 
         called_kwargs = mock_infer.call_args.kwargs
-        expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
+        expected_kwargs = dict(EXPECTED_KWARGS_GRPC_DEFAULT)
         expected_kwargs.update(
             {
                 "inputs": inputs_dict,
                 "outputs": list(expected_result),
             }
         )
-        assert all(
-            called_kwargs.get(arg_name) == arg_value
-            for arg_name, arg_value in expected_kwargs.items()
-            if arg_name not in ["inputs", "outputs"]  # inputs and outputs requires manual verification
-        )
-        assert not [key for key in called_kwargs if key not in list(expected_kwargs)]  # no additional kwargs
+        for arg_name, arg_value in expected_kwargs.items():
+            if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
+                assert called_kwargs.get(arg_name) == arg_value
+        for key in called_kwargs:
+            assert key in expected_kwargs
         assert [output.name() for output in called_kwargs.get("outputs")] == list(expected_kwargs["outputs"])
         inputs_called_arg = {i.name(): extract_array_from_grpc_infer_input(i) for i in called_kwargs.get("inputs")}
         verify_equalness_of_dicts_with_ndarray(inputs_called_arg, expected_kwargs["inputs"])
@@ -469,7 +477,9 @@ def test_sync_http_client_init_obtain_expected_model_config_when_lazy_init_is_di
     spy_client_init = mocker.spy(tritonclient.http.InferenceServerClient, "__init__")
     client = ModelClient("http://localhost:8000", ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name, lazy_init=False)
 
-    spy_client_init.assert_called_once_with(client._client, "localhost:8000")
+    spy_client_init.assert_called_once_with(
+        client._client, "localhost:8000", network_timeout=60.0, connection_timeout=60.0
+    )
     assert client.model_config == ADD_SUB_WITH_BATCHING_MODEL_CONFIG
 
 
@@ -545,7 +555,7 @@ def test_sync_http_client_infer_sample_returns_expected_result_when_infer_on_mod
         result = client.infer_sample(a, b)
 
         called_kwargs = mock_infer.call_args.kwargs
-        expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
+        expected_kwargs = dict(EXPECTED_KWARGS_HTTP_DEFAULT)
         expected_kwargs.update(
             {
                 # expect to send data with additional batch axis
@@ -553,12 +563,11 @@ def test_sync_http_client_infer_sample_returns_expected_result_when_infer_on_mod
                 "outputs": list(expected_result),
             }
         )
-        assert all(
-            called_kwargs.get(arg_name) == arg_value
-            for arg_name, arg_value in expected_kwargs.items()
-            if arg_name not in ["inputs", "outputs"]  # inputs and outputs requires manual verification
-        )
-        assert not [key for key in called_kwargs if key not in list(expected_kwargs)]  # no additional kwargs
+        for arg_name, arg_value in expected_kwargs.items():
+            if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
+                assert called_kwargs.get(arg_name) == arg_value
+        for key in called_kwargs:
+            assert key in expected_kwargs
         assert [output.name() for output in called_kwargs.get("outputs")] == list(expected_kwargs["outputs"])
         inputs_called_arg = {i.name(): extract_array_from_http_infer_input(i) for i in called_kwargs.get("inputs")}
         verify_equalness_of_dicts_with_ndarray(inputs_called_arg, expected_kwargs["inputs"])
@@ -581,7 +590,7 @@ def test_sync_http_client_infer_sample_returns_expected_result_when_positional_a
         result = client.infer_sample(a, b)
 
         called_kwargs = mock_infer.call_args.kwargs
-        expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
+        expected_kwargs = dict(EXPECTED_KWARGS_HTTP_DEFAULT)
         expected_kwargs.update(
             {
                 "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
@@ -589,12 +598,11 @@ def test_sync_http_client_infer_sample_returns_expected_result_when_positional_a
                 "outputs": list(expected_result),
             }
         )
-        assert all(
-            called_kwargs.get(arg_name) == arg_value
-            for arg_name, arg_value in expected_kwargs.items()
-            if arg_name not in ["inputs", "outputs"]  # inputs and outputs requires manual verification
-        )
-        assert not [key for key in called_kwargs if key not in list(expected_kwargs)]  # no additional kwargs
+        for arg_name, arg_value in expected_kwargs.items():
+            if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
+                assert called_kwargs.get(arg_name) == arg_value
+        for key in called_kwargs:
+            assert key in expected_kwargs
         assert [output.name() for output in called_kwargs.get("outputs")] == list(expected_kwargs["outputs"])
         inputs_called_arg = {i.name(): extract_array_from_http_infer_input(i) for i in called_kwargs.get("inputs")}
         verify_equalness_of_dicts_with_ndarray(inputs_called_arg, expected_kwargs["inputs"])
@@ -619,7 +627,7 @@ def test_sync_http_client_infer_sample_returns_expected_result_when_named_args_a
         result = client.infer_sample(**inputs_dict)
 
         called_kwargs = mock_infer.call_args.kwargs
-        expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
+        expected_kwargs = dict(EXPECTED_KWARGS_HTTP_DEFAULT)
         expected_kwargs.update(
             {
                 "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
@@ -627,12 +635,11 @@ def test_sync_http_client_infer_sample_returns_expected_result_when_named_args_a
                 "outputs": list(expected_result),
             }
         )
-        assert all(
-            called_kwargs.get(arg_name) == arg_value
-            for arg_name, arg_value in expected_kwargs.items()
-            if arg_name not in ["inputs", "outputs"]  # inputs and outputs requires manual verification
-        )
-        assert not [key for key in called_kwargs if key not in list(expected_kwargs)]  # no additional kwargs
+        for arg_name, arg_value in expected_kwargs.items():
+            if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
+                assert called_kwargs.get(arg_name) == arg_value
+        for key in called_kwargs:
+            assert key in expected_kwargs
         assert [output.name() for output in called_kwargs.get("outputs")] == list(expected_kwargs["outputs"])
         inputs_called_arg = {i.name(): extract_array_from_http_infer_input(i) for i in called_kwargs.get("inputs")}
         verify_equalness_of_dicts_with_ndarray(inputs_called_arg, expected_kwargs["inputs"])
@@ -655,19 +662,18 @@ def test_sync_http_client_infer_batch_returns_expected_result_when_positional_ar
         result = client.infer_batch(a, b)
 
         called_kwargs = mock_infer.call_args.kwargs
-        expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
+        expected_kwargs = dict(EXPECTED_KWARGS_HTTP_DEFAULT)
         expected_kwargs.update(
             {
                 "inputs": {"a": a, "b": b},
                 "outputs": list(expected_result),
             }
         )
-        assert all(
-            called_kwargs.get(arg_name) == arg_value
-            for arg_name, arg_value in expected_kwargs.items()
-            if arg_name not in ["inputs", "outputs"]  # inputs and outputs requires manual verification
-        )
-        assert not [key for key in called_kwargs if key not in list(expected_kwargs)]  # no additional kwargs
+        for arg_name, arg_value in expected_kwargs.items():
+            if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
+                assert called_kwargs.get(arg_name) == arg_value
+        for key in called_kwargs:
+            assert key in expected_kwargs
         assert [output.name() for output in called_kwargs.get("outputs")] == list(expected_kwargs["outputs"])
         inputs_called_arg = {i.name(): extract_array_from_http_infer_input(i) for i in called_kwargs.get("inputs")}
         verify_equalness_of_dicts_with_ndarray(inputs_called_arg, expected_kwargs["inputs"])
@@ -692,19 +698,18 @@ def test_sync_http_client_infer_batch_returns_expected_result_when_named_args_ar
         result = client.infer_batch(**inputs_dict)
 
         called_kwargs = mock_infer.call_args.kwargs
-        expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
+        expected_kwargs = dict(EXPECTED_KWARGS_HTTP_DEFAULT)
         expected_kwargs.update(
             {
                 "inputs": inputs_dict,
                 "outputs": list(expected_result),
             }
         )
-        assert all(
-            called_kwargs.get(arg_name) == arg_value
-            for arg_name, arg_value in expected_kwargs.items()
-            if arg_name not in ["inputs", "outputs"]  # inputs and outputs requires manual verification
-        )
-        assert not [key for key in called_kwargs if key not in list(expected_kwargs)]  # no additional kwargs
+        for arg_name, arg_value in expected_kwargs.items():
+            if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
+                assert called_kwargs.get(arg_name) == arg_value
+        for key in called_kwargs:
+            assert key in expected_kwargs
         assert [output.name() for output in called_kwargs.get("outputs")] == list(expected_kwargs["outputs"])
         inputs_called_arg = {i.name(): extract_array_from_http_infer_input(i) for i in called_kwargs.get("inputs")}
         verify_equalness_of_dicts_with_ndarray(inputs_called_arg, expected_kwargs["inputs"])
@@ -771,3 +776,25 @@ def test_del_of_inference_client_does_not_raise_error():
 
     _create_client_and_delete()
     gc.collect()
+
+
+@pytest.mark.timeout(0.3)
+def test_init_http_passes_timeout(mocker):
+    with ModelClient("http://localhost:6669", "dummy", init_timeout_s=0.2, inference_timeout_s=0.1) as client:
+        with pytest.raises(PyTritonClientTimeoutError):
+            client.wait_for_model(timeout_s=0.2).result()
+
+
+@pytest.mark.timeout(0.3)
+@pytest.mark.xfail(reason="GRPC triton client doesn't support timeout for is_server_ready and is_server_live functions")
+def test_init_grpc_passes_timeout_03(mocker):
+    with ModelClient("grpc://localhost:6669", "dummy", init_timeout_s=0.2, inference_timeout_s=0.1) as client:
+        with pytest.raises(PyTritonClientTimeoutError):
+            client.wait_for_model(timeout_s=0.2).result()
+
+
+@pytest.mark.timeout(1.0)
+def test_init_grpc_passes_timeout_10(mocker):
+    with ModelClient("grpc://localhost:6669", "dummy", init_timeout_s=0.2, inference_timeout_s=0.1) as client:
+        with pytest.raises(PyTritonClientTimeoutError):
+            client.wait_for_model(timeout_s=0.2).result()

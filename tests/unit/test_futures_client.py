@@ -21,7 +21,7 @@ import pytest
 from tritonclient.grpc import InferenceServerClient as GrpcInferenceServerClient
 
 from pytriton.client import FuturesModelClient, ModelClient
-from pytriton.client.exceptions import PyTritonClientUrlParseError, PyTritonClientValueError
+from pytriton.client.exceptions import PyTritonClientTimeoutError, PyTritonClientUrlParseError, PyTritonClientValueError
 from pytriton.model_config import DeviceKind
 from pytriton.model_config.generator import ModelConfigGenerator
 from pytriton.model_config.triton_model_config import TensorSpec, TritonModelConfig
@@ -320,3 +320,31 @@ def test_infer_batch_dict_passed_arguments_returns_arguments(mocker):
         return_value = client.infer_batch(a=a, b=b).result()
         assert return_value == ret
         patch_client_infer_batch.assert_called_once_with(parameters=None, headers=None, a=a, b=b)
+
+
+@pytest.mark.timeout(0.3)
+def test_init_http_passes_timeout(mocker):
+    with FuturesModelClient("http://localhost:6669", "dummy", init_timeout_s=0.2, inference_timeout_s=0.1) as client:
+        with pytest.raises(PyTritonClientTimeoutError):
+            client.wait_for_model(timeout_s=0.2).result()
+        assert list(client._thread_clients.values())[0]._init_timeout_s == 0.2
+        assert list(client._thread_clients.values())[0]._inference_timeout_s == 0.1
+
+
+@pytest.mark.xfail(reason="GRPC triton client doesn't support timeout for is_server_ready and is_server_live functions")
+@pytest.mark.timeout(0.3)
+def test_init_grpc_passes_timeout_03(mocker):
+    with FuturesModelClient("grpc://localhost:6669", "dummy", init_timeout_s=0.2, inference_timeout_s=0.1) as client:
+        with pytest.raises(PyTritonClientTimeoutError):
+            client.wait_for_model(timeout_s=0.2).result()
+        assert list(client._thread_clients.values())[0]._init_timeout_s == 0.2
+        assert list(client._thread_clients.values())[0]._inference_timeout_s == 0.1
+
+
+@pytest.mark.timeout(1.0)
+def test_init_grpc_passes_timeout_10(mocker):
+    with FuturesModelClient("grpc://localhost:6669", "dummy", init_timeout_s=0.2, inference_timeout_s=0.1) as client:
+        with pytest.raises(PyTritonClientTimeoutError):
+            client.wait_for_model(timeout_s=0.2).result()
+        assert list(client._thread_clients.values())[0]._init_timeout_s == 0.2
+        assert list(client._thread_clients.values())[0]._inference_timeout_s == 0.1
