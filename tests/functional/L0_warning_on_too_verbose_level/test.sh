@@ -15,7 +15,10 @@
 
 set -xe
 
-THIS_SCRIPT_DIR="$(realpath --relative-to="${PWD}" "$(dirname "$0")")"
+THIS_SCRIPT_PATH="$(realpath --relative-to="$(pwd)" "$0")"
+TEST_MODULE="$(dirname "${THIS_SCRIPT_PATH}"|sed 's/\//./g').test"
 
-pip install pytest-timeout numpy
-python3 $THIS_SCRIPT_DIR/test.py --verbose
+python -m"${TEST_MODULE}" \
+    --init-timeout-s 300 \
+    --shutdown-timeout-s 60 \
+    --verbose

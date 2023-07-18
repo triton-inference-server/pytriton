@@ -45,6 +45,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Union
 import typing_inspect
 
 from pytriton.client import ModelClient
+from pytriton.client.utils import create_client_from_url, wait_for_server_ready
 from pytriton.decorators import TritonContext
 from pytriton.exceptions import PyTritonValidationError
 from pytriton.model_config.tensor import Tensor
@@ -258,6 +259,48 @@ class TritonConfig:
         return cls(**config_with_casted_values)
 
 
+class _LogLevelChecker:
+    """Check if log level is too verbose."""
+
+    def __init__(self, url: str) -> None:
+        """Initialize LogLevelChecker.
+
+        Args:
+            url: Triton Inference Server URL in form of <scheme>://<host>:<port>
+
+        Raises:
+            PyTritonClientInvalidUrlError: if url is invalid
+        """
+        self._client = create_client_from_url(url)
+        self._log_settings = None
+
+    def check(self, skip_update: bool = False):
+        """Check if log level is too verbose.
+
+        Also obtains wait for server is ready + log settings from server if not already obtained.
+
+        Raises:
+            PyTritonClientTimeoutError: if timeout is reached
+        """
+        if self._log_settings is None and not skip_update:
+            wait_for_server_ready(self._client)
+            self._log_settings = self._client.get_log_settings()
+
+        if self._log_settings is not None:
+            log_settings = self._log_settings
+            if hasattr(log_settings, "settings"):  # grpc client
+                log_settings = log_settings.settings
+                log_settings = {key: value.string_param for key, value in log_settings.items()}
+            else:  # http client
+                log_settings = {key: str(value) for key, value in log_settings.items()}
+            log_verbose_level = int(log_settings.get("log_verbose_level", 0)) if log_settings is not None else 0
+            if log_verbose_level > 0:
+                LOGGER.warning(
+                    f"Triton Inference Server is running with enabled verbose logs (log_verbose_level={log_verbose_level}). "
+                    "It may affect inference performance."
+                )
+
+
 class Triton:
     """Triton Inference Server for Python models."""
 
@@ -332,6 +375,12 @@ class Triton:
             self._stopped = True
 
         self.triton_context = TritonContext()
+        url = (
+            self._triton_server.get_endpoint("http")
+            if (self._config.allow_http is None or self._config.allow_http)
+            else self._triton_server.get_endpoint("grpc")
+        )
+        self._log_level_checker = _LogLevelChecker(url)
 
     def __enter__(self) -> "Triton":
         """Enter the context.
@@ -377,6 +426,7 @@ class Triton:
         with self._cv:
             self._cv.notify_all()
         LOGGER.debug("Stopped Triton Inference server and proxy backends")
+        self._log_level_checker.check(skip_update=True)
 
     def serve(self, monitoring_period_sec: int = MONITORING_PERIOD_SEC) -> None:
         """Run Triton Inference Server and lock thread for serving requests/response.
@@ -464,11 +514,15 @@ class Triton:
         """Log loaded models in console to show the available endpoints."""
         endpoint = "http" if self._config.allow_http in [True, None] else "grpc"
         server_url = self._triton_server.get_endpoint(endpoint)
+
+        self._log_level_checker.check()
+
         for model in self._model_manager.models:
             with ModelClient(
                 url=server_url, model_name=model.model_name, model_version=str(model.model_version)
             ) as client:
                 client.wait_for_model(timeout_s=120)
+
             LOGGER.info(f"Infer function available as model: `{MODEL_URL.format(model_name=model.model_name)}`")
             LOGGER.info(f"  Status:         `GET  {MODEL_READY_URL.format(model_name=model.model_name)}`")
             LOGGER.info(f"  Model config:   `GET  {MODEL_CONFIG_URL.format(model_name=model.model_name)}`")

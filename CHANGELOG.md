@@ -22,6 +22,7 @@ limitations under the License.
 - Renamed `PyTritonClientUrlParseError` to `PyTritonClientInvalidUrlError`
 - `ModelClient` and `FuturesModelClient` methods raise `PyTritonClientClosedError` when used after client is closed
 - Pinned tritonclient dependency due to issues with tritonclient >= 2.34 on systems with glibc version lower than 2.34
+- Added warning after Triton Server setup and teardown while using too verbose logging level as it may cause a significant performance drop in model inference
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 

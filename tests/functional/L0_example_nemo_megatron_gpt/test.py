@@ -24,6 +24,7 @@ from tests.utils import (
     DEFAULT_LOG_FORMAT,
     ScriptThread,
     get_current_container_version,
+    search_warning_on_too_verbose_log_level,
     verify_docker_image_in_readme_same_as_tested,
 )
 
@@ -83,6 +84,7 @@ def main():
         sys.exit(-2)
 
     verify_client_output(client_thread.output)
+    assert not search_warning_on_too_verbose_log_level(server_thread.output)
 
 
 if __name__ == "__main__":

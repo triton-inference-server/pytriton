@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,10 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-set -xe
-
-THIS_SCRIPT_DIR="$(realpath --relative-to="${PWD}" "$(dirname "$0")")"
-
-pip install pytest-timeout numpy
-python3 $THIS_SCRIPT_DIR/test.py --verbose

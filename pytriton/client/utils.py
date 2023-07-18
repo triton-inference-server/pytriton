@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -220,7 +220,7 @@ def wait_for_server_ready(
             _LOGGER.warning(f"Exception while checking server readiness: {e}")
             return False
         except (RpcError, ConnectionError, socket.gaierror) as e:  # GRPC and HTTP clients raises these errors
-            _LOGGER.warning(f"Exception while checking server readiness: {e}")
+            _LOGGER.debug(f"Exception while checking server readiness: {e}")
             return False
         except Exception as e:
             _LOGGER.exception(f"Exception while checking server readiness: {e}")
@@ -354,12 +354,12 @@ def create_client_from_url(url: str, network_timeout_s: Optional[float] = None) 
     if scheme == "grpc":
         # by default grpc client has very large number of timeout, thus we want to make it equal to http client timeout
         network_timeout_s = _DEFAULT_NETWORK_TIMEOUT_S if network_timeout_s is None else network_timeout_s
-
-    triton_client_init_kwargs = {}
-    if network_timeout_s is not None:
         _LOGGER.warning(
             f"tritonclient.grpc doesn't support timeout for other commands than infer. Ignoring network_timeout: {network_timeout_s}."
         )
+
+    triton_client_init_kwargs = {}
+    if network_timeout_s is not None:
         triton_client_init_kwargs.update(
             **{
                 "grpc": {},
