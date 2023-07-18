@@ -21,6 +21,7 @@ limitations under the License.
 - Added `inference_timeout_s` parameters to client classes
 - Renamed `PyTritonClientUrlParseError` to `PyTritonClientInvalidUrlError`
 - `ModelClient` and `FuturesModelClient` methods raise `PyTritonClientClosedError` when used after client is closed
+- Pinned tritonclient dependency due to issues with tritonclient >= 2.34 on systems with glibc version lower than 2.34
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 
