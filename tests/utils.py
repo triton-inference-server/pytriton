@@ -186,7 +186,6 @@ class ProcessMonitoring:
 
         self._logger.info("==== Dump process info (with its children)")
         for process in [self._process] + self.children:
-
             try:
                 self._logger.info(f"{process} parent={process.parent()} ")
             except psutil.NoSuchProcess:

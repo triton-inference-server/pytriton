@@ -15,9 +15,7 @@
 """Test of network timeouts with pytest"""
 
 import logging
-import socket
 import time
-from contextlib import closing
 
 import numpy as np
 import pytest
@@ -27,6 +25,7 @@ from pytriton.client.exceptions import PyTritonClientInferenceServerError, PyTri
 from pytriton.decorators import batch
 from pytriton.model_config import ModelConfig, Tensor
 from pytriton.triton import Triton, TritonConfig
+from tests.utils import find_free_port
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,16 +35,6 @@ _LARGE_TIMEOUT = 1.5
 _TEST_TIMEOUT = 25.0
 _GARGANTUAN_TIMEOUT = 10.0
 _WRONG_TIMEOUT = -1.0
-
-
-def find_free_ports():
-    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-        s.bind(("", 0))
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s2:
-            s2.bind(("", 0))
-            s2.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            return s.getsockname()[1], s2.getsockname()[1]
 
 
 # Define a fixture to start and stop the Triton server with the Sleeper model
@@ -139,7 +128,8 @@ def triton_server():
                 time.sleep(_SMALL_TIMEOUT)
             _LOGGER.info("Triton server stopped.")
 
-    grpc_port, http_port = find_free_ports()
+    grpc_port = find_free_port()
+    http_port = find_free_port()
     _LOGGER.debug(f"Using ports: grpc={grpc_port}, http={http_port}")
     with TritonInstance(
         grpc_port=grpc_port, http_port=http_port, model_name="Sleeper", infer_function=_infer_fn

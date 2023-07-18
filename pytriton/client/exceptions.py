@@ -50,8 +50,8 @@ class PyTritonClientValueError(PyTritonClientError):
     pass
 
 
-class PyTritonClientUrlParseError(PyTritonClientValueError):
-    """Error raised on problems with parsing Triton Inference Server url."""
+class PyTritonClientInvalidUrlError(PyTritonClientValueError):
+    """Error raised when provided Triton Inference Server url is invalid."""
 
     pass
 
@@ -64,6 +64,12 @@ class PyTritonClientTimeoutError(PyTritonClientError):
 
 class PyTritonClientModelUnavailableError(PyTritonClientError):
     """Model with given name and version is unavailable on the given Triton Inference Server."""
+
+    pass
+
+
+class PyTritonClientClosedError(PyTritonClientError):
+    """Error raised in case of trying to use closed client."""
 
     pass
 

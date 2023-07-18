@@ -11,20 +11,29 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
 import logging
 import sys
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import pytest
-from tritonclient.grpc import InferenceServerClient as GrpcInferenceServerClient
 
 from pytriton.client import FuturesModelClient, ModelClient
-from pytriton.client.exceptions import PyTritonClientTimeoutError, PyTritonClientUrlParseError, PyTritonClientValueError
+from pytriton.client.exceptions import (
+    PyTritonClientClosedError,
+    PyTritonClientInvalidUrlError,
+    PyTritonClientTimeoutError,
+    PyTritonClientValueError,
+)
 from pytriton.model_config import DeviceKind
-from pytriton.model_config.generator import ModelConfigGenerator
 from pytriton.model_config.triton_model_config import TensorSpec, TritonModelConfig
+
+from .utils import (
+    patch_grpc_client__model_up_and_ready,
+    patch_grpc_client__server_up_and_ready,
+    patch_http_client__model_up_and_ready,
+    patch_http_client__server_up_and_ready,
+)
 
 logging.basicConfig(level=logging.DEBUG)
 LOGGER = logging.getLogger("test_sync_client")
@@ -62,55 +71,18 @@ ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG = TritonModelConfig(
 )
 
 _GRPC_LOCALHOST_URL = "grpc://localhost:8001"
-
-
-def _patch_grpc_client__server_up_and_ready(mocker):
-    mocker.patch.object(
-        GrpcInferenceServerClient, GrpcInferenceServerClient.is_server_ready.__name__
-    ).return_value = True
-    mocker.patch.object(
-        GrpcInferenceServerClient, GrpcInferenceServerClient.is_server_live.__name__
-    ).return_value = True
-
-
-def _patch_grpc_client__model_up_and_ready(mocker, model_config: TritonModelConfig):
-    from google.protobuf import json_format  # pytype: disable=pyi-error
-    from tritonclient.grpc import model_config_pb2, service_pb2  # pytype: disable=pyi-error
-
-    mock_get_repo_index = mocker.patch.object(
-        GrpcInferenceServerClient, GrpcInferenceServerClient.get_model_repository_index.__name__
-    )
-    mock_get_repo_index.return_value = service_pb2.RepositoryIndexResponse(
-        models=[
-            service_pb2.RepositoryIndexResponse.ModelIndex(
-                name=model_config.model_name, version="1", state="READY", reason=""
-            ),
-        ]
-    )
-
-    mocker.patch.object(
-        GrpcInferenceServerClient, GrpcInferenceServerClient.is_model_ready.__name__
-    ).return_value = True
-
-    model_config_dict = ModelConfigGenerator(model_config).get_config()
-    model_config_protobuf = json_format.ParseDict(model_config_dict, model_config_pb2.ModelConfig())
-    response = service_pb2.ModelConfigResponse(config=model_config_protobuf)
-    response_dict = json.loads(json_format.MessageToJson(response, preserving_proto_field_name=True))
-    mock_get_model_config = mocker.patch.object(
-        GrpcInferenceServerClient, GrpcInferenceServerClient.get_model_config.__name__
-    )
-    mock_get_model_config.return_value = response_dict
+_HTTP_LOCALHOST_URL = "http://localhost:8000"
 
 
 def test_wait_for_model_raise_error_when_invalid_url_provided():
-    with pytest.raises(PyTritonClientUrlParseError, match="Could not parse url"):
+    with pytest.raises(PyTritonClientInvalidUrlError, match="Invalid url"):
         client = FuturesModelClient(["localhost:8001"], "dummy")  # pytype: disable=wrong-arg-types
-        client.wait_for_model().result()
+        client.wait_for_model(timeout_s=0.1).result()
 
 
 def test_wait_for_model_passes_timeout_to_client(mocker):
-    _patch_grpc_client__server_up_and_ready(mocker)
-    _patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
+    patch_grpc_client__server_up_and_ready(mocker)
+    patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
 
     spy_client_close = mocker.spy(ModelClient, ModelClient.close.__name__)
     mock_client_wait_for_model = mocker.patch.object(ModelClient, ModelClient.wait_for_model.__name__)
@@ -133,8 +105,8 @@ def test_wait_for_model_passes_timeout_to_client(mocker):
 
 
 def test_init_passes_max_workers_to_thread_pool_executor(mocker):
-    _patch_grpc_client__server_up_and_ready(mocker)
-    _patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
+    patch_grpc_client__server_up_and_ready(mocker)
+    patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
 
     # Disable sync client exit
     mock_client = mocker.patch.object(ModelClient, ModelClient.__exit__.__name__)
@@ -154,8 +126,8 @@ def test_init_passes_max_workers_to_thread_pool_executor(mocker):
 
 
 def test_infer_raises_error_when_mixed_args_convention_used(mocker):
-    _patch_grpc_client__server_up_and_ready(mocker)
-    _patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
+    patch_grpc_client__server_up_and_ready(mocker)
+    patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
 
     a = np.array([1], dtype=np.float32)
     b = np.array([1], dtype=np.float32)
@@ -169,7 +141,6 @@ def test_infer_raises_error_when_mixed_args_convention_used(mocker):
             PyTritonClientValueError,
             match="Use either positional either keyword method arguments convention",
         ):
-
             client.infer_sample(a, b=b).result()
 
     with FuturesModelClient(_GRPC_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
@@ -181,8 +152,8 @@ def test_infer_raises_error_when_mixed_args_convention_used(mocker):
 
 
 def test_infer_sample_returns_values_creates_client(mocker):
-    _patch_grpc_client__server_up_and_ready(mocker)
-    _patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
+    patch_grpc_client__server_up_and_ready(mocker)
+    patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
 
     a = np.array([1], dtype=np.float32)
     b = np.array([2], dtype=np.float32)
@@ -207,8 +178,8 @@ def test_infer_sample_returns_values_creates_client(mocker):
 
 
 def test_infer_sample_returns_values_creates_client_close_wait(mocker):
-    _patch_grpc_client__server_up_and_ready(mocker)
-    _patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
+    patch_grpc_client__server_up_and_ready(mocker)
+    patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
 
     a = np.array([1], dtype=np.float32)
     b = np.array([2], dtype=np.float32)
@@ -234,8 +205,8 @@ def test_infer_sample_returns_values_creates_client_close_wait(mocker):
 
 
 def test_infer_batch_returns_values_creates_client(mocker):
-    _patch_grpc_client__server_up_and_ready(mocker)
-    _patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
+    patch_grpc_client__server_up_and_ready(mocker)
+    patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
 
     a = np.array([1], dtype=np.float32)
     b = np.array([2], dtype=np.float32)
@@ -256,8 +227,8 @@ def test_infer_batch_returns_values_creates_client(mocker):
 
 
 def test_infer_sample_list_passed_arguments_returns_arguments(mocker):
-    _patch_grpc_client__server_up_and_ready(mocker)
-    _patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
+    patch_grpc_client__server_up_and_ready(mocker)
+    patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
 
     a = np.array([1], dtype=np.float32)
     b = np.array([2], dtype=np.float32)
@@ -266,15 +237,14 @@ def test_infer_sample_list_passed_arguments_returns_arguments(mocker):
     patch_client_infer_sample = mocker.patch.object(ModelClient, ModelClient.infer_sample.__name__)
     patch_client_infer_sample.return_value = ret
     with FuturesModelClient(_GRPC_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
-
         return_value = client.infer_sample(a, b).result()
         assert return_value == ret
         patch_client_infer_sample.assert_called_once_with(a, b, parameters=None, headers=None)
 
 
 def test_infer_sample_dict_passed_arguments_returns_arguments(mocker):
-    _patch_grpc_client__server_up_and_ready(mocker)
-    _patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
+    patch_grpc_client__server_up_and_ready(mocker)
+    patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
 
     a = np.array([1], dtype=np.float32)
     b = np.array([2], dtype=np.float32)
@@ -283,15 +253,14 @@ def test_infer_sample_dict_passed_arguments_returns_arguments(mocker):
     patch_client_infer_sample = mocker.patch.object(ModelClient, ModelClient.infer_sample.__name__)
     patch_client_infer_sample.return_value = ret
     with FuturesModelClient(_GRPC_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
-
         return_value = client.infer_sample(a=a, b=b).result()
         assert return_value == ret
         patch_client_infer_sample.assert_called_once_with(a=a, b=b, parameters=None, headers=None)
 
 
 def test_infer_batch_list_passed_arguments_returns_arguments(mocker):
-    _patch_grpc_client__server_up_and_ready(mocker)
-    _patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
+    patch_grpc_client__server_up_and_ready(mocker)
+    patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
 
     a = np.array([1], dtype=np.float32)
     b = np.array([2], dtype=np.float32)
@@ -306,8 +275,8 @@ def test_infer_batch_list_passed_arguments_returns_arguments(mocker):
 
 
 def test_infer_batch_dict_passed_arguments_returns_arguments(mocker):
-    _patch_grpc_client__server_up_and_ready(mocker)
-    _patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
+    patch_grpc_client__server_up_and_ready(mocker)
+    patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
 
     a = np.array([1], dtype=np.float32)
     b = np.array([2], dtype=np.float32)
@@ -316,7 +285,6 @@ def test_infer_batch_dict_passed_arguments_returns_arguments(mocker):
     patch_client_infer_batch = mocker.patch.object(ModelClient, ModelClient.infer_batch.__name__)
     patch_client_infer_batch.return_value = ret
     with FuturesModelClient(_GRPC_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
-
         return_value = client.infer_batch(a=a, b=b).result()
         assert return_value == ret
         patch_client_infer_batch.assert_called_once_with(parameters=None, headers=None, a=a, b=b)
@@ -327,24 +295,52 @@ def test_init_http_passes_timeout(mocker):
     with FuturesModelClient("http://localhost:6669", "dummy", init_timeout_s=0.2, inference_timeout_s=0.1) as client:
         with pytest.raises(PyTritonClientTimeoutError):
             client.wait_for_model(timeout_s=0.2).result()
-        assert list(client._thread_clients.values())[0]._init_timeout_s == 0.2
-        assert list(client._thread_clients.values())[0]._inference_timeout_s == 0.1
+        one_of_model_clients = list(client._thread_clients.values())[0]
+        assert one_of_model_clients._init_timeout_s == 0.2
+        assert one_of_model_clients._inference_timeout_s == 0.1
 
 
-@pytest.mark.xfail(reason="GRPC triton client doesn't support timeout for is_server_ready and is_server_live functions")
 @pytest.mark.timeout(0.3)
 def test_init_grpc_passes_timeout_03(mocker):
     with FuturesModelClient("grpc://localhost:6669", "dummy", init_timeout_s=0.2, inference_timeout_s=0.1) as client:
         with pytest.raises(PyTritonClientTimeoutError):
             client.wait_for_model(timeout_s=0.2).result()
-        assert list(client._thread_clients.values())[0]._init_timeout_s == 0.2
-        assert list(client._thread_clients.values())[0]._inference_timeout_s == 0.1
+        one_of_model_clients = list(client._thread_clients.values())[0]
+        assert one_of_model_clients._init_timeout_s == 0.2
+        assert one_of_model_clients._inference_timeout_s == 0.1
 
 
-@pytest.mark.timeout(1.0)
-def test_init_grpc_passes_timeout_10(mocker):
-    with FuturesModelClient("grpc://localhost:6669", "dummy", init_timeout_s=0.2, inference_timeout_s=0.1) as client:
-        with pytest.raises(PyTritonClientTimeoutError):
-            client.wait_for_model(timeout_s=0.2).result()
-        assert list(client._thread_clients.values())[0]._init_timeout_s == 0.2
-        assert list(client._thread_clients.values())[0]._inference_timeout_s == 0.1
+def test_http_client_raises_error_when_used_after_close(mocker):
+    patch_http_client__server_up_and_ready(mocker)
+    patch_http_client__model_up_and_ready(mocker, ADD_SUB_WITH_BATCHING_MODEL_CONFIG)
+
+    with ModelClient(_HTTP_LOCALHOST_URL, "dummy") as client:
+        pass
+
+    with pytest.raises(PyTritonClientClosedError):
+        client.wait_for_model(timeout_s=0.2)
+
+    a = np.array([1], dtype=np.float32)
+    with pytest.raises(PyTritonClientClosedError):
+        client.infer_sample(a=a)
+
+    with pytest.raises(PyTritonClientClosedError):
+        client.infer_batch(a=[a])
+
+
+def test_grpc_client_raises_error_when_used_after_close(mocker):
+    patch_grpc_client__server_up_and_ready(mocker)
+    patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITH_BATCHING_MODEL_CONFIG)
+
+    with FuturesModelClient(_GRPC_LOCALHOST_URL, "dummy") as client:
+        pass
+
+    with pytest.raises(PyTritonClientClosedError):
+        client.wait_for_model(timeout_s=0.2).result()
+
+    a = np.array([1], dtype=np.float32)
+    with pytest.raises(PyTritonClientClosedError):
+        client.infer_sample(a=a).result()
+
+    with pytest.raises(PyTritonClientClosedError):
+        client.infer_batch(a=[a]).result()

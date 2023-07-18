@@ -18,6 +18,10 @@ limitations under the License.
 
 ## Unreleased
 
+- Added `inference_timeout_s` parameters to client classes
+- Renamed `PyTritonClientUrlParseError` to `PyTritonClientInvalidUrlError`
+- `ModelClient` and `FuturesModelClient` methods raise `PyTritonClientClosedError` when used after client is closed
+
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 
 - Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.33.0](https://github.com/triton-inference-server/server/releases/tag/v2.33.0)
