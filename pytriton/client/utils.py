@@ -178,7 +178,10 @@ def get_model_config(
 def _warn_on_too_big_network_timeout(client: _TritonSyncClientType, timeout_s: float):
     if isinstance(client, tritonclient.http.InferenceServerClient):
         connection_pool = client._client_stub._connection_pool
-        if connection_pool.network_timeout > timeout_s or connection_pool.connection_timeout > timeout_s:
+        network_reldiff_s = (connection_pool.network_timeout - timeout_s) / timeout_s
+        connection_reldiff_s = (connection_pool.connection_timeout - timeout_s) / timeout_s
+        rtol = 0.001
+        if network_reldiff_s > rtol or connection_reldiff_s > rtol:
             _LOGGER.warning(
                 "Client network and/or connection timeout is smaller than requested timeout_s. This may cause unexpected behavior. "
                 f"network_timeout={connection_pool.network_timeout} "
@@ -278,7 +281,6 @@ def wait_for_model_ready(
         return model_state == _ModelState.READY and client.is_model_ready(model_name)
 
     with condition:
-        timeout_s = max(0.0, should_finish_before_s - time.time())
         wait_for_server_ready(client, timeout_s=timeout_s, condition=condition)
         timeout_s = max(0.0, should_finish_before_s - time.time())
         _LOGGER.debug(f"Waiting for model {model_name}/{model_version_msg} to be ready (timeout={timeout_s})")
