@@ -21,7 +21,7 @@ import signal
 import sys
 import time
 
-from tests.utils import DEFAULT_LOG_FORMAT, ScriptThread
+from tests.utils import DEFAULT_LOG_FORMAT, ScriptThread, search_warning_on_too_verbose_log_level
 
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 METADATA = {
@@ -84,6 +84,7 @@ def main():
         sys.exit(-2)
 
     verify_client_output(client_thread.output)
+    assert not search_warning_on_too_verbose_log_level(server_thread.output)
 
 
 if __name__ == "__main__":

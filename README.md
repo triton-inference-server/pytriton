@@ -59,6 +59,7 @@ Before installing the library, ensure that you meet the following requirements:
 
 - An operating system with glibc >= 2.31. Triton Inference Server and PyTriton have only been rigorously tested on Ubuntu 20.04.
   Other supported operating systems include Ubuntu 20.04+, Debian 11+, Rocky Linux 9+, and Red Hat Universal Base Image 9+.
+  - to check your glibc version, run `ldd --version`
 - Python version >= 3.8. If you are using Python 3.9+, see the section "[Installation on Python 3.9+](https://triton-inference-server.github.io/pytriton/latest/installation#installation-on-python-39)" for additional steps.
 - pip >= 20.3
 
@@ -85,6 +86,14 @@ You can install the package from [pypi.org](https://pypi.org/project/nvidia-pytr
 ```shell
 pip install -U nvidia-pytriton
 ```
+
+**Important**: The `pip` version must be at least 20.3. To upgrade an older version of pip, run:
+
+```shell
+pip install -U pip
+```
+
+More details about installation can be found in the [documentation](https://triton-inference-server.github.io/pytriton/latest/installation/).
 
 **Important**: The Triton Inference Server binary is installed as part of the PyTriton package.
 
@@ -185,7 +194,7 @@ moment, the model is available under the name `Linear` in the Triton server. The
 `localhost:8000/v2/models/Linear/infer`, which are passed to the `infer_fn` function.
 
 If you would like to use Triton in the background mode, use `run`. More about that can be found
-in the [Deploying Models](https://triton-inference-server.github.io/pytriton/latest/deploying_models) page.
+in the [Deploying Models](https://triton-inference-server.github.io/pytriton/latest/initialization/) page.
 
 Once the `serve` or `run` method is called on the `Triton` object, the server status can be obtained using:
 
@@ -252,10 +261,10 @@ print(result_dict)
 
 The full example code can be found in [examples/linear_random_pytorch](examples/linear_random_pytorch).
 
-You can learn more about client usage in the [Clients](docs/clients.md) document.
+You can learn more about client usage in the [Clients](https://triton-inference-server.github.io/pytriton/latest/clients/) document.
 
 More information about running the server and models can be found
-in [Deploying Models](https://triton-inference-server.github.io/pytriton/latest/deploying_models/) page of documentation.
+in [Deploying Models](https://triton-inference-server.github.io/pytriton/latest/initialization/) page of documentation.
 
 ## Architecture
 

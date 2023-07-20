@@ -20,3 +20,4 @@ limitations under the License.
 - Support is currently limited to the x86-64 instruction set architecture.
 - Running multiple scripts hosting PyTriton on the same machine or container is not feasible.
 - Deadlocks may occur in some models when employing the NCCL communication library and multiple Inference Callables are triggered concurrently. This issue can be observed when deploying multiple instances of the same model or multiple models within a single server script. Additional information about this issue can be found [here](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/communicators.html#using-multiple-nccl-communicators-concurrently).
+- Enabling verbose logging may cause a significant performance drop in model inference.

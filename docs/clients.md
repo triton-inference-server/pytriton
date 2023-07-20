@@ -160,3 +160,75 @@ for output_data in output_data_list:
     class_name = class_names[output_label]
     print(f"The image is classified as {class_name}.")
 ```
+
+## Client timeouts
+
+When creating a [ModelClient][pytriton.client.client.ModelClient] or [FuturesModelClient][pytriton.client.client.FuturesModelClient] object, you can specify the timeout for waiting until the server and model are ready using the `init_timeout_s` parameter. By default, the timeout is set to 5 minutes (300 seconds).
+
+Example usage:
+
+<!--pytest.mark.skip-->
+```python
+import numpy as np
+from pytriton.client import ModelClient, FuturesModelClient
+
+input1_data = np.random.randn(128, 2)
+with ModelClient("localhost", "MyModel", init_timeout_s=120) as client:
+    # Raises PyTritonClientTimeoutError if the server or model is not ready within the specified timeout
+    result_dict = client.infer_batch(input1_data)
+
+
+with FuturesModelClient("localhost", "MyModel", init_timeout_s=120) as client:
+    future = client.infer_batch(input1_data)
+    ...
+    # It will raise `PyTritonClientTimeoutError` if the server is not ready and the model is not loaded within 120 seconds
+    # from the time `infer_batch` was called by a thread from `ThreadPoolExecutor`
+    result_dict = future.result()
+```
+
+You can disable the default behavior of waiting for the server and model to be ready during first inference request by setting `lazy_init` to `False`:
+
+<!--pytest.mark.skip-->
+```python
+import numpy as np
+from pytriton.client import ModelClient, FuturesModelClient
+
+input1_data = np.random.randn(128, 2)
+
+# will raise PyTritonClientTimeoutError if server is not ready and model loaded
+# within 120 seconds during intialization of client
+with ModelClient("localhost", "MyModel", init_timeout_s=120, lazy_init=False) as client:
+    result_dict = client.infer_batch(input1_data)
+```
+
+You can specify the timeout for the client to wait for the inference response from the server.
+The default timeout is 60 seconds. You can specify the timeout when creating the [ModelClient][pytriton.client.client.ModelClient] or [FuturesModelClient][pytriton.client.client.FuturesModelClient] object:
+
+<!--pytest.mark.skip-->
+```python
+import numpy as np
+from pytriton.client import ModelClient, FuturesModelClient
+
+input1_data = np.random.randn(128, 2)
+with ModelClient("localhost", "MyModel", inference_timeout_s=240) as client:
+    # Raises `PyTritonClientTimeoutError` if the server does not respond to inference request within 240 seconds
+    result_dict = client.infer_batch(input1_data)
+
+
+with FuturesModelClient("localhost", "MyModel", inference_timeout_s=240) as client:
+    future = client.infer_batch(input1_data)
+    ...
+    # Raises `PyTritonClientTimeoutError` if the server does not respond within 240 seconds
+    # from the time `infer_batch` was called by a thread from `ThreadPoolExecutor`
+    result_dict = future.result()
+```
+
+!!! warning "gRPC client timeout not fully supported"
+
+    There are some missing features in the gRPC client that prevent it from working correctly with timeouts
+    used during the wait for the server and model to be ready. This may cause the client to hang if the server
+    doesn't respond with the current server or model state.
+
+!!! info "Server side timeout not implemented"
+
+    Currently, there is no support for server-side timeout. The server will continue to process the request even if the client timeout is reached.

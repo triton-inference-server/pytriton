@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import tritonclient.grpc
 import tritonclient.http
 import tritonclient.utils
 
+from pytriton.model_config.generator import ModelConfigGenerator
 from pytriton.model_config.triton_model_config import TritonModelConfig
 
 
@@ -94,3 +95,49 @@ def extract_array_from_http_infer_input(input_: tritonclient.http.InferInput):
     np_array = np.frombuffer(input_._raw_data, dtype=tritonclient.utils.triton_to_np_dtype(input_.datatype()))
     np_array = np_array.reshape(input_.shape())
     return np_array
+
+
+def patch_grpc_client__server_up_and_ready(mocker):
+    mocker.patch.object(tritonclient.grpc.InferenceServerClient, "is_server_ready").return_value = True
+    mocker.patch.object(tritonclient.grpc.InferenceServerClient, "is_server_live").return_value = True
+
+
+def patch_http_client__server_up_and_ready(mocker):
+    mocker.patch.object(tritonclient.http.InferenceServerClient, "is_server_ready").return_value = True
+    mocker.patch.object(tritonclient.http.InferenceServerClient, "is_server_live").return_value = True
+
+
+def patch_grpc_client__model_up_and_ready(mocker, model_config: TritonModelConfig):
+    from google.protobuf import json_format  # pytype: disable=pyi-error
+    from tritonclient.grpc import model_config_pb2, service_pb2  # pytype: disable=pyi-error
+
+    mock_get_repo_index = mocker.patch.object(tritonclient.grpc.InferenceServerClient, "get_model_repository_index")
+    mock_get_repo_index.return_value = service_pb2.RepositoryIndexResponse(
+        models=[
+            service_pb2.RepositoryIndexResponse.ModelIndex(
+                name=model_config.model_name, version="1", state="READY", reason=""
+            ),
+        ]
+    )
+
+    mocker.patch.object(tritonclient.grpc.InferenceServerClient, "is_model_ready").return_value = True
+
+    model_config_dict = ModelConfigGenerator(model_config).get_config()
+    model_config_protobuf = json_format.ParseDict(model_config_dict, model_config_pb2.ModelConfig())
+    response = service_pb2.ModelConfigResponse(config=model_config_protobuf)
+    response_dict = json.loads(json_format.MessageToJson(response, preserving_proto_field_name=True))
+    mock_get_model_config = mocker.patch.object(tritonclient.grpc.InferenceServerClient, "get_model_config")
+    mock_get_model_config.return_value = response_dict
+
+
+def patch_http_client__model_up_and_ready(mocker, model_config: TritonModelConfig):
+    mock_get_repo_index = mocker.patch.object(tritonclient.http.InferenceServerClient, "get_model_repository_index")
+    mock_get_repo_index.return_value = [
+        {"name": model_config.model_name, "version": "1", "state": "READY", "reason": ""}
+    ]
+
+    mocker.patch.object(tritonclient.http.InferenceServerClient, "is_model_ready").return_value = True
+
+    model_config_dict = ModelConfigGenerator(model_config).get_config()
+    mock_get_model_config = mocker.patch.object(tritonclient.http.InferenceServerClient, "get_model_config")
+    mock_get_model_config.return_value = model_config_dict

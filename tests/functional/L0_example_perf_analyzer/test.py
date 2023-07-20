@@ -21,7 +21,12 @@ import sys
 import time
 from multiprocessing.util import DEFAULT_LOGGING_FORMAT
 
-from tests.utils import ScriptThread, get_current_container_version, verify_docker_image_in_readme_same_as_tested
+from tests.utils import (
+    ScriptThread,
+    get_current_container_version,
+    search_warning_on_too_verbose_log_level,
+    verify_docker_image_in_readme_same_as_tested,
+)
 
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 METADATA = {
@@ -95,6 +100,7 @@ def main():
         sys.exit(-2)
 
     verify_client_output(client_thread.output)
+    assert not search_warning_on_too_verbose_log_level(server_thread.output)
 
 
 if __name__ == "__main__":

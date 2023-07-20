@@ -106,7 +106,7 @@ def main():
 
         infer_callable = NemoGptCallable(model_name="GPT", model=model)
 
-        triton_config = TritonConfig(http_address=ENDPOINT_BIND_ADDRESS, http_port=HTTP_PORT, log_verbose=4)
+        triton_config = TritonConfig(http_address=ENDPOINT_BIND_ADDRESS, http_port=HTTP_PORT)
         with Triton(config=triton_config) as triton:
             triton.bind(
                 model_name=infer_callable.model_name,

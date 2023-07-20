@@ -186,7 +186,6 @@ class ProcessMonitoring:
 
         self._logger.info("==== Dump process info (with its children)")
         for process in [self._process] + self.children:
-
             try:
                 self._logger.info(f"{process} parent={process.parent()} ")
             except psutil.NoSuchProcess:
@@ -221,3 +220,8 @@ def verify_docker_image_in_readme_same_as_tested(readme_path, image_name_with_ve
     )
     for entry in match_iterator:
         assert entry.group() == image_name_with_version, f"{entry.group()} != {image_name_with_version}"
+
+
+def search_warning_on_too_verbose_log_level(logs: str):
+    pattern = r"Triton Inference Server is running with enabled verbose logs.*It may affect inference performance."
+    return re.search(pattern, logs)

@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,22 +26,23 @@ Use to start and maintain the Triton Inference Server process.
 
 """
 import ctypes.util
+import importlib
 import logging
 import os
 import pathlib
 import pkgutil
 import signal
-import site
 import sys
 import threading
 import traceback
-from typing import Callable, Dict, Optional, Sequence, Union
+from typing import Callable, Dict, Literal, Optional, Sequence, Union
 
 from pytriton.constants import (
     DEFAULT_GRPC_PORT,
     DEFAULT_HTTP_PORT,
     DEFAULT_METRICS_PORT,
     PYTRITON_CACHE_DIR,
+    TRITON_LOCAL_IP,
     TRITON_PYTHON_BACKEND_INTERPRETER_DIRNAME,
 )
 from pytriton.utils.logging import silence_3rd_party_loggers
@@ -51,6 +52,7 @@ from .triton_server_config import TritonServerConfig
 LOGGER = logging.getLogger(__name__)
 SERVER_OUTPUT_TIMEOUT_SECS = 30
 _PROXY_REQUIRED_MODULES = ["numpy", "zmq"]
+_PYTRITON_STARTED_IN_PY38 = (3, 8) <= sys.version_info < (3, 9)
 
 silence_3rd_party_loggers()
 
@@ -66,10 +68,8 @@ def get_triton_python_backend_python_env() -> pathlib.Path:
     Returns:
         Path to the python environment with python 3.8
     """
-    pytriton_started_in_python38 = (3, 8) <= sys.version_info < (3, 9)
     env_path = pathlib.Path(sys.exec_prefix)
-    env_site_dirs = site.getsitepackages()
-    if not pytriton_started_in_python38:
+    if not _PYTRITON_STARTED_IN_PY38:
         venv_path = PYTRITON_CACHE_DIR / TRITON_PYTHON_BACKEND_INTERPRETER_DIRNAME
         if not venv_path.exists():
             raise RuntimeError(
@@ -78,10 +78,21 @@ def get_triton_python_backend_python_env() -> pathlib.Path:
                 f"Refer to https://github.com/triton-inference-server/pytriton/blob/main/docs/installation.md for more details."
             )
         env_path = venv_path
+
         env_site_dirs = [(env_path / "lib" / "python3.8" / "site-packages").as_posix()]
 
-    installed_modules = [module_info.name for module_info in pkgutil.iter_modules(env_site_dirs)]
-    missing_modules = list(set(_PROXY_REQUIRED_MODULES) - set(installed_modules))
+        installed_modules = [module_info.name for module_info in pkgutil.iter_modules(env_site_dirs)]
+        missing_modules = list(set(_PROXY_REQUIRED_MODULES) - set(installed_modules))
+    else:
+        installed_modules = []
+        missing_modules = []
+        for module_name in _PROXY_REQUIRED_MODULES:
+            try:
+                importlib.import_module(module_name)
+                installed_modules.append(module_name)
+            except ImportError:
+                missing_modules.append(module_name)
+
     if missing_modules:
         raise RuntimeError(
             "Python environment for python backend is missing required packages. "
@@ -223,17 +234,28 @@ class TritonServer:
         """
         return self._tritonserver_logs
 
-    def get_ports(self) -> Dict:
-        """Expose port of running inference server.
+    def get_endpoint(self, endpoint: Literal["http", "grpc", "metrics"]) -> str:
+        """Get endpoint url.
+
+        Args:
+            endpoint: endpoint name
 
         Returns:
-            Dict with server ports for protocol and endpoints
+            endpoint url in form of {protocol}://{host}:{port}
         """
-        return {
+        protocols = {"http": "http", "grpc": "grpc", "metrics": "http"}
+        addresses = {
+            "http": self._server_config["http-address"] or TRITON_LOCAL_IP,
+            "grpc": self._server_config["grpc-address"] or TRITON_LOCAL_IP,
+            "metrics": self._server_config["metrics-address"] or self._server_config["http-address"] or TRITON_LOCAL_IP,
+        }
+        ports = {
             "http": self._server_config["http-port"] or DEFAULT_HTTP_PORT,
             "grpc": self._server_config["grpc-port"] or DEFAULT_GRPC_PORT,
             "metrics": self._server_config["metrics-port"] or DEFAULT_METRICS_PORT,
         }
+
+        return f"{protocols[endpoint]}://{addresses[endpoint]}:{ports[endpoint]}"
 
     def _record_logs(self, line: Union[bytes, str]) -> None:
         """Record logs obtained from server process. If verbose logging enabled, print the log into STDOUT.
@@ -263,9 +285,11 @@ class TritonServer:
             env["LD_LIBRARY_PATH"] += ":" + self._server_libs_path.as_posix()
         else:
             env["LD_LIBRARY_PATH"] = self._server_libs_path.as_posix()
-        env.pop("PYTHONPATH", None)
-        python_bin_directory = get_triton_python_backend_python_env() / "bin"
+
+        env_path = get_triton_python_backend_python_env()
+        python_bin_directory = env_path / "bin"
         env["PATH"] = f"{python_bin_directory.as_posix()}:{env['PATH']}"
+        env["PYTHONPATH"] = f"{os.pathsep}".join(sys.path) if _PYTRITON_STARTED_IN_PY38 else ""
 
         return env
 
