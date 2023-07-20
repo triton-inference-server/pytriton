@@ -26,12 +26,12 @@ Use to start and maintain the Triton Inference Server process.
 
 """
 import ctypes.util
+import importlib
 import logging
 import os
 import pathlib
 import pkgutil
 import signal
-import site
 import sys
 import threading
 import traceback
@@ -52,6 +52,7 @@ from .triton_server_config import TritonServerConfig
 LOGGER = logging.getLogger(__name__)
 SERVER_OUTPUT_TIMEOUT_SECS = 30
 _PROXY_REQUIRED_MODULES = ["numpy", "zmq"]
+_PYTRITON_STARTED_IN_PY38 = (3, 8) <= sys.version_info < (3, 9)
 
 silence_3rd_party_loggers()
 
@@ -67,10 +68,8 @@ def get_triton_python_backend_python_env() -> pathlib.Path:
     Returns:
         Path to the python environment with python 3.8
     """
-    pytriton_started_in_python38 = (3, 8) <= sys.version_info < (3, 9)
     env_path = pathlib.Path(sys.exec_prefix)
-    env_site_dirs = site.getsitepackages()
-    if not pytriton_started_in_python38:
+    if not _PYTRITON_STARTED_IN_PY38:
         venv_path = PYTRITON_CACHE_DIR / TRITON_PYTHON_BACKEND_INTERPRETER_DIRNAME
         if not venv_path.exists():
             raise RuntimeError(
@@ -79,10 +78,21 @@ def get_triton_python_backend_python_env() -> pathlib.Path:
                 f"Refer to https://github.com/triton-inference-server/pytriton/blob/main/docs/installation.md for more details."
             )
         env_path = venv_path
+
         env_site_dirs = [(env_path / "lib" / "python3.8" / "site-packages").as_posix()]
 
-    installed_modules = [module_info.name for module_info in pkgutil.iter_modules(env_site_dirs)]
-    missing_modules = list(set(_PROXY_REQUIRED_MODULES) - set(installed_modules))
+        installed_modules = [module_info.name for module_info in pkgutil.iter_modules(env_site_dirs)]
+        missing_modules = list(set(_PROXY_REQUIRED_MODULES) - set(installed_modules))
+    else:
+        installed_modules = []
+        missing_modules = []
+        for module_name in _PROXY_REQUIRED_MODULES:
+            try:
+                importlib.import_module(module_name)
+                installed_modules.append(module_name)
+            except ImportError:
+                missing_modules.append(module_name)
+
     if missing_modules:
         raise RuntimeError(
             "Python environment for python backend is missing required packages. "
@@ -275,9 +285,11 @@ class TritonServer:
             env["LD_LIBRARY_PATH"] += ":" + self._server_libs_path.as_posix()
         else:
             env["LD_LIBRARY_PATH"] = self._server_libs_path.as_posix()
-        env.pop("PYTHONPATH", None)
-        python_bin_directory = get_triton_python_backend_python_env() / "bin"
+
+        env_path = get_triton_python_backend_python_env()
+        python_bin_directory = env_path / "bin"
         env["PATH"] = f"{python_bin_directory.as_posix()}:{env['PATH']}"
+        env["PYTHONPATH"] = f"{os.pathsep}".join(sys.path) if _PYTRITON_STARTED_IN_PY38 else ""
 
         return env
 

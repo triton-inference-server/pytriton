@@ -16,7 +16,9 @@ limitations under the License.
 
 # Changelog
 
-## Unreleased
+## unreleased
+
+- Improved verification of Proxy Backend environment when running under same Python interpreter
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 
