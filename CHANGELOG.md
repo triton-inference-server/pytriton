@@ -19,6 +19,7 @@ limitations under the License.
 ## unreleased
 
 - Improved verification of Proxy Backend environment when running under same Python interpreter
+- Fixed pytriton.__version__ to represent currently installed version
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 
