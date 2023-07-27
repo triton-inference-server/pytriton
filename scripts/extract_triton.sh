@@ -15,12 +15,13 @@
 
 set -x
 
-export TRITON_CONTAINER=$1
-
+export DOCKER_IMAGE=$1
 export TARGET_DIR=$2
+export PLATFORM=$3
+
 rm -rf "${TARGET_DIR}"
 
-export TRITON_CONTAINER_ID=$(docker create --rm "${TRITON_CONTAINER}" bash -c "sleep 1h")
+export TRITON_CONTAINER_ID=$(docker create --pull always --platform "${PLATFORM}" --rm "${DOCKER_IMAGE}" bash -c "sleep 1h")
 docker start "${TRITON_CONTAINER_ID}"
 
 mkdir -p "${TARGET_DIR}"/backends

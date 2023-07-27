@@ -39,6 +39,9 @@ PIP_INSTALL := pip install --extra-index-url https://pypi.ngc.nvidia.com
 TRITONSERVER_IMAGE_VERSION = 23.04
 TRITONSERVER_IMAGE_NAME = nvcr.io/nvidia/tritonserver:$(TRITONSERVER_IMAGE_VERSION)-pyt-python-py3
 TRITONSERVER_OUTPUT_DIR = pytriton/tritonserver
+# to set PLATFORM from outside, use: make PLATFORM=linux/aarch64;
+# correct values are: linux/x86_64 (default), linux/aarch64
+PLATFORM=linux/x86_64
 
 help:
 	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
@@ -95,14 +98,14 @@ coverage: ## check code coverage quickly with the default Python
 
 dist: clean extract-triton ## builds source and wheel package
 	python3 -m build .
-	find ./dist -iname *-linux*.whl -type f -exec bash ./scripts/add_libs_to_wheel.sh $(TRITONSERVER_IMAGE_NAME) $(TRITONSERVER_OUTPUT_DIR) {} \;
+	find ./dist -iname *-linux*.whl -type f -exec bash ./scripts/add_libs_to_wheel.sh $(TRITONSERVER_IMAGE_NAME) $(TRITONSERVER_OUTPUT_DIR) {} ${PLATFORM} \;
 	find ./dist -iname *-linux*.whl -type f -delete
 	ls -lh dist
 	twine check dist/*
 
 extract-triton:
 	# changing dst path, change also in clean-build and pyproject.toml
-	bash ./scripts/extract_triton.sh $(TRITONSERVER_IMAGE_NAME) $(TRITONSERVER_OUTPUT_DIR)
+	bash ./scripts/extract_triton.sh $(TRITONSERVER_IMAGE_NAME) $(TRITONSERVER_OUTPUT_DIR) $(PLATFORM)
 
 install: clean extract-triton ## install the package to the active Python's site-packages
 	$(PIP_INSTALL) --upgrade pip

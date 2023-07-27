@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,14 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # noqa: D104
-from importlib.metadata import PackageNotFoundError, version
+from importlib.metadata import version
 
-try:
-    __version__ = version("nvidia-pytriton")
-except PackageNotFoundError:
-    # package is not installed
-    pass
+import pytriton
 
-from pytriton import client  # noqa: F401
-from pytriton import model_config  # noqa: F401
-from pytriton import triton  # noqa: F401
+
+def test_version():
+    assert pytriton.__version__ == version("nvidia-pytriton")
