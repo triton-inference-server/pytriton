@@ -83,9 +83,22 @@ class ModelConfigParser:
         }
 
         backend_parameters_config = model_config_dict.get("parameters", [])
-        backend_parameters = {
-            name: backend_parameters_config[name]["string_value"] for name in backend_parameters_config
-        }
+        if isinstance(backend_parameters_config, list):
+            # If the backend_parameters_config is a list of strings, use them as keys with empty values
+            LOGGER.debug(f"backend_parameters_config is a list of strings: {backend_parameters_config}")
+            backend_parameters = {name: "" for name in backend_parameters_config}
+        elif isinstance(backend_parameters_config, dict):
+            # If the backend_parameters_config is a dictionary, use the key and "string_value" fields as key-value pairs
+            LOGGER.debug(f"backend_parameters_config is a dictionary: {backend_parameters_config}")
+            backend_parameters = {
+                name: backend_parameters_config[name]["string_value"] for name in backend_parameters_config
+            }
+        else:
+            # Otherwise, raise an error
+            LOGGER.error(
+                f"Invalid type {type(backend_parameters_config)} for backend_parameters_config: {backend_parameters_config}"
+            )
+            raise TypeError(f"Invalid type for backend_parameters_config: {type(backend_parameters_config)}")
 
         inputs = [
             cls.rewrite_io_spec(item, "input", idx) for idx, item in enumerate(model_config_dict.get("input", []))

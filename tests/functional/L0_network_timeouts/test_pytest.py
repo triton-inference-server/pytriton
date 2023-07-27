@@ -14,18 +14,19 @@
 # limitations under the License.
 """Test of network timeouts with pytest"""
 
+import contextlib
 import logging
+import socket
 import time
 
 import numpy as np
 import pytest
 
-from pytriton.client import ModelClient
+from pytriton.client import AsyncioModelClient, FuturesModelClient, ModelClient
 from pytriton.client.exceptions import PyTritonClientInferenceServerError, PyTritonClientTimeoutError
 from pytriton.decorators import batch
 from pytriton.model_config import ModelConfig, Tensor
 from pytriton.triton import Triton, TritonConfig
-from tests.utils import find_free_port
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,9 +38,28 @@ _GARGANTUAN_TIMEOUT = 10.0
 _WRONG_TIMEOUT = -1.0
 
 
+@pytest.fixture(scope="function")
+def find_free_ports():
+    """Fixture to find free ports for gprc, http, and metrics"""
+    with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as grpc:
+        grpc.bind(("", 0))
+        grpc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as http:
+            http.bind(("", 0))
+            http.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as metrics:
+                metrics.bind(("", 0))
+                metrics.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                yield {
+                    "grpc_port": grpc.getsockname()[1],
+                    "http_port": http.getsockname()[1],
+                    "metrics_port": metrics.getsockname()[1],
+                }
+
+
 # Define a fixture to start and stop the Triton server with the Sleeper model
 @pytest.fixture(scope="function")
-def triton_server():
+def triton_server(find_free_ports):
     @batch
     def _infer_fn(**inputs):  # noqa: N803
         _LOGGER.debug(f"Inputs: {inputs}")
@@ -56,11 +76,12 @@ def triton_server():
 
         """Context manager to hold Triton instance and ports"""
 
-        def __init__(self, grpc_port, http_port, model_name, infer_function):
+        def __init__(self, grpc_port, http_port, metrics_port, model_name, infer_function):
             self.grpc_port = grpc_port
             self.http_port = http_port
+            self.metrics_port = metrics_port
             self.model_name = model_name
-            self.config = TritonConfig(http_port=http_port, grpc_port=grpc_port)
+            self.config = TritonConfig(http_port=http_port, grpc_port=grpc_port, metrics_port=metrics_port)
             self.infer_function = infer_function
             self.grpc_url = f"grpc://localhost:{self.grpc_port}"
             self.http_url = f"http://localhost:{self.http_port}"
@@ -128,12 +149,8 @@ def triton_server():
                 time.sleep(_SMALL_TIMEOUT)
             _LOGGER.info("Triton server stopped.")
 
-    grpc_port = find_free_port()
-    http_port = find_free_port()
-    _LOGGER.debug(f"Using ports: grpc={grpc_port}, http={http_port}")
-    with TritonInstance(
-        grpc_port=grpc_port, http_port=http_port, model_name="Sleeper", infer_function=_infer_fn
-    ) as triton:
+    _LOGGER.debug(f"Using ports: grpc={find_free_ports}")
+    with TritonInstance(**find_free_ports, model_name="Sleeper", infer_function=_infer_fn) as triton:
         yield triton
 
 
@@ -143,7 +160,7 @@ def http_client(triton_server):
     _LOGGER.debug(
         f"Preparing client for {triton_server.http_url} with init timeout {_GARGANTUAN_TIMEOUT} and inference timeout {_SMALL_TIMEOUT}."
     )
-    return ModelClient(
+    yield ModelClient(
         url=triton_server.http_url,
         model_name=triton_server.model_name,
         init_timeout_s=_GARGANTUAN_TIMEOUT,
@@ -157,7 +174,63 @@ def grpc_client(triton_server):
     _LOGGER.debug(
         f"Preparing client for {triton_server.grpc_url} with init timeout {_GARGANTUAN_TIMEOUT} and inference timeout {_SMALL_TIMEOUT}."
     )
-    return ModelClient(
+    yield ModelClient(
+        url=triton_server.grpc_url,
+        model_name=triton_server.model_name,
+        init_timeout_s=_GARGANTUAN_TIMEOUT,
+        inference_timeout_s=_SMALL_TIMEOUT,
+    )
+
+
+# Define a fixture to create and return a client object with a very small timeout value
+@pytest.fixture(scope="function")
+async def async_http_client(triton_server):
+    _LOGGER.debug(
+        f"Preparing client for {triton_server.http_url} with init timeout {_GARGANTUAN_TIMEOUT} and inference timeout {_SMALL_TIMEOUT}."
+    )
+    return AsyncioModelClient(
+        url=triton_server.http_url,
+        model_name=triton_server.model_name,
+        init_timeout_s=_GARGANTUAN_TIMEOUT,
+        inference_timeout_s=_SMALL_TIMEOUT,
+    )
+
+
+# Define a fixture to create and return a client object with a very small timeout value
+@pytest.fixture(scope="function")
+async def async_grpc_client(triton_server):
+    _LOGGER.debug(
+        f"Preparing client for {triton_server.grpc_url} with init timeout {_GARGANTUAN_TIMEOUT} and inference timeout {_SMALL_TIMEOUT}."
+    )
+    return AsyncioModelClient(
+        url=triton_server.grpc_url,
+        model_name=triton_server.model_name,
+        init_timeout_s=_GARGANTUAN_TIMEOUT,
+        inference_timeout_s=_SMALL_TIMEOUT,
+    )
+
+
+# Define a fixture to create and return a client object with a very small timeout value
+@pytest.fixture(scope="function")
+def futures_http_client(triton_server):
+    _LOGGER.debug(
+        f"Preparing client for {triton_server.http_url} with init timeout {_GARGANTUAN_TIMEOUT} and inference timeout {_SMALL_TIMEOUT}."
+    )
+    yield FuturesModelClient(
+        url=triton_server.http_url,
+        model_name=triton_server.model_name,
+        init_timeout_s=_GARGANTUAN_TIMEOUT,
+        inference_timeout_s=_SMALL_TIMEOUT,
+    )
+
+
+# Define a fixture to create and return a client object with a very small timeout value
+@pytest.fixture(scope="function")
+def futures_grpc_client(triton_server):
+    _LOGGER.debug(
+        f"Preparing client for {triton_server.grpc_url} with init timeout {_GARGANTUAN_TIMEOUT} and inference timeout {_SMALL_TIMEOUT}."
+    )
+    yield FuturesModelClient(
         url=triton_server.grpc_url,
         model_name=triton_server.model_name,
         init_timeout_s=_GARGANTUAN_TIMEOUT,
@@ -169,60 +242,150 @@ def grpc_client(triton_server):
 @pytest.fixture(scope="session")
 def input_sleep_large():
     _LOGGER.debug(f"Preparing input array with value {_LARGE_TIMEOUT}.")
-    return np.array([[_LARGE_TIMEOUT]], dtype=np.float64)
+    yield np.array([[_LARGE_TIMEOUT]], dtype=np.float64)
 
 
 # Define a fixture to create and return an input array with a value of -1 seconds
 @pytest.fixture(scope="session")
 def input_sleep_wrong():
     _LOGGER.debug(f"Preparing input array with value {_LARGE_TIMEOUT}.")
-    return np.array([[_WRONG_TIMEOUT]], dtype=np.float64)
+    yield np.array([[_WRONG_TIMEOUT]], dtype=np.float64)
 
 
 # Define a fixture to create and return an input array with a value of 1.5 seconds
 @pytest.fixture(scope="session")
 def input_sleep_smallest():
     _LOGGER.debug(f"Preparing input array with value {_LARGE_TIMEOUT}.")
-    return np.array([[_SMALLEST_TIMEOUT]], dtype=np.float64)
+    yield np.array([[_SMALLEST_TIMEOUT]], dtype=np.float64)
 
 
 @pytest.mark.timeout(_TEST_TIMEOUT)
 def test_infer_sample_network_timeout_grpc(triton_server, grpc_client, input_sleep_large):
     _LOGGER.debug(f"Testing grpc_client with input {input_sleep_large}.")
     with pytest.raises(PyTritonClientTimeoutError):
-        grpc_client.infer_sample(input_sleep_large)
+        with grpc_client as client:
+            client.infer_sample(input_sleep_large)
 
 
 @pytest.mark.timeout(_TEST_TIMEOUT)
 def test_infer_sample_network_timeout_http(triton_server, http_client, input_sleep_large):
     _LOGGER.debug(f"Testing http_client with input {input_sleep_large}.")
     with pytest.raises(PyTritonClientTimeoutError):
-        http_client.infer_sample(input_sleep_large)
+        with http_client as client:
+            client.infer_sample(input_sleep_large)
 
 
 @pytest.mark.timeout(_TEST_TIMEOUT)
 def test_infer_sample_model_failure_grpc(triton_server, grpc_client, input_sleep_wrong):
     _LOGGER.debug(f"Testing grpc_client with input {input_sleep_wrong}.")
     with pytest.raises(PyTritonClientInferenceServerError):
-        grpc_client.infer_sample(input_sleep_wrong)
+        with grpc_client as client:
+            client.infer_sample(input_sleep_wrong)
 
 
 @pytest.mark.timeout(_TEST_TIMEOUT)
 def test_infer_sample_model_failure_http(triton_server, http_client, input_sleep_wrong):
     _LOGGER.debug(f"Testing http_client with input {input_sleep_wrong}.")
     with pytest.raises(PyTritonClientInferenceServerError):
-        http_client.infer_sample(input_sleep_wrong)
+        with http_client as client:
+            client.infer_sample(input_sleep_wrong)
 
 
 @pytest.mark.timeout(_TEST_TIMEOUT)
 def test_infer_sample_success_grpc(triton_server, grpc_client, input_sleep_smallest):
     _LOGGER.debug(f"Testing grpc_client with input {input_sleep_smallest}.")
-    result = grpc_client.infer_sample(input_sleep_smallest)
+    with grpc_client as client:
+        result = client.infer_sample(input_sleep_smallest)
     assert result["OUTPUT_1"] == input_sleep_smallest
 
 
 @pytest.mark.timeout(_TEST_TIMEOUT)
 def test_infer_sample_success_http(triton_server, http_client, input_sleep_smallest):
     _LOGGER.debug(f"Testing http_client with input {input_sleep_smallest}.")
-    result = http_client.infer_sample(input_sleep_smallest)
+    with http_client as client:
+        result = client.infer_sample(input_sleep_smallest)
     assert result["OUTPUT_1"] == input_sleep_smallest
+
+
+@pytest.mark.async_timeout(_TEST_TIMEOUT)
+async def test_infer_sample_network_timeout_async_grpc(triton_server, async_grpc_client, input_sleep_large):
+    _LOGGER.debug(f"Testing grpc_client with input {input_sleep_large}.")
+    with pytest.raises(PyTritonClientTimeoutError):
+        async with async_grpc_client as client:
+            await client.infer_sample(input_sleep_large)
+
+
+@pytest.mark.async_timeout(_TEST_TIMEOUT)
+async def test_infer_sample_network_timeout_async_http(triton_server, async_http_client, input_sleep_large):
+    _LOGGER.debug(f"Testing http_client with input {input_sleep_large}.")
+    with pytest.raises(PyTritonClientTimeoutError):
+        async with async_http_client as client:
+            await client.infer_sample(input_sleep_large)
+
+
+@pytest.mark.async_timeout(_TEST_TIMEOUT)
+async def test_infer_sample_model_failure_async_grpc(triton_server, async_grpc_client, input_sleep_wrong):
+    _LOGGER.debug(f"Testing grpc_client with input {input_sleep_wrong}.")
+    with pytest.raises(PyTritonClientInferenceServerError):
+        async with async_grpc_client as client:
+            await client.infer_sample(input_sleep_wrong)
+
+
+@pytest.mark.async_timeout(_TEST_TIMEOUT)
+async def test_infer_sample_model_failure_async_http(triton_server, async_http_client, input_sleep_wrong):
+    _LOGGER.debug(f"Testing http_client with input {input_sleep_wrong}.")
+    with pytest.raises(PyTritonClientInferenceServerError):
+        async with async_http_client as client:
+            await client.infer_sample(input_sleep_wrong)
+
+
+@pytest.mark.async_timeout(_TEST_TIMEOUT)
+async def test_infer_sample_success_async_http(triton_server, async_http_client, input_sleep_smallest):
+    _LOGGER.debug(f"Testing http_client with input {input_sleep_smallest}.")
+    async with async_http_client as client:
+        result = await client.infer_sample(input_sleep_smallest)
+    assert result["OUTPUT_1"] == input_sleep_smallest
+
+
+@pytest.mark.async_timeout(_TEST_TIMEOUT)
+async def test_infer_sample_success_async_grpc(triton_server, async_grpc_client, input_sleep_smallest):
+    _LOGGER.debug(f"Testing http_client with input {input_sleep_smallest}.")
+    async with async_grpc_client as client:
+        result = await client.infer_sample(input_sleep_smallest)
+    assert result["OUTPUT_1"] == input_sleep_smallest
+
+
+@pytest.mark.timeout(_TEST_TIMEOUT)
+def test_infer_sample_network_timeout_grpc_futures(triton_server, futures_grpc_client, input_sleep_large):
+    _LOGGER.debug(f"Testing futures_grpc_client with input {input_sleep_large}.")
+    with futures_grpc_client as client:
+        future = client.infer_sample(input_sleep_large)
+        with pytest.raises(PyTritonClientTimeoutError):
+            future.result()
+
+
+@pytest.mark.timeout(_TEST_TIMEOUT)
+def test_infer_sample_network_timeout_http_futures(triton_server, futures_http_client, input_sleep_large):
+    _LOGGER.debug(f"Testing futures_http_client with input {input_sleep_large}.")
+    with futures_http_client as client:
+        future = client.infer_sample(input_sleep_large)
+        with pytest.raises(PyTritonClientTimeoutError):
+            future.result()
+
+
+@pytest.mark.timeout(_TEST_TIMEOUT)
+def test_infer_sample_model_failure_grpc_futures(triton_server, futures_grpc_client, input_sleep_wrong):
+    _LOGGER.debug(f"Testing futures_grpc_client with input {input_sleep_wrong}.")
+    with futures_grpc_client as client:
+        future = client.infer_sample(input_sleep_wrong)
+        with pytest.raises(PyTritonClientInferenceServerError):
+            future.result()
+
+
+@pytest.mark.timeout(_TEST_TIMEOUT)
+def test_infer_sample_model_failure_http_futures(triton_server, futures_http_client, input_sleep_wrong):
+    _LOGGER.debug(f"Testing futures_http_client with input {input_sleep_wrong}.")
+    with futures_http_client as client:
+        future = client.infer_sample(input_sleep_wrong)
+        with pytest.raises(PyTritonClientInferenceServerError):
+            future.result()

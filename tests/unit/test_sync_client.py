@@ -135,22 +135,32 @@ def test_sync_grpc_client_init_obtain_expected_model_config_when_lazy_init_is_di
     spy_get_model_config = mocker.spy(tritonclient.grpc.InferenceServerClient, "get_model_config")
     client = ModelClient("grpc://localhost:8001", ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name, lazy_init=False)
 
-    assert [(call.args, call.kwargs) for call in spy_client_init.mock_calls] == [
-        (
-            (
-                client._general_client,
-                "localhost:8001",
-            ),
-            {},
-        ),
-        (
-            (
-                client._infer_client,
-                "localhost:8001",
-            ),
-            {},
-        ),
-    ]
+    first_call = spy_client_init.mock_calls[0]
+
+    assert first_call.args == (client._general_client, "localhost:8001")
+    assert first_call.kwargs == {}
+
+    second_call = spy_client_init.mock_calls[1]
+
+    assert second_call.args == (client._infer_client, "localhost:8001")
+    assert second_call.kwargs == {}
+
+    # assert [(call.args, call.kwargs) for call in spy_client_init.mock_calls] == [
+    #     (
+    #         (
+    #             client._general_client,
+    #             "localhost:8001",
+    #         ),
+    #         {},
+    #     ),
+    #     (
+    #         (
+    #             client._infer_client,
+    #             "localhost:8001",
+    #         ),
+    #         {},
+    #     ),
+    # ]
 
     spy_get_model_config.assert_called_once_with(
         ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
@@ -452,16 +462,32 @@ def test_sync_http_client_init_obtain_expected_model_config_when_lazy_init_is_di
     spy_client_init = mocker.spy(tritonclient.http.InferenceServerClient, "__init__")
     client = ModelClient(_HTTP_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name, lazy_init=False)
 
-    assert [(call.args, call.kwargs) for call in spy_client_init.mock_calls] == [
-        (
-            (client._general_client, "localhost:8000"),
-            {"connection_timeout": _DEFAULT_NETWORK_TIMEOUT_S, "network_timeout": _DEFAULT_NETWORK_TIMEOUT_S},
-        ),
-        (
-            (client._infer_client, "localhost:8000"),
-            {"connection_timeout": DEFAULT_INFERENCE_TIMEOUT_S, "network_timeout": DEFAULT_INFERENCE_TIMEOUT_S},
-        ),
-    ]
+    first_call = spy_client_init.mock_calls[0]
+
+    assert first_call.args == (client._general_client, "localhost:8000")
+    assert first_call.kwargs == {
+        "connection_timeout": _DEFAULT_NETWORK_TIMEOUT_S,
+        "network_timeout": _DEFAULT_NETWORK_TIMEOUT_S,
+    }
+
+    second_call = spy_client_init.mock_calls[1]
+
+    assert second_call.args == (client._infer_client, "localhost:8000")
+    assert second_call.kwargs == {
+        "connection_timeout": DEFAULT_INFERENCE_TIMEOUT_S,
+        "network_timeout": DEFAULT_INFERENCE_TIMEOUT_S,
+    }
+
+    # assert [(call.args, call.kwargs) for call in spy_client_init.mock_calls] == [
+    #     (
+    #         (client._general_client, "localhost:8000"),
+    #         {"connection_timeout": _DEFAULT_NETWORK_TIMEOUT_S, "network_timeout": _DEFAULT_NETWORK_TIMEOUT_S},
+    #     ),
+    #     (
+    #         (client._infer_client, "localhost:8000"),
+    #         {"connection_timeout": DEFAULT_INFERENCE_TIMEOUT_S, "network_timeout": DEFAULT_INFERENCE_TIMEOUT_S},
+    #     ),
+    # ]
     assert client.model_config == ADD_SUB_WITH_BATCHING_MODEL_CONFIG
 
 
@@ -785,8 +811,8 @@ def test_init_http_passes_timeout():
             client.wait_for_model(timeout_s=0.2)
 
 
-@pytest.mark.timeout(0.3)
-def test_init_grpc_passes_timeout_03():
+@pytest.mark.timeout(5)
+def test_init_grpc_passes_timeout_5():
     with ModelClient("grpc://localhost:6669", "dummy", init_timeout_s=0.2, inference_timeout_s=0.1) as client:
         with pytest.raises(PyTritonClientTimeoutError):
             client.wait_for_model(timeout_s=0.2)

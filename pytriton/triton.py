@@ -45,7 +45,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Union
 import typing_inspect
 
 from pytriton.client import ModelClient
-from pytriton.client.utils import create_client_from_url, wait_for_server_ready
+from pytriton.client.utils import wait_for_server_ready
 from pytriton.decorators import TritonContext
 from pytriton.exceptions import PyTritonValidationError
 from pytriton.model_config.tensor import Tensor
@@ -271,7 +271,7 @@ class _LogLevelChecker:
         Raises:
             PyTritonClientInvalidUrlError: if url is invalid
         """
-        self._client = create_client_from_url(url)
+        self._client = ModelClient(url, "Dummy")
         self._log_settings = None
 
     def check(self, skip_update: bool = False):
@@ -283,8 +283,10 @@ class _LogLevelChecker:
             PyTritonClientTimeoutError: if timeout is reached
         """
         if self._log_settings is None and not skip_update:
-            wait_for_server_ready(self._client)
-            self._log_settings = self._client.get_log_settings()
+            condition = threading.Condition(threading.RLock())
+            with condition:
+                wait_for_server_ready(self._client._general_client, timeout_s=120, condition=condition)
+            self._log_settings = self._client._general_client.get_log_settings()
 
         if self._log_settings is not None:
             log_settings = self._log_settings

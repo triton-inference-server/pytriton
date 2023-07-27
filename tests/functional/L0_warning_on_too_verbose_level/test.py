@@ -27,9 +27,12 @@ METADATA = {
 
 
 def main():
+    import threading
+
     import numpy as np
 
-    from pytriton.client.utils import create_client_from_url, wait_for_server_ready
+    from pytriton.client import ModelClient
+    from pytriton.client.utils import wait_for_server_ready
     from pytriton.decorators import batch
     from pytriton.model_config import ModelConfig, Tensor
     from pytriton.triton import Triton, TritonConfig
@@ -81,8 +84,10 @@ def main():
             config=ModelConfig(max_batch_size=128),
         )
         triton.run()
-        client = create_client_from_url(f"http://localhost:{triton_config.http_port}")
-        wait_for_server_ready(client, timeout_s=args.init_timeout_s)
+        client = ModelClient(f"http://localhost:{triton_config.http_port}", "Dummy")
+        condition = threading.Condition(threading.RLock())
+        with condition:
+            wait_for_server_ready(client._general_client, timeout_s=args.init_timeout_s, condition=condition)
 
     # obtain logs from handler
     logs = handler.stream.getvalue()

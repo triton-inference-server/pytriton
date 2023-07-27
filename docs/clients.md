@@ -103,7 +103,7 @@ with FuturesModelClient("localhost:8000", "TextGen") as client:
     # Wait for all the futures to complete and get the results
     output_data_list = [output_data_future.result() for output_data_future in output_data_futures]
 
-# Print the list of result dictionaries
+# Print tokens
 print(output_data_list)
 
 # Detokenize the output texts using the tokenizer and print them
@@ -160,6 +160,114 @@ for output_data in output_data_list:
     class_name = class_names[output_label]
     print(f"The image is classified as {class_name}.")
 ```
+
+## AsyncioModelClient
+
+AsyncioModelClient is an asynchronous client that can perform inference requests using the asyncio library. You can use AsyncioModelClient to communicate with the deployed model using HTTP or gRPC protocol. You can specify the protocol when creating the AsyncioModelClient object.
+
+For example, you can use AsyncioModelClient to send requests to a PyTorch model that performs linear regression:
+
+<!--pytest.mark.skip-->
+```python
+import torch
+from pytriton.client import AsyncioModelClient
+
+# Create some input data as a numpy array
+input1_data = torch.randn(2).cpu().detach().numpy()
+
+# Create an AsyncioModelClient object with the server address and model name
+async with AsyncioModelClient("localhost:8000", "Linear") as client:
+    # Call the infer_sample method with the input data
+    result_dict = await client.infer_sample(input1_data)
+
+# Print the result dictionary
+print(result_dict)
+```
+
+You can also use FastAPI to create a web application that exposes the results of inference at an HTTP endpoint. FastAPI is a modern, fast, web framework for building APIs with Python 3.6+ based on standard Python type hints.
+
+To use FastAPI, you need to install it with:
+
+```bash
+pip install fastapi
+```
+
+You also need an ASGI server, for production such as Uvicorn or Hypercorn.
+
+To install Uvicorn, run:
+
+```bash
+pip install uvicorn[standard]
+```
+
+The `uvicorn` uses port `8000` as default for web server. Triton server default port is also `8000` for HTTP protocol. You can change uvicorn port by using `--port` option. PyTriton also supports custom ports configuration for Triton server. The class `TritonConfig` contains parameters for ports configuration. You can pass it to `Triton` during initialization:
+
+<!--pytest.mark.skip-->
+```python
+config = TritonConfig(http_port=8015)
+triton_server = Triton(config=config)
+```
+
+You can use this `triton_server` object to bind your inference model and run HTTP endpoint from Triton Inference Server at port `8015`.
+
+
+Then you can create a FastAPI app that uses the AsyncioModelClient to perform inference and return the results as JSON:
+
+<!--pytest.mark.skip-->
+```python
+from fastapi import FastAPI
+import torch
+from pytriton.client import AsyncioModelClient
+
+app = FastAPI()
+
+@app.get("/predict")
+async def predict():
+    # Create some input data as a numpy array
+    input1_data = torch.randn(2).cpu().detach().numpy()
+
+    # Create an AsyncioModelClient object with the server address and model name
+    async with AsyncioModelClient("localhost:8000", "Linear") as client:
+        # Call the infer_sample method with the input data
+        result_dict = await client.infer_sample(input1_data)
+
+    # Return the result dictionary as JSON
+    return result_dict
+```
+
+Save this file as `main.py`.
+
+To run the app, use the command:
+
+<!--pytest.mark.skip-->
+```bash
+uvicorn main:app --reload --port 8015
+```
+
+You can then access the endpoint at `http://127.0.0.1:8015/predict` and see the JSON response.
+
+You can also check the interactive API documentation at `http://127.0.0.1:8015/docs`.
+
+You can test your server using curl:
+
+<!--pytest.mark.skip-->
+```bash
+curl -X 'GET' \
+  'http://127.0.0.1:8015/predict' \
+  -H 'accept: application/json'
+```
+
+Command will print three random numbers:
+<!--pytest.mark.skip-->
+```python
+[-0.2608422636985779,-0.6435106992721558,-0.3492531180381775]
+```
+
+For more information about FastAPI and Uvicorn, check out these links:
+
+- [FastAPI documentation](https://fastapi.tiangolo.com/)
+- [Uvicorn documentation](https://www.uvicorn.org/)
+
 
 ## Client timeouts
 
