@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,5 +30,7 @@ logger.info("Sending request")
 with ModelClient("localhost", "BERT", init_timeout_s=init_timeout_s) as client:
     result_dict = client.infer_sample(sequence)
 
+
 for output_name, output_data in result_dict.items():
-    logger.info(f"{output_name}: {output_data.tolist()}")
+    output_data = np.array2string(output_data, max_line_width=np.inf, separator=",").replace("\n", "")
+    logger.info(f"{output_name}: {output_data}")

@@ -42,7 +42,8 @@ with Triton() as triton:
       outputs=[
           Tensor(shape=(-1,), dtype=np.float32),
       ],
-      config=ModelConfig(max_batch_size=8)
+      config=ModelConfig(max_batch_size=8),
+      strict=True,
   )
 ```
 
@@ -53,6 +54,7 @@ The `bind` method's mandatory arguments are:
 - `inputs`: defines the number, types, and shapes for model inputs
 - `outputs`: defines the number, types, and shapes for model outputs
 - `config`: more customization for model deployment and behavior on the Triton server
+- `strict`: enable inference callable output validation of data types and shapes against provided model config
 
 Once the `bind` method is called, the model is created in the Triton Inference Server model store under
 the provided `model_name`.

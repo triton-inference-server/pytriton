@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ class FasterTransformerTritonServer:
         )
         outputs = (
             Tensor(name="sentences", shape=(-1, 1), dtype=bytes),
-            Tensor(name="sequence_length", shape=(-1,), dtype=np.uint32),
+            Tensor(name="sequence_length", shape=(-1,), dtype=np.int64),
             Tensor(name="cum_log_probs", shape=(-1,), dtype=np.float32),
         )
         self._inputs = {spec.name: spec for spec in inputs}
@@ -63,6 +63,7 @@ class FasterTransformerTritonServer:
                 inputs=tuple(self._inputs.values()),
                 outputs=tuple(self._outputs.values()),
                 config=self._config,
+                strict=True,
             )
             triton.serve()
 
@@ -115,7 +116,7 @@ class FasterTransformerTritonServer:
 
         return {
             "sentences": sentences,
-            "sequence_length": sentences_length,
+            "sequence_length": sentences_length[..., 0],
             "cum_log_probs": output_cum_log_probs.cpu().numpy(),
         }
 

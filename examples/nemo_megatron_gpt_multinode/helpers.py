@@ -82,7 +82,7 @@ def typedict2tensor(
             type_ = typing.get_args(type_)[0]
             count += 1
         count -= 1  # we don't want to count the last dimension
-        shape = (-1,) * count if count > 1 else (1,)
+        shape = (-1,) * count if count > 0 else (1,)
         return {"shape": shape, "dtype": _map_type(type_)}
 
     overwrite_kwargs = overwrite_kwargs or {}

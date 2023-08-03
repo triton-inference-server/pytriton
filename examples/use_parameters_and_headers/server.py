@@ -48,6 +48,7 @@ with Triton(config=TritonConfig(http_header_forward_pattern="header.*")) as trit
             Tensor(name="scaled_sub", dtype=np.float32, shape=(-1,)),
         ],
         config=ModelConfig(max_batch_size=128),
+        strict=True,
     )
     logger.info("Serving model")
     triton.serve()

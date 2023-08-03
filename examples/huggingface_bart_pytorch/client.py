@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -71,9 +71,13 @@ def main():
 
     with ModelClient(args.url, "BART", init_timeout_s=args.init_timeout_s) as client:
         for req_idx in range(1, args.iterations + 1):
-            logger.debug(f"Sending request ({req_idx}).")
+            logger.info(f"Sending request ({req_idx}).")
             result_dict = client.infer_batch(sequence)
-            logger.debug(f"Result: {result_dict} for request ({req_idx}).")
+            for output_name, output_data in result_dict.items():
+                output_data = np.array2string(
+                    output_data, threshold=np.inf, max_line_width=np.inf, separator=","
+                ).replace("\n", "")
+                logger.info(f"{output_name}: {output_data} for request ({req_idx}).")
 
 
 if __name__ == "__main__":

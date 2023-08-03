@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@ def _infer_fn(**image):
     for logit in logits:
         predicted_label = logit.argmax(-1).item()
         label = np.char.encode(model.config.id2label[predicted_label], "utf-8")
-        labels.append(label)
+        labels.append([label])
 
     return {"label": np.array(labels)}
 
@@ -89,12 +89,13 @@ def main():
                 Tensor(name="image", dtype=np.uint8, shape=(-1,)),
             ],
             outputs=[
-                Tensor(name="label", dtype=bytes, shape=(-1,)),
+                Tensor(name="label", dtype=bytes, shape=(1,)),
             ],
             config=ModelConfig(
                 max_batch_size=args.max_batch_size,
                 batcher=DynamicBatcher(max_queue_delay_microseconds=5000),  # 5ms
             ),
+            strict=True,
         )
         logger.info("Serving inference")
         triton.serve()

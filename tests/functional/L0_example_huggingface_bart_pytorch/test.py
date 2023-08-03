@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,9 +35,7 @@ METADATA = {
 
 
 def verify_client_output(client_output):
-    expected_pattern = (
-        r"Result: \{'labels': array\(\[b'travel', b'cooking', b'festival', b'literature'\], dtype=object\)\}"
-    )
+    expected_pattern = r"label: \[\[b'travel'\], \[b'cooking'\], \[b'festival'\], \[b'literature'\]\]"
     output_match = re.search(expected_pattern, client_output, re.MULTILINE)
     output_array = output_match.group(0) if output_match else None
     if not output_array:

@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,6 +48,7 @@ def test_get_model_config_return_model_config_when_minimal_required_data():
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
             triton_context=triton_context,
+            strict=False,
         )
 
         model_config = model._get_triton_model_config()
@@ -93,6 +94,7 @@ def test_get_model_config_return_model_config_when_custom_names():
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
             triton_context=triton_context,
+            strict=False,
         )
 
         model_config = model._get_triton_model_config()
@@ -135,6 +137,7 @@ def test_generate_model_create_model_store():
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
             triton_context=triton_context,
+            strict=False,
         )
 
         with tempfile.TemporaryDirectory() as tempdir:
@@ -172,6 +175,7 @@ def test_generate_models_with_same_names_and_different_versions_create_model_sto
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
             triton_context=triton_context,
+            strict=False,
         )
         model2 = Model(
             model_name="simple",
@@ -187,6 +191,7 @@ def test_generate_models_with_same_names_and_different_versions_create_model_sto
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
             triton_context=triton_context,
+            strict=False,
         )
 
         with tempfile.TemporaryDirectory() as tempdir:
@@ -228,6 +233,7 @@ def test_setup_create_proxy_backend_connection():
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
             triton_context=triton_context,
+            strict=False,
         )
 
         model.setup()
@@ -259,6 +265,7 @@ def test_setup_can_be_called_multiple_times():
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
             triton_context=triton_context,
+            strict=False,
         )
 
         try:
@@ -301,6 +308,7 @@ def test_clean_remove_proxy_backend_connection():
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
             triton_context=triton_context,
+            strict=False,
         )
 
         model.setup()
@@ -330,6 +338,7 @@ def test_clean_can_be_called_multiple_times():
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
             triton_context=triton_context,
+            strict=False,
         )
 
         model.setup()
@@ -360,6 +369,7 @@ def test_is_alive_return_false_when_model_not_setup():
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
             triton_context=triton_context,
+            strict=False,
         )
 
         assert model.is_alive() is False
@@ -387,6 +397,7 @@ def test_is_alive_return_true_when_model_is_setup():
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
             triton_context=triton_context,
+            strict=False,
         )
 
         model.setup()
@@ -431,6 +442,7 @@ def test_triton_context_injection():
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
             triton_context=triton_context,
+            strict=False,
         )
         model2 = Model(
             model_name="simple2",
@@ -445,6 +457,7 @@ def test_triton_context_injection():
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
             triton_context=triton_context,
+            strict=False,
         )
         model3 = Model(
             model_name="simple3",
@@ -459,6 +472,7 @@ def test_triton_context_injection():
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
             triton_context=triton_context,
+            strict=False,
         )
 
         tr = TritonModelRepository(path=None, workspace=workspace)

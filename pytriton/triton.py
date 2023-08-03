@@ -466,6 +466,7 @@ class Triton:
         outputs: Sequence[Tensor],
         model_version: int = 1,
         config: Optional[ModelConfig] = None,
+        strict: bool = False,
     ) -> None:
         """Create a model with given name and inference callable binding into Triton Inference Server.
 
@@ -481,6 +482,7 @@ class Triton:
             alphanumeric characters, dots, underscores and dashes.
             model_version: Version of model
             config: Model configuration for Triton Inference Server deployment
+            strict: Enable strict validation between model config outputs and inference function result
         """
         self._validate_model_name(model_name)
         model = Model(
@@ -492,6 +494,7 @@ class Triton:
             config=config if config else ModelConfig(),
             workspace=self._workspace,
             triton_context=self.triton_context,
+            strict=strict,
         )
         model.on_model_event(self._on_model_event)
 

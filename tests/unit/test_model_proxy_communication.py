@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -76,7 +76,7 @@ def test_model_throws_exception(tmp_path, mocker):
         model_config_json = json.dumps(ModelConfigGenerator(model_config).get_config()).encode("utf-8")
 
         zmq_context = zmq.Context()
-        inference_handler = InferenceHandler(infer_fn, model_config, shared_memory_socket, zmq_context)
+        inference_handler = InferenceHandler(infer_fn, model_config, shared_memory_socket, zmq_context, strict=False)
         inference_handler.start()
 
         with mocker.patch.object(TritonPythonModel, "_get_instance_socket", return_value=shared_memory_socket):

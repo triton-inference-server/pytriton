@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,7 +34,6 @@ import traceback
 import typing
 from typing import Callable
 
-import numpy as np
 import zmq  # pytype: disable=import-error
 
 from pytriton.exceptions import PyTritonUnrecoverableError
@@ -46,6 +45,7 @@ from pytriton.proxy.communication import (
     ShmManager,
 )
 from pytriton.proxy.types import Request, Response
+from pytriton.proxy.validators import validate_outputs
 
 LOGGER = logging.getLogger(__name__)
 
@@ -70,6 +70,7 @@ class InferenceHandler(th.Thread):
         model_config: TritonModelConfig,
         shared_memory_socket: str,
         zmq_context: zmq.Context,
+        strict: bool,
     ):
         """Create a PythonBackend object.
 
@@ -78,10 +79,13 @@ class InferenceHandler(th.Thread):
             model_config: Triton model configuration
             shared_memory_socket: Socket path for shared memory communication
             zmq_context: zero mq context
+            strict: Enable strict validation for model callable outputs
         """
         super().__init__()
         self._model_config = model_config
         self._model_callable = model_callable
+        self._model_outputs = {output.name: output for output in model_config.outputs}
+        self._strict = strict
         self.stopped = False
 
         self.shm_request_manager = ShmManager()
@@ -117,7 +121,12 @@ class InferenceHandler(th.Thread):
                     outputs = self._model_callable(inputs)
 
                     LOGGER.debug(f"Validating outputs for {self._model_config.model_name}.")
-                    self._validate_outputs(outputs)
+                    validate_outputs(
+                        model_config=self._model_config,
+                        model_outputs=self._model_outputs,
+                        outputs=outputs,
+                        strict=self._strict,
+                    )
 
                     outputs = [Response(data=output) for output in outputs]
 
@@ -161,19 +170,6 @@ class InferenceHandler(th.Thread):
 
             LOGGER.info("Leaving proxy backend thread")
             self._notify_proxy_backend_observers(InferenceHandlerEvent.FINISHED, None)
-
-    def _validate_outputs(self, outputs):
-        if not isinstance(outputs, list):
-            raise ValueError("Outputs returned by model callable must be list of request dicts with numpy arrays")
-
-        for request in outputs:
-            if not isinstance(request, dict):
-                raise ValueError("Outputs returned by model callable must be list of request dicts with numpy arrays")
-            for key, value in request.items():
-                if not isinstance(key, str):
-                    raise ValueError("Not all keys returned by model callable are string")
-                if not isinstance(value, np.ndarray):
-                    raise ValueError("Not all values returned by model callable are numpy arrays")
 
     def stop(self) -> None:
         """Stop the InferenceHandler communication."""
