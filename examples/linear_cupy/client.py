@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,8 +25,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 VECTOR_SIZE = 10
 BATCH_SIZE = 2
 
-u_batch = np.ones((BATCH_SIZE, VECTOR_SIZE), dtype=np.float32)
-v_batch = np.ones((BATCH_SIZE, VECTOR_SIZE), dtype=np.float32)
+u_batch = np.ones((BATCH_SIZE, VECTOR_SIZE), dtype=np.float64)
+v_batch = np.ones((BATCH_SIZE, VECTOR_SIZE), dtype=np.float64)
 
 logger.info(f"u: {u_batch.tolist()}")
 logger.info(f"v: {v_batch.tolist()}")

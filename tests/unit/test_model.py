@@ -47,6 +47,7 @@ def test_get_model_config_return_model_config_when_minimal_required_data(tmp_pat
         config=ModelConfig(max_batch_size=128, batching=True),
         workspace=workspace,
         triton_context=triton_context,
+        strict=False,
     )
 
     model_config = model._get_triton_model_config()
@@ -94,6 +95,7 @@ def test_get_model_config_return_model_config_when_custom_names():
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
             triton_context=triton_context,
+            strict=False,
         )
 
         model_config = model._get_triton_model_config()
@@ -136,6 +138,7 @@ def test_generate_model_create_model_store():
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
             triton_context=triton_context,
+            strict=False,
         )
 
         with tempfile.TemporaryDirectory() as tempdir:
@@ -173,6 +176,7 @@ def test_generate_models_with_same_names_and_different_versions_create_model_sto
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
             triton_context=triton_context,
+            strict=False,
         )
         model2 = Model(
             model_name="simple",
@@ -188,6 +192,7 @@ def test_generate_models_with_same_names_and_different_versions_create_model_sto
             config=ModelConfig(max_batch_size=128, batching=True),
             workspace=workspace,
             triton_context=triton_context,
+            strict=False,
         )
 
         with tempfile.TemporaryDirectory() as tempdir:
@@ -228,6 +233,7 @@ def test_setup_create_proxy_backend_connection(tmp_path):
         config=ModelConfig(max_batch_size=128, batching=True),
         workspace=workspace,
         triton_context=triton_context,
+        strict=False,
     )
 
     try:
@@ -260,6 +266,7 @@ def test_setup_can_be_called_multiple_times(tmp_path):
         config=ModelConfig(max_batch_size=128, batching=True),
         workspace=workspace,
         triton_context=triton_context,
+        strict=False,
     )
 
     try:
@@ -303,6 +310,7 @@ def test_clean_remove_proxy_backend_connection(tmp_path):
         config=ModelConfig(max_batch_size=128, batching=True),
         workspace=workspace,
         triton_context=triton_context,
+        strict=False,
     )
 
     try:
@@ -335,6 +343,7 @@ def test_clean_can_be_called_multiple_times(tmp_path):
         config=ModelConfig(max_batch_size=128, batching=True),
         workspace=workspace,
         triton_context=triton_context,
+        strict=False,
     )
 
     try:
@@ -352,22 +361,25 @@ def test_is_alive_return_false_when_model_not_setup(tmp_path):
         return inputs
 
     triton_context = TritonContext()
-    workspace = Workspace(tmp_path / "workspace")
-    model = Model(
-        model_name="simple",
-        model_version=2,
-        inference_fn=infer_func,
-        inputs=[
-            Tensor(name="variable1", dtype=object, shape=(2, 1)),
-            Tensor(name="variable2", dtype=np.float32, shape=(2, 1)),
-        ],
-        outputs=[
-            Tensor(name="factorials", dtype=np.int32, shape=(-1,)),
-        ],
-        config=ModelConfig(max_batch_size=128, batching=True),
-        workspace=workspace,
-        triton_context=triton_context,
-    )
+    with tempfile.TemporaryDirectory() as tempdir:
+        tempdir = pathlib.Path(tempdir)
+        workspace = Workspace(tempdir / "workspace")
+        model = Model(
+            model_name="simple",
+            model_version=2,
+            inference_fn=infer_func,
+            inputs=[
+                Tensor(name="variable1", dtype=object, shape=(2, 1)),
+                Tensor(name="variable2", dtype=np.float32, shape=(2, 1)),
+            ],
+            outputs=[
+                Tensor(name="factorials", dtype=np.int32, shape=(-1,)),
+            ],
+            config=ModelConfig(max_batch_size=128, batching=True),
+            workspace=workspace,
+            triton_context=triton_context,
+            strict=False,
+        )
 
     assert not model.is_alive()
 
@@ -393,6 +405,7 @@ def test_is_alive_return_true_when_model_is_setup(tmp_path):
         config=ModelConfig(max_batch_size=128, batching=True),
         workspace=workspace,
         triton_context=triton_context,
+        strict=False,
     )
 
     try:
@@ -437,6 +450,7 @@ def test_triton_context_injection(tmp_path):
         config=ModelConfig(max_batch_size=128, batching=True),
         workspace=workspace,
         triton_context=triton_context,
+        strict=False,
     )
     model2 = Model(
         model_name="simple2",
@@ -451,6 +465,7 @@ def test_triton_context_injection(tmp_path):
         config=ModelConfig(max_batch_size=128, batching=True),
         workspace=workspace,
         triton_context=triton_context,
+        strict=False,
     )
     model3 = Model(
         model_name="simple3",
@@ -465,6 +480,7 @@ def test_triton_context_injection(tmp_path):
         config=ModelConfig(max_batch_size=128, batching=True),
         workspace=workspace,
         triton_context=triton_context,
+        strict=False,
     )
 
     tr = TritonModelRepository(path=None, workspace=workspace)

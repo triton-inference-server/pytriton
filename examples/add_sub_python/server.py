@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,6 +47,7 @@ with Triton() as triton:
             Tensor(name="sub", dtype=np.float32, shape=(-1,)),
         ],
         config=ModelConfig(max_batch_size=128),
+        strict=True,
     )
     logger.info("Serving model")
     triton.serve()

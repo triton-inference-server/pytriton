@@ -78,6 +78,7 @@ class Model:
         config: ModelConfig,
         workspace: Workspace,
         triton_context: TritonContext,
+        strict: bool,
     ):
         """Create Python model with required data.
 
@@ -89,6 +90,7 @@ class Model:
             outputs: Model outputs definition
             config: model configuration parameters
             workspace: workspace for storing artifacts
+            strict: Enable strict validation of model outputs
 
         Raises:
             PyTritonValidationError if one or more of provided values are incorrect.
@@ -100,6 +102,7 @@ class Model:
         self.zmq_context = zmq.Context()
         self._observers_lock = threading.Lock()
         self._inference_handlers_lock = threading.Lock()
+        self._strict = strict
 
         self.infer_functions = [inference_fn] if isinstance(inference_fn, Callable) else inference_fn
         if not isinstance(self.infer_functions, (Sequence, Callable)):
@@ -167,6 +170,7 @@ class Model:
                         shared_memory_socket=f"{self._shared_memory_socket}_{i}",
                         data_store_socket=self._data_store_socket.as_posix(),
                         zmq_context=self.zmq_context,
+                        strict=self._strict,
                     )
                     inference_handler.on_proxy_backend_event(self._on_proxy_backend_event)
                     inference_handler.start()

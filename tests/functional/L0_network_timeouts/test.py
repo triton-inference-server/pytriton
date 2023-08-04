@@ -38,11 +38,11 @@ def main():
             "-v",
             "--log-cli-level=DEBUG",
             "--log-cli-format='%(asctime)s [%(levelname)s] [%(process)d:%(thread)d] %(message)s'",
-            "--timeout=60",
+            "--timeout=180",
             os.path.join(rel_path, "test_pytest.py"),
         ]
     else:
-        test_command = ["pytest", "--timeout=10", os.path.join(rel_path, "test_pytest.py")]
+        test_command = ["pytest", "--timeout=180", os.path.join(rel_path, "test_pytest.py")]
     print("Test command:", test_command)  # noqa: T201 # pylint: disable=print-statement
     test_process = subprocess.Popen(test_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 

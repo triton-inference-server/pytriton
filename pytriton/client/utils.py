@@ -13,27 +13,19 @@
 # limitations under the License.
 """Utility module supporting model clients."""
 import enum
-import inspect
 import logging
 import socket
-import sys
 import threading
 import time
-import urllib.parse
 from typing import Optional, Union
 
-import gevent
 import tritonclient.grpc
 import tritonclient.http
+import tritonclient.http.aio
 from grpc import RpcError
 from tritonclient.utils import InferenceServerException
 
-from pytriton.client.exceptions import (
-    PyTritonClientInvalidUrlError,
-    PyTritonClientModelUnavailableError,
-    PyTritonClientTimeoutError,
-)
-from pytriton.constants import DEFAULT_GRPC_PORT, DEFAULT_HTTP_PORT
+from pytriton.client.exceptions import PyTritonClientModelUnavailableError, PyTritonClientTimeoutError
 from pytriton.model_config.parser import ModelConfigParser
 
 _LOGGER = logging.getLogger(__name__)
@@ -44,8 +36,11 @@ _DEFAULT_NETWORK_TIMEOUT_S = 60.0  # 1min
 _DEFAULT_WAIT_FOR_SERVER_READY_TIMEOUT_S = 60.0  # 1min
 _DEFAULT_WAIT_FOR_MODEL_TIMEOUT_S = 300.0  # 5min
 
+LATEST_MODEL_VERSION = "<latest>"
+# Special value for model_version argument. If model_version is None, the latest version of the model is returned.
 
-class _ModelState(enum.Enum):
+
+class ModelState(enum.Enum):
     """Describe model state in Triton.
 
     Attributes:
@@ -61,7 +56,8 @@ class _ModelState(enum.Enum):
     READY = "READY"
 
 
-def _parse_http_response(models):
+def parse_http_response(models):
+    """Parse model repository index response from Triton Inference Server for HTTP."""
     models_states = {}
     _LOGGER.debug("Parsing model repository index entries:")
     for model in models:
@@ -69,13 +65,14 @@ def _parse_http_response(models):
         if not model.get("version"):
             continue
 
-        model_state = _ModelState(model["state"]) if model.get("state") else _ModelState.LOADING
+        model_state = ModelState(model["state"]) if model.get("state") else ModelState.LOADING
         models_states[(model["name"], model["version"])] = model_state
 
     return models_states
 
 
-def _parse_grpc_response(models):
+def parse_grpc_response(models):
+    """Parse model repository index response from Triton Inference Server for GRCP."""
     models_states = {}
     _LOGGER.debug("Parsing model repository index entries:")
     for model in models:
@@ -83,7 +80,7 @@ def _parse_grpc_response(models):
         if not model.version:
             continue
 
-        model_state = _ModelState(model.state) if model.state else _ModelState.LOADING
+        model_state = ModelState(model.state) if model.state else ModelState.LOADING
         models_states[(model.name, model.version)] = model_state
 
     return models_states
@@ -93,7 +90,7 @@ def get_model_state(
     client: _TritonSyncClientType,
     model_name: str,
     model_version: Optional[str] = None,
-) -> _ModelState:
+) -> ModelState:
     """Obtains state of the model deployed in Triton Inference Server.
 
     Args:
@@ -110,22 +107,22 @@ def get_model_state(
     """
     repository_index = client.get_model_repository_index()
     if isinstance(repository_index, list):
-        models_states = _parse_http_response(models=repository_index)
+        models_states = parse_http_response(models=repository_index)
     else:
-        models_states = _parse_grpc_response(models=repository_index.models)
+        models_states = parse_grpc_response(models=repository_index.models)
 
     if model_version is None:
         requested_model_states = {
             version: state for (name, version), state in models_states.items() if name == model_name
         }
         if not requested_model_states:
-            return _ModelState.UNAVAILABLE
+            return ModelState.UNAVAILABLE
         else:
             requested_model_states = sorted(requested_model_states.items(), key=lambda item: int(item[0]))
             latest_version, latest_version_state = requested_model_states[-1]
             return latest_version_state
     else:
-        return models_states.get((model_name, model_version), _ModelState.UNAVAILABLE)
+        return models_states.get((model_name, model_version), ModelState.UNAVAILABLE)
 
 
 def get_model_config(
@@ -267,17 +264,17 @@ def wait_for_model_ready(
         PyTritonClientTimeoutError: If server and model are not in readiness state before given timeout.
         PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
     """
-    model_version_msg = model_version if model_version is not None else "<latest>"
+    model_version_msg = model_version if model_version is not None else LATEST_MODEL_VERSION
     timeout_s = timeout_s if timeout_s is not None else _DEFAULT_WAIT_FOR_MODEL_TIMEOUT_S
     should_finish_before_s = time.time() + timeout_s
     condition = condition or threading.Condition(threading.RLock())
 
     def _is_model_ready():
         model_state = get_model_state(client, model_name, model_version)
-        if model_state == _ModelState.UNAVAILABLE:
+        if model_state == ModelState.UNAVAILABLE:
             raise PyTritonClientModelUnavailableError(f"Model {model_name}/{model_version_msg} is unavailable.")
 
-        return model_state == _ModelState.READY and client.is_model_ready(model_name)
+        return model_state == ModelState.READY and client.is_model_ready(model_name)
 
     with condition:
         wait_for_server_ready(client, timeout_s=timeout_s, condition=condition)
@@ -290,104 +287,3 @@ def wait_for_model_ready(
                 raise PyTritonClientTimeoutError(
                     f"Waiting for model {model_name}/{model_version_msg} to be ready timed out."
                 )
-
-
-def create_client_from_url(url: str, network_timeout_s: Optional[float] = None) -> _TritonSyncClientType:  # type: ignore
-    """Create Triton Inference Server client.
-
-    Args:
-        url: url of the server to connect to.
-            If url doesn't contain scheme (e.g. "localhost:8001") http scheme is added.
-            If url doesn't contain port (e.g. "localhost") default port for given scheme is added.
-        network_timeout_s: timeout for client commands. Default value is 60.0 s.
-
-    Returns:
-        Triton Inference Server client.
-
-    Raises:
-        PyTritonClientInvalidUrlError: If provided Triton Inference Server url is invalid.
-    """
-    if not isinstance(url, str):
-        raise PyTritonClientInvalidUrlError(f"Invalid url {url}. Url must be a string.")
-
-    try:
-        parsed_url = urllib.parse.urlparse(url)
-        # change in py3.9+
-        # https://github.com/python/cpython/commit/5a88d50ff013a64fbdb25b877c87644a9034c969
-        if sys.version_info < (3, 9) and not parsed_url.scheme and "://" in parsed_url.path:
-            raise ValueError(f"Invalid url {url}. Only grpc and http are supported.")
-        if (sys.version_info < (3, 9) and not parsed_url.scheme and "://" not in parsed_url.path) or (
-            sys.version_info >= (3, 9) and parsed_url.scheme and not parsed_url.netloc
-        ):
-            _LOGGER.debug(f"Adding http scheme to {url}")
-            parsed_url = urllib.parse.urlparse(f"http://{url}")
-
-        scheme = parsed_url.scheme.lower()
-        if scheme not in ["grpc", "http"]:
-            raise ValueError(f"Invalid scheme {scheme}. Only grpc and http are supported.")
-        port = parsed_url.port or {"grpc": DEFAULT_GRPC_PORT, "http": DEFAULT_HTTP_PORT}[scheme]
-    except ValueError as e:
-        raise PyTritonClientInvalidUrlError(f"Invalid url {url}") from e
-
-    url = f"{parsed_url.hostname}:{port}"
-    triton_client_lib = {"grpc": tritonclient.grpc, "http": tritonclient.http}[scheme]
-
-    def _monkey_patch_client():
-        old_del = getattr(triton_client_lib.InferenceServerClient, "__del__")  # noqa: B009
-
-        # Monkey patch __del__ method from client to catch error in client when instance is garbage collected.
-        # This is needed because we are closing client in __exit__ method or in close method.
-        # (InferenceClient uses gevent library which does not support closing twice from different threads)
-        def _monkey_patched_del(self):
-            """Monkey patched del."""
-            try:
-                old_del(self)
-            except gevent.exceptions.InvalidThreadUseError:
-                _LOGGER.warning("gevent.exceptions.InvalidThreadUseError in __del__ of InferenceServerClient")
-            except Exception as e:
-                _LOGGER.error("Exception in __del__ of InferenceServerClient: %s", e)
-
-        if old_del:
-            triton_client_lib.InferenceServerClient.__del__ = _monkey_patched_del
-
-    _monkey_patch_client()
-
-    if scheme == "grpc":
-        # by default grpc client has very large number of timeout, thus we want to make it equal to http client timeout
-        network_timeout_s = _DEFAULT_NETWORK_TIMEOUT_S if network_timeout_s is None else network_timeout_s
-        _LOGGER.warning(
-            f"tritonclient.grpc doesn't support timeout for other commands than infer. Ignoring network_timeout: {network_timeout_s}."
-        )
-
-    triton_client_init_kwargs = {}
-    if network_timeout_s is not None:
-        triton_client_init_kwargs.update(
-            **{
-                "grpc": {},
-                # connection_timeout
-                #     This value sets the maximum time allowed for establishing a connection to the server.
-                #     We use the inference timeout here instead of the init timeout because the init timeout
-                #     is meant for waiting for the model to be ready. The connection timeout should be shorter
-                #     than the init timeout because it only checks if connection is established (e.g. correct port)
-                # network_timeout
-                #     This value sets the maximum time allowed for each network request
-                #     in both model loading and inference process
-                "http": {"connection_timeout": network_timeout_s, "network_timeout": network_timeout_s},
-            }[scheme]
-        )
-
-    _LOGGER.debug(f"Creating InferenceServerClient for {parsed_url.scheme}://{url} with {triton_client_init_kwargs}")
-    return triton_client_lib.InferenceServerClient(url, **triton_client_init_kwargs)
-
-
-def get_client_lib_from_client(client: _TritonSyncClientType):
-    """Get Triton Inference Server client library module.
-
-    Args:
-        client: Triton Inference Server client.
-
-    Returns:
-        Triton Inference Server client library module.
-    """
-    package_name: str = inspect.getmodule(client).__package__  # pytype: disable=attribute-error
-    return sys.modules[package_name]

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -62,7 +62,7 @@ def _infer_fn(
         ).images
     ):
         raw_data = _encode_image_to_base64(image)
-        outputs.append(raw_data)
+        outputs.append([raw_data])
         LOGGER.debug(f"Generated result for prompt `{prompts[idx]}` with size {len(raw_data)}")
 
     LOGGER.debug(f"Prepared batch response of size: {len(outputs)}")
@@ -108,6 +108,7 @@ def main():
                     max_queue_delay_microseconds=100,
                 ),
             ),
+            strict=True,
         )
         triton.serve()
 

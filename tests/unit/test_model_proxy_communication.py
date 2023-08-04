@@ -103,6 +103,7 @@ def test_model_throws_exception(tmp_path, mocker):
                 shared_memory_socket=shared_memory_socket,
                 data_store_socket=data_store_socket,
                 zmq_context=zmq_context,
+                strict=False,
             )
             inference_handler.start()
 

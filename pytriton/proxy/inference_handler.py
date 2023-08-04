@@ -35,7 +35,6 @@ import traceback
 import typing
 from typing import Callable
 
-import numpy as np
 import zmq  # pytype: disable=import-error
 
 from pytriton.exceptions import PyTritonUnrecoverableError
@@ -47,6 +46,7 @@ from pytriton.proxy.communication import (
     TensorStore,
 )
 from pytriton.proxy.types import Request
+from pytriton.proxy.validators import validate_outputs
 
 LOGGER = logging.getLogger(__name__)
 
@@ -72,6 +72,7 @@ class InferenceHandler(th.Thread):
         shared_memory_socket: str,
         data_store_socket: str,
         zmq_context: zmq.Context,
+        strict: bool,
     ):
         """Create a PythonBackend object.
 
@@ -81,10 +82,13 @@ class InferenceHandler(th.Thread):
             shared_memory_socket: Socket path for shared memory communication
             data_store_socket: Socket path for data store communication
             zmq_context: zero mq context
+            strict: Enable strict validation for model callable outputs
         """
         super().__init__()
         self._model_config = model_config
         self._model_callable = model_callable
+        self._model_outputs = {output.name: output for output in model_config.outputs}
+        self._strict = strict
         self.stopped = False
 
         self._tensor_store = TensorStore(data_store_socket)
@@ -125,8 +129,13 @@ class InferenceHandler(th.Thread):
                     LOGGER.debug(f"Processing inference callback for {model_name}.")
                     responses = self._model_callable(inputs)
 
-                    LOGGER.debug(f"Validating outputs for {model_name}.")
-                    self._validate_outputs(responses)
+                    LOGGER.debug(f"Validating outputs for {self._model_config.model_name}.")
+                    validate_outputs(
+                        model_config=self._model_config,
+                        model_outputs=self._model_outputs,
+                        outputs=responses,
+                        strict=self._strict,
+                    )
 
                     # to avoid reallocation need to declare required size of the buffer here
                     LOGGER.debug(f"Copying outputs to shared memory for {model_name}.")
@@ -177,35 +186,6 @@ class InferenceHandler(th.Thread):
 
             LOGGER.info("Leaving proxy backend thread")
             self._notify_proxy_backend_observers(InferenceHandlerEvent.FINISHED, None)
-
-    def _validate_outputs(self, outputs):
-        if not isinstance(outputs, list):
-            raise ValueError("Outputs returned by model callable must be list of request dicts with numpy arrays")
-
-        for request in outputs:
-            if not isinstance(request, dict):
-                raise ValueError("Outputs returned by model callable must be list of request dicts with numpy arrays")
-            for key, value in request.items():
-                if not isinstance(key, str):
-                    raise ValueError("Not all keys returned by model callable are string")
-                if not isinstance(value, np.ndarray):
-                    raise ValueError("Not all values returned by model callable are numpy arrays")
-                else:
-                    allowed_kind = "biufOSU"
-                    if value.dtype.kind not in allowed_kind:
-                        raise ValueError(
-                            f"Only bool, numeric, string, unicode and object arrays are supported by Triton (dtype.kind: {allowed_kind}). "
-                            f"Returned {key} has {value.dtype.kind} dtype.kind."
-                        )
-                    if value.dtype.kind == "O":
-                        if isinstance(value.item(0), str):
-                            raise ValueError(
-                                "Use string/byte-string instead of object for passing string in NumPy array."
-                            )
-                        elif not isinstance(value.item(0), bytes):
-                            raise ValueError(
-                                f"Only bytes as objects dtype are supported by PyTriton. Returned {key} has {type(value.item(0))} type."
-                            )
 
     def stop(self) -> None:
         """Stop the InferenceHandler communication."""

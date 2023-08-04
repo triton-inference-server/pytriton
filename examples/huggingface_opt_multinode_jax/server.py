@@ -1,4 +1,4 @@
-# Copyright (c) 2022 - 2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -116,6 +116,7 @@ def run(model, params, number_of_gpus, max_batch_size, server_ip, port, number_o
                     Tensor(name="output", dtype=np.bytes_, shape=(1,)),
                 ],
                 config=ModelConfig(max_batch_size=max_batch_size),
+                strict=True,
             )
             # Serve model through Triton Inference Server
             LOGGER.info("Serving inference")

@@ -1,5 +1,5 @@
 <!--
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,8 +16,11 @@ limitations under the License.
 
 # Changelog
 
-## Unreleased
+## (unreleased)
 
+- Introduced `strict` flag in `Triton.bind` which enables data types and shapes validation of inference callable outputs
+  against model config
+- Added `AsyncioModelClient` which works in FastAPI and other async frameworks
 - Updated communication protocol between Proxy Backend and Inference Callable
 - Updated data sharing between Proxy Backend and Inference Callable
 

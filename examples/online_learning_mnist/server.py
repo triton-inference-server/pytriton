@@ -118,7 +118,7 @@ class OnlineLearning(threading.Thread):
     def train(self, image, target):
         """Train function is used in training endpoint."""
         self.train_data_queue.put((image.copy(), target.copy()))
-        return [np.array([self.last_loss]).astype(np.float32)]
+        return {"last_loss": np.array([[self.last_loss]]).astype(np.float32)}
 
     @batch
     def infer(self, image):
@@ -127,7 +127,7 @@ class OnlineLearning(threading.Thread):
         with self.lock:
             res = self.infer_model(data_tensor)
         res = res.numpy(force=True)
-        return [res]
+        return {"predictions": res}
 
 
 def main():
@@ -149,9 +149,10 @@ def main():
                 ],
                 outputs=[
                     # last loss value batch
-                    Tensor(name="results", dtype=np.int32, shape=(-1,)),
+                    Tensor(name="last_loss", dtype=np.float32, shape=(1,)),
                 ],
                 config=ModelConfig(max_batch_size=64),
+                strict=True,
             )
             triton.bind(
                 model_name="MnistInfer",
@@ -162,9 +163,10 @@ def main():
                 ],
                 outputs=[
                     # predictions taken from softmax layer
-                    Tensor(name="predictions", dtype=np.float32, shape=(1,)),
+                    Tensor(name="predictions", dtype=np.float32, shape=(-1,)),
                 ],
                 config=ModelConfig(max_batch_size=64),
+                strict=True,
             )
 
             LOGGER.info("Serving model")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -43,17 +43,17 @@ LABELS = [
 
 @batch
 def _infer_fn(sequence: np.ndarray):
-    sequence = np.char.decode(sequence.astype("bytes"), "utf-8")  # need to convert dtype=object to bytes first
+    sequence = np.char.decode(sequence.astype("bytes"), "utf-8")
     sequence = sequence.tolist()
 
     classification_result = CLASSIFIER(sequence, LABELS)
     result_labels = []
     for result in classification_result:
         logger.debug(result)
-        label = result["labels"][0]
-        result_labels.append(label)
+        most_probable_label = result["labels"][0]
+        result_labels.append([most_probable_label])
 
-    return {"labels": np.char.encode(result_labels, "utf-8")}
+    return {"label": np.char.encode(result_labels, "utf-8")}
 
 
 def main():
@@ -84,9 +84,10 @@ def main():
                 Tensor(name="sequence", dtype=bytes, shape=(1,)),
             ],
             outputs=[
-                Tensor(name="labels", dtype=bytes, shape=(-1,)),
+                Tensor(name="label", dtype=bytes, shape=(1,)),
             ],
             config=ModelConfig(max_batch_size=args.max_batch_size),
+            strict=True,
         )
         logger.info("Serving inference")
         triton.serve()

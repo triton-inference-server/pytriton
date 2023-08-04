@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -95,7 +95,7 @@ def main():
                 file_idx = req_idx + idx
                 file_path = results_path / str(file_idx) / "image.jpeg"
                 file_path.parent.mkdir(parents=True, exist_ok=True)
-                msg = base64.b64decode(image)
+                msg = base64.b64decode(image[0])
                 buffer = io.BytesIO(msg)
                 image = Image.open(buffer)
                 with file_path.open("wb") as fp:
