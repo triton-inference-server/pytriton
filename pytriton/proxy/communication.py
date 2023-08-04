@@ -16,13 +16,52 @@
 It is used for interaction between model and proxy_backend.
 """
 
+import atexit
+import ctypes
+import ctypes.util
 import dataclasses
+import fcntl
+import gc
 import json
+import logging
+import math
+import multiprocessing.managers
+import multiprocessing.shared_memory
+import pathlib
+import signal
 import struct
-from multiprocessing.shared_memory import SharedMemory
-from typing import Dict, List, Literal, Optional, Tuple, Union
+import threading
+import time
+import uuid
+import weakref
+from typing import Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 import numpy as np
+
+_LOGGER = None
+
+
+def _update_logger():
+    """Update module logger."""
+    try:
+        # https://github.com/triton-inference-server/python_backend/blob/main/src/pb_stub.cc#L1501
+        import triton_python_backend_utils as pb_utils  # pytype: disable=import-error
+
+        logger = pb_utils.Logger  # pytype: disable=module-attr
+        logger.error = logger.log_error
+        logger.warning = logger.log_warn
+        logger.info = logger.log_info
+        logger.debug = logger.log_verbose
+        # do not set log_to_stderr in Proxy Backend
+    except (ImportError, AttributeError):
+        logger = logging.getLogger(__name__)
+        root_logger = logging.getLogger()
+        if root_logger.level <= logging.INFO:
+            multiprocessing.util.log_to_stderr(logging.INFO)
+    global _LOGGER
+    _LOGGER = logger
+    return logger
+
 
 # copy from
 # https://github.com/triton-inference-server/python_backend/blob/main/src/resources/triton_python_backend_utils.py
@@ -189,29 +228,11 @@ def calc_serialized_size_of_numpy_with_struct_header(tensor: np.ndarray) -> List
     return [header_size, data_size]
 
 
-@dataclasses.dataclass(frozen=True)
-class TensorId:
-    """Data class for storing id of tensor in Tensor Store."""
-
-    memory_name: str
-    memory_offset: int
-
-    @classmethod
-    def from_str(cls, tensor_id: str):
-        """Create TensorId object from string."""
-        memory_name, memory_offset = tensor_id.split(":", maxsplit=1)
-        return cls(memory_name, int(memory_offset))
-
-    def __str__(self):
-        """Convert TensorId object to string."""
-        return f"{self.memory_name}:{self.memory_offset}"
-
-
 @dataclasses.dataclass
 class MetaRequestResponse:
     """Data class for storing input/output data and parameters."""
 
-    data: Dict[str, TensorId]
+    data: Dict[str, str]
     parameters: Optional[Dict[str, Union[str, int, bool]]] = None
 
 
@@ -232,10 +253,7 @@ class InferenceHandlerRequests:
         return cls(
             requests=[
                 MetaRequestResponse(
-                    data={
-                        input_name: TensorId.from_str(tensor_id)
-                        for input_name, tensor_id in request.get("data", {}).items()
-                    },
+                    data=request.get("data", {}),
                     parameters=request.get("parameters"),
                 )
                 for request in requests["requests"]
@@ -247,7 +265,7 @@ class InferenceHandlerRequests:
         requests = {
             "requests": [
                 {
-                    "data": {input_name: str(tensor_id) for input_name, tensor_id in request.data.items()},
+                    "data": request.data,
                     "parameters": request.parameters,
                 }
                 for request in self.requests
@@ -272,15 +290,7 @@ class InferenceHandlerResponses:
         """
         responses = json.loads(content)
         return cls(
-            responses=[
-                MetaRequestResponse(
-                    {
-                        output_name: TensorId.from_str(tensor_id)
-                        for output_name, tensor_id in response.get("data", {}).items()
-                    }
-                )
-                for response in responses.get("responses", [])
-            ],
+            responses=[MetaRequestResponse(response.get("data", {})) for response in responses.get("responses", [])],
             error=responses.get("error"),
         )
 
@@ -288,143 +298,443 @@ class InferenceHandlerResponses:
         """Serializes InferenceHandlerResponses object to bytes."""
         result = {"error": self.error}
         if self.responses:
-            result["responses"] = [
-                {"data": {output_name: str(tensor_id) for output_name, tensor_id in response.data.items()}}
-                for response in self.responses
-            ]
+            result["responses"] = [{"data": response.data} for response in self.responses]
         return json.dumps(result).encode("utf-8")
 
 
-class ShmManager:
-    """Controls transfer between input and output numpy arrays in via shared memory."""
+@dataclasses.dataclass
+class BlockDescriptor:
+    """Descriptor of block in shared memory."""
+
+    shm_name: str
+    offset: int
+    size: Optional[int] = None
+
+    def __post_init__(self):
+        """Initialize other attributes."""
+        self.id = f"{self.shm_name}:{self.offset}"
+
+    @classmethod
+    def from_id(cls, tensor_id: str):
+        """Create BlockDescriptor from dict."""
+        shm_name, offset = tensor_id.split(":")
+        return cls(shm_name, int(offset))
+
+
+class _SharedMemorySegment:
+    def __init__(self, size):
+        self.shared_memory = multiprocessing.shared_memory.SharedMemory(create=True, size=size)
+        multiprocessing.util.debug(f"Created {self.shared_memory.name} of size {self.shared_memory.size}")
+        self.used_blocks: List[BlockDescriptor] = []
+        self.used_blocks_lock = threading.RLock()
+        self.free_blocks = [BlockDescriptor(self.shared_memory.name, offset=0, size=size)]
+        self.max_free_block_size = size
+
+    def _update_free_blocks(self):
+        total_size = self.shared_memory.size
+        free_blocks = []
+        offset = 0
+
+        with self.used_blocks_lock:
+            # find holes between used blocks
+            for used_block in self.used_blocks:
+                if used_block.offset > offset:
+                    free_blocks.append(
+                        BlockDescriptor(self.shared_memory.name, offset=offset, size=used_block.offset - offset)
+                    )
+                offset = used_block.offset + used_block.size
+        # if tail is free
+        if offset < total_size:
+            free_blocks.append(BlockDescriptor(self.shared_memory.name, offset=offset, size=total_size - offset))
+
+        self.free_blocks = free_blocks
+        self.max_free_block_size = max(block.size for block in self.free_blocks)
+
+    def __contains__(self, block_id: str) -> bool:
+        with self.used_blocks_lock:
+            return any(block_id == block.id for block in self.used_blocks)  # pytype: disable=attribute-error
+
+    def __getitem__(self, block_id: str) -> BlockDescriptor:
+        with self.used_blocks_lock:
+            for block in self.used_blocks:
+                if block.id == block_id:  # pytype: disable=attribute-error
+                    return block
+        raise KeyError(f"Block with id {block_id} not found in segment {self.shared_memory.name}")
+
+    def allocate(self, offset, byte_size):
+        block = BlockDescriptor(self.shared_memory.name, offset=offset, size=byte_size)
+        with self.used_blocks_lock:
+            self.used_blocks.append(block)
+            self.used_blocks.sort(key=lambda block: block.offset)
+            self._update_free_blocks()
+        return block
+
+    def release(self, block: BlockDescriptor):
+        with self.used_blocks_lock:
+            self.used_blocks.remove(block)
+            self._update_free_blocks()
+
+
+class _DataBlocksServer:
+    _instance = None
+    _cnt = 0
+    _minimal_segment_size = 4096  # 4KB
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
 
     def __init__(self):
-        """Initialize ShmManager class."""
-        self._shm_buffer = None
-        self._serialized_arrays = {}
-        self._offset = 0
+        # WAR: for some reason, the __init__ is called on each create of proxy object
+        if self._cnt == 1:
+            return
+        self._cnt += 1
+        self._id = uuid.uuid4()  # to verify that it is singleton across processes
+        self._segments = []
+        self._segments_lock = threading.RLock()
+        atexit.register(self.close)
+
+    def get_free_blocks(self, bytes_sizes: Sequence[int]) -> Sequence[str]:
+        tensors_ids = []
+        with self._segments_lock:
+            for byte_size in bytes_sizes:
+                for segment in self._segments:
+                    if segment.max_free_block_size >= byte_size:
+                        for free_block in segment.free_blocks:
+                            if free_block.size >= byte_size:
+                                block = self._allocate_block(segment, free_block.offset, byte_size)
+                                tensors_ids.append(block.id)  # pytype: disable=attribute-error
+                                break
+                    else:
+                        continue  # If no suitable block was found, try the next segment
+                    break  # If a suitable block was found, don't try any more segments
+                else:  # If no suitable block was found in any segment
+                    new_segment_size = int(
+                        max(self._minimal_segment_size, math.pow(2, math.ceil(math.log2(byte_size))))
+                    )
+                    block = self._allocate_block(
+                        self._create_new_segment(new_segment_size), offset=0, byte_size=byte_size
+                    )
+                    tensors_ids.append(block.id)  # pytype: disable=attribute-error
+        return tensors_ids
+
+    def release_block(self, block_id: str):
+        with self._segments_lock:
+            for segment in self._segments:
+                try:
+                    block = segment[block_id]
+                    segment.release(block)
+                    return
+                except KeyError:
+                    pass
+        raise KeyError(f"Block with id {block_id} not found in server")
+
+    def _allocate_block(self, segment: _SharedMemorySegment, offset: int, byte_size: int) -> BlockDescriptor:
+        return segment.allocate(offset, byte_size)
+
+    def _create_new_segment(self, segment_size):
+        segment = _SharedMemorySegment(segment_size)
+        self._segments.append(segment)
+        return segment
+
+    def _get_debug_status(self):
+        return {
+            "server_id": str(self._id),
+            "host_pid": multiprocessing.current_process().pid,
+            "segments": [
+                {
+                    "shared_memory": segment.shared_memory.name,
+                    "used_blocks": [str(block) for block in segment.used_blocks],
+                }
+                for segment in self._segments
+            ],
+        }
+
+    def close(self):
+        multiprocessing.util.debug(f"Closing server {self._id}")
+        with self._segments_lock:
+            for segment in self._segments:
+                multiprocessing.util.debug(f"Closing and delete segment {segment.shared_memory.name}")
+                segment.shared_memory.close()
+                segment.shared_memory.unlink()
+
+
+class BlocksStoreManager(multiprocessing.managers.BaseManager):
+    """Remote block store for storing and retrieving numpy arrays in/from shared memory."""
+
+    @classmethod
+    def _run_server(cls, registry, address, authkey, serializer, writer, initializer=None, initargs=()):
+        PR_SET_PDEATHSIG = 1  # noqa
+        libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
+        libc.prctl(PR_SET_PDEATHSIG, signal.SIGTERM)  # terminate process when parent **thread** dies
+        super()._run_server(
+            registry, address, authkey, serializer, writer, initializer, initargs
+        )  # pytype: disable=attribute-error
+
+
+_DataBlocksServerProxy = multiprocessing.managers.MakeProxyType(  # pytype: disable=module-attr
+    "DataBlocksServerProxy",
+    ("release_block", "get_free_blocks", "_get_debug_status", "close"),
+)
+
+BlocksStoreManager.register("blocks", _DataBlocksServer, proxytype=_DataBlocksServerProxy)
+
+
+class _FileLock:
+    _locks = {}
+
+    def __new__(cls, file_path):
+        if file_path not in cls._locks:
+            cls._locks[file_path] = super().__new__(cls)
+        return cls._locks[file_path]
+
+    def __init__(self, file_path):
+        if hasattr(self, "_file_path"):
+            return
+        self._file_path = pathlib.Path(file_path)
+        self._file_lock = None
+        self._lock = threading.RLock()
+        atexit.register(self._clean)
+
+    def __enter__(self):
+        self._file_lock = self._file_path.open("a")
+        fcntl.flock(self._file_lock.fileno(), fcntl.LOCK_EX)
+        self._lock.acquire()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        fcntl.flock(self._file_lock.fileno(), fcntl.LOCK_UN)
+        self._lock.release()
+
+    def _clean(self):
+        if self._file_lock is not None:
+            self._file_lock.close()
+        try:
+            self._file_path.unlink(missing_ok=True)
+        except OSError as e:
+            _LOGGER.warning(f"Could not remove lock file {self._file_path}; {e}")
+
+
+class TensorStore:
+    """Tensor store for storing and retrieving numpy arrays in/from shared memory."""
+
+    _SOCKET_EXISTANCE_CHECK_INTERVAL_S = 0.1
+
+    def __init__(self, address: Union[str, pathlib.Path], auth_key: Optional[bytes] = None):
+        """Initialize TensorStore object.
+
+        Args:
+            address: address of data store
+            auth_key: authentication key required to setup connection. If not provided, current process authkey will be used
+        """
+        _update_logger()
+        address = address.as_posix() if isinstance(address, pathlib.Path) else address
+        self._remote_blocks_store_manager = BlocksStoreManager(address, authkey=auth_key)
+        self._remote_blocks_store = None
+        self._manager_start_stop_filelock = _FileLock(f"{address}.lock")
+
+        # container for keeping map between tensor_id and numpy array weak ref
+        self._handled_blocks: Dict[str, weakref.ReferenceType] = {}
+        self._handled_blocks_lock = threading.RLock()
+
+        self._shm_segments: Dict[str, multiprocessing.shared_memory.SharedMemory] = {}
+        self._shm_segments_lock = threading.RLock()
+
         self.serialize = serialize_numpy_with_struct_header
         self.deserialize = deserialize_numpy_with_struct_header
-        self._calc_serialized_size = calc_serialized_size_of_numpy_with_struct_header
+        self._calc_serialized_tensor_size = calc_serialized_size_of_numpy_with_struct_header
 
-    def calc_serialized_size(self, tensor) -> int:
-        """Calculate size of serialized tensor.
+    @property
+    def address(self) -> str:
+        """Return address of remote block store."""
+        return self._remote_blocks_store_manager.address
 
-        Include frames storage (its sizes and total size).
+    def start(self):
+        """Start remote block store."""
+        with self._manager_start_stop_filelock:
+            self._remote_blocks_store_manager.start()
+            self._remote_blocks_store = self._remote_blocks_store_manager.blocks()  # pytype: disable=attribute-error
 
-        Args:
-            tensor: numpy array to serialize
+            address = pathlib.Path(self._remote_blocks_store_manager.address)
+            self._wait_for_address(address)
+            _LOGGER.debug(
+                f"Started remote block store at {address} (pid={self._remote_blocks_store_manager._process.pid})"  # pytype: disable=attribute-error
+            )
 
-        Returns:
-            size of serialized tensor
-        """
-        # frames sizes + total size + frames sizes
-        return sum(self._calc_serialized_size(tensor)) + struct.calcsize("<I") + 2 * struct.calcsize("<I")
+    def connect(self, timeout_s: Optional[float] = None):
+        """Connect to remote block store."""
+        address = pathlib.Path(self._remote_blocks_store_manager.address)
 
-    def reset_buffer(self, required_buffer_size: int):
-        """Reset shared memory buffer.
+        self._wait_for_address(address, timeout_s)
+        self._remote_blocks_store_manager.connect()
+        self._remote_blocks_store = self._remote_blocks_store_manager.blocks()  # pytype: disable=attribute-error
 
-        Reallocate buffer if it is not big enough.
+    def _wait_for_address(self, address, timeout_s: Optional[float] = None):
+        should_stop_at = time.time() + timeout_s if timeout_s is not None else None
+        if timeout_s is not None and self._SOCKET_EXISTANCE_CHECK_INTERVAL_S > timeout_s:
+            socket_existance_check_interval = timeout_s
+        else:
+            socket_existance_check_interval = self._SOCKET_EXISTANCE_CHECK_INTERVAL_S
 
-        Args:
-            required_buffer_size: size of buffer to allocate
-        """
-        if self._shm_buffer and self._shm_buffer.size < required_buffer_size:
-            self.dispose()
+        while not address.exists():
+            if should_stop_at is not None and time.time() >= should_stop_at:
+                raise TimeoutError(f"Timeout while waiting for {address} to be created")
+            time.sleep(socket_existance_check_interval)
 
-        if self._shm_buffer is None:
-            self._shm_buffer = SharedMemory(create=True, size=required_buffer_size)
+    def _calc_serialized_size(self, tensor: np.ndarray) -> int:
+        # frames payload sum + total size + frames sizes
+        # assume 2 frames: header with tensor description + data
+        return sum(self._calc_serialized_tensor_size(tensor)) + struct.calcsize("<I") + 2 * struct.calcsize("<I")
 
-        self._offset = 0
-
-    def append(self, tensor: np.ndarray) -> TensorId:
+    def put(self, tensors: Sequence[np.ndarray]) -> Sequence[str]:
         """Append tensor to shared memory buffer.
 
         Args:
-            tensor: numpy array to append
+            tensors: numpy arrays to store
 
         Returns:
-            TensorId object
+            List of ids of stored tensors
         """
-        if self._shm_buffer is None:
-            raise RuntimeError(
-                "Shared memory buffer is not initialized. Call reset_buffer(required_buffer_size) first."
-            )
+        byte_size_of_frames_containers = [self._calc_serialized_size(tensor) for tensor in tensors]
+        tensors_ids = self._remote_blocks_store.get_free_blocks(byte_size_of_frames_containers)
+        blocks = [BlockDescriptor.from_id(tensor_id) for tensor_id in tensors_ids]
 
-        frames = self.serialize(tensor)
-        offset = self._offset
-        data_copied_len = self._copy_frames(frames, offset)
-        self._offset += data_copied_len
-        tensor_id = TensorId(self._shm_buffer.name, offset)
-        return tensor_id
+        for tensor, block in zip(tensors, blocks):
+            with self._shm_segments_lock:
+                shm = self._shm_segments.get(block.shm_name)
+                if shm is None:
+                    shm = multiprocessing.shared_memory.SharedMemory(block.shm_name, create=False)
+                    self._shm_segments[block.shm_name] = shm
 
-    def get(self, tensor_id: Union[str, TensorId]) -> np.ndarray:
-        """Get tensor from shared memory buffer.
+            frames = self.serialize(tensor)
+            self._copy_frames(frames, shm, block.offset)
+
+        return tensors_ids
+
+    def get(self, tensor_id: str) -> np.ndarray:
+        """Get numpy array from tensor store.
 
         Args:
-            tensor_id: TensorId object or string representation of TensorId
+            tensor_id: id of of tenosr to get
 
         Returns:
             numpy array
         """
-        if isinstance(tensor_id, str):
-            tensor_id = TensorId.from_str(tensor_id)
-        frames = self._handle_frames(tensor_id.memory_name, tensor_id.memory_offset)
-        tensor = self.deserialize(frames)
-        return tensor
+        tensor = None
+        # try to handle already handled tensor from weakref
+        with self._handled_blocks_lock:
+            tensor_ref = self._handled_blocks.get(tensor_id)
+            if tensor_ref is not None:
+                tensor = tensor_ref()
 
-    def _copy_frames(self, frames: List[Union[bytes, memoryview]], offset) -> int:
-        # caller should ensure that self._shm_buffer is initialized
-        shm_buffer: SharedMemory = self._shm_buffer  # type: ignore
+        if tensor is None:  # if tensor was not handled yet or weakref is already empty
+            block = BlockDescriptor.from_id(tensor_id)
 
+            # check if shm segment is already opened
+            with self._shm_segments_lock:
+                shm = self._shm_segments.get(block.shm_name)
+
+            # if not open it and put into cache
+            if shm is None:
+                shm = multiprocessing.shared_memory.SharedMemory(block.shm_name, create=False)
+                with self._shm_segments_lock:
+                    shm = self._shm_segments.setdefault(block.shm_name, shm)  # in meantime other thread could create it
+
+            frames = self._handle_frames(shm, block.offset)
+            tensor = self.deserialize(frames)
+
+            # store tensor in weakref to be able to release shared memory when tensor will be garbage collected
+            with self._handled_blocks_lock:
+                tensor_ref = self._handled_blocks.setdefault(tensor_id, weakref.ref(tensor))
+                tensor = tensor_ref()
+
+        return tensor  # pytype: disable=bad-return-type
+
+    def release_block(self, tensor_id: str):
+        """Release shared memory block.
+
+        Args:
+            tensor_id: id of tensor to release
+        """
+        _LOGGER.debug(f"Releasing shared memory block for tensor {tensor_id}")
+
+        tensor_ref = None
+        with self._handled_blocks_lock:
+            tensor_ref = self._handled_blocks.pop(tensor_id, None)
+
+        try:
+            if tensor_ref is not None:
+                self._remote_blocks_store.release_block(tensor_id)
+        except OSError:  # thrown when remote process is already closed
+            _LOGGER.warning(
+                f"Failed to release block {tensor_id} on remote process at {self.address}. Probably remote process is already closed"
+            )
+
+    def _copy_frames(
+        self,
+        frames: List[Union[bytes, memoryview]],
+        shm: multiprocessing.shared_memory.SharedMemory,
+        offset: int,
+    ) -> int:
         total_size = struct.calcsize("<I")  # start after total_size; max 4GB for all frames
         for frame in frames:
             if isinstance(frame, bytes):
                 frame = memoryview(frame)
 
             assert frame.contiguous, "Only contiguous arrays are supported"
-            struct.pack_into("<I", shm_buffer.buf, offset + total_size, frame.nbytes)
+            struct.pack_into("<I", shm.buf, offset + total_size, frame.nbytes)
             total_size += struct.calcsize("<I")
-            shm_buffer.buf[offset + total_size : offset + total_size + frame.nbytes] = frame.cast("B")
+            shm.buf[offset + total_size : offset + total_size + frame.nbytes] = frame.cast("B")
 
             total_size += frame.nbytes
 
-        struct.pack_into("<I", shm_buffer.buf, offset, total_size)
+        struct.pack_into("<I", shm.buf, offset, total_size)
         return total_size
 
-    def _handle_frames(self, memory_name, block_offset: int) -> List[memoryview]:
-
-        if self._shm_buffer and self._shm_buffer.name != memory_name:
-            self.dispose()
-        if self._shm_buffer is None:
-            self._shm_buffer = SharedMemory(memory_name, create=False)
-
-        if self._shm_buffer.size < block_offset:
-            raise RuntimeError(f"Shared memory buffer is too small for requested offset {block_offset}")
-
+    def _handle_frames(self, shm: multiprocessing.shared_memory.SharedMemory, block_offset: int) -> List[memoryview]:
         frames = []
-        (total_size,) = struct.unpack_from("<I", self._shm_buffer.buf, block_offset)
+        (total_size,) = struct.unpack_from("<I", shm.buf, block_offset)
         offset = struct.calcsize("<I")
         while offset < total_size:
-            (frame_size,) = struct.unpack_from("<I", self._shm_buffer.buf, block_offset + offset)
+            (frame_size,) = struct.unpack_from("<I", shm.buf, block_offset + offset)
             offset += struct.calcsize("<I")
-            frame = self._shm_buffer.buf[block_offset + offset : block_offset + offset + frame_size]
+            frame = shm.buf[block_offset + offset : block_offset + offset + frame_size]
             offset += frame_size
             frames.append(frame)
         return frames
 
-    def dispose(self):
-        """Free resources used by this wrapper."""
-        if self._shm_buffer:
-            self._shm_buffer.close()
-            try:
-                self._shm_buffer.unlink()
-            except FileNotFoundError:
-                from multiprocessing.resource_tracker import unregister
+    def close(self):
+        """Free resources used by TensorStore object."""
+        from multiprocessing.resource_tracker import register, unregister
 
-                # to WAR bug in SharedMemory:
-                # not unregistering shared memory segment in current process resource tracker
-                # when /dev/shm file doesn't exist - removed by other process
-                unregister(self._shm_buffer._name, "shared_memory")  # pytype: disable=attribute-error
-        self._shm_buffer = None
-        self._memory_name = None
+        _LOGGER.debug("TensorStore is being closed")
+
+        gc.collect()
+        with self._handled_blocks_lock:
+            tensors_ids = list(self._handled_blocks)
+            for tensor_id in tensors_ids:
+                self.release_block(tensor_id)
+
+        with self._shm_segments_lock:
+            for shm in self._shm_segments.values():
+                _LOGGER.debug(f"Unregistering shared memory {shm.name}")
+                try:
+                    shm.close()
+                    register(shm._name, "shared_memory")  # pytype: disable=attribute-error
+                    unregister(shm._name, "shared_memory")  # pytype: disable=attribute-error
+                except Exception as e:
+                    _LOGGER.warning(f"Failed to unregister shared memory {shm.name}: {e}")
+
+            self._shm_segments = {}
+
+        if hasattr(self._remote_blocks_store_manager, "shutdown"):
+            if self._remote_blocks_store is not None:
+                _LOGGER.debug(f"Releasing all resources on remote process at {self.address}")
+                try:
+                    self._remote_blocks_store.close()
+                except FileNotFoundError:  # thrown when remote process is already closed
+                    pass
+            self._remote_blocks_store = None
+            _LOGGER.debug(f"Shutting down side process of data store at {self.address}")
+            self._remote_blocks_store_manager.shutdown()
+        _LOGGER.debug(f"TensorStore at {self.address} closed")

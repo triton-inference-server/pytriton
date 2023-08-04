@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Model base class."""
+import base64
 import copy
 import enum
+import json
 import logging
+import multiprocessing
 import pathlib
 import shutil
 import threading
@@ -112,6 +115,7 @@ class Model:
         self._workspace = workspace
         ipc_socket_path = self._workspace.path / f"ipc_proxy_backend_{model_name}"
         self._shared_memory_socket = f"ipc://{ipc_socket_path.as_posix()}"
+        self._data_store_socket = self._workspace.path / "data_store.sock"
         self._triton_model_config: Optional[TritonModelConfig] = None
         self._model_events_observers: typing.List[ModelEventsHandler] = []
 
@@ -161,6 +165,7 @@ class Model:
                         model_callable=infer_function,
                         model_config=triton_model_config,
                         shared_memory_socket=f"{self._shared_memory_socket}_{i}",
+                        data_store_socket=self._data_store_socket.as_posix(),
                         zmq_context=self.zmq_context,
                     )
                     inference_handler.on_proxy_backend_event(self._on_proxy_backend_event)
@@ -249,7 +254,14 @@ class Model:
         try:
             for i in range(len(self.infer_functions)):
                 socket.recv()
-                socket.send_string(f"{self._shared_memory_socket}_{i}")
+                authkey = multiprocessing.current_process().authkey
+                instance_data = {
+                    "shared-memory-socket": f"{self._shared_memory_socket}_{i}",
+                    "data-store-socket": self._data_store_socket.as_posix(),
+                    "auth-key": base64.b64encode(authkey).decode("utf-8"),
+                }
+                json_payload = json.dumps(instance_data)
+                socket.send_string(json_payload)
         except Exception as exception:
             LOGGER.error("Internal proxy backend error. It will be closed.")
             LOGGER.exception(exception)

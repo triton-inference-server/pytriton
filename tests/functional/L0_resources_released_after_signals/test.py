@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -54,13 +54,13 @@ def _run_infer(url, init_timeout_s, batch_size):
         np.testing.assert_allclose(result_batch["sub"], a_batch - b_batch)
 
 
-def _check_resources_allocated():
-    shared_memory_files = list(pathlib.Path("/dev/shm").rglob("*"))
+def _check_resources_allocated(initial_shared_memory_files):
+    shared_memory_files = sorted(set(pathlib.Path("/dev/shm").rglob("*")) - set(initial_shared_memory_files))
     assert shared_memory_files, shared_memory_files
 
 
-def _check_resources_released():
-    shared_memory_files = list(pathlib.Path("/dev/shm").rglob("*"))
+def _check_resources_released(initial_shared_memory_files):
+    shared_memory_files = sorted(set(pathlib.Path("/dev/shm").rglob("*")) - set(initial_shared_memory_files))
     assert not shared_memory_files, shared_memory_files
 
 
@@ -88,6 +88,7 @@ def _run_test(init_timeout_s, verbose, seed, signal_value, test_timeout_s):
     if verbose:
         server_cmd.append("--verbose")
 
+    initial_shared_memory_files = list(pathlib.Path("/dev/shm").rglob("*"))
     with ScriptThread(server_cmd, name="server") as server_thread:
         url = f"http://localhost:{http_port}"
         _run_infer(url, init_timeout_s, batch_size=32)
@@ -97,7 +98,7 @@ def _run_test(init_timeout_s, verbose, seed, signal_value, test_timeout_s):
         children_processes = server_thread.process.children(recursive=True)
         LOGGER.info(f"Found children processes: {children_processes}")
 
-        _check_resources_allocated()
+        _check_resources_allocated(initial_shared_memory_files)
         LOGGER.info(f"Sending {signal_value} to server script process ({server_thread.process})")
         server_thread.process.send_signal(signal_value)
 
@@ -123,7 +124,7 @@ def _run_test(init_timeout_s, verbose, seed, signal_value, test_timeout_s):
         else:
             LOGGER.info("All processed terminated")
 
-    _check_resources_released()
+    _check_resources_released(initial_shared_memory_files)
 
 
 def main():

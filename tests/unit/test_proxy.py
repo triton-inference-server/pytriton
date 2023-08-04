@@ -19,7 +19,7 @@ import numpy as np
 import zmq
 
 from pytriton.model_config.triton_model_config import TensorSpec, TritonModelConfig
-from pytriton.proxy.communication import InferenceHandlerRequests, MetaRequestResponse, ShmManager
+from pytriton.proxy.communication import InferenceHandlerRequests, MetaRequestResponse, TensorStore
 from pytriton.proxy.inference_handler import InferenceHandler
 from pytriton.proxy.types import Request
 
@@ -55,30 +55,42 @@ def test_proxy_throws_exception_when_infer_func_returns_non_supported_type(tmp_p
     input1 = np.ones((128, 4), dtype="float32")
     input2 = np.zeros((128, 4), dtype="float32")
 
-    shm_manager = ShmManager()
-
-    requests = [Request({"input1": input1, "input2": input2})]
-    required_size_bytes = sum(
-        shm_manager.calc_serialized_size(input_data) for request in requests for input_data in request.values()
-    )
-    shm_manager.reset_buffer(required_size_bytes)
-    meta_requests = InferenceHandlerRequests(
-        requests=[
-            MetaRequestResponse(
-                data={input_name: shm_manager.append(input_data) for input_name, input_data in request.items()},
-                parameters=request.parameters,
-            )
-            for request in requests
-        ]
-    )
+    # simulate tensor store started by proxy backend
+    data_store_socket = (tmp_path / "data_store.socket").as_posix()
+    tensor_store = TensorStore(data_store_socket)  # authkey will be taken from current process
 
     try:
 
         def _infer_fn(_):
             return {"output1": np.array([1, 2, 3]), "output2": np.array([1, 2, 3])}
 
+        tensor_store.start()  # start tensor store side process - this way InferenceHandler will create client for it
+        requests = [Request({"input1": input1, "input2": input2})]
+        input_arrays_with_coords = [
+            (request_idx, input_name, tensor)
+            for request_idx, request in enumerate(requests)
+            for input_name, tensor in request.items()
+        ]
+        tensor_ids = tensor_store.put([tensor for _, _, tensor in input_arrays_with_coords])
+        requests_with_ids = [{}] * len(requests)
+        for (request_idx, input_name, _), tensor_id in zip(input_arrays_with_coords, tensor_ids):
+            requests_with_ids[request_idx][input_name] = tensor_id
+
+        meta_requests = InferenceHandlerRequests(
+            requests=[
+                MetaRequestResponse(data=request_with_ids, parameters=request.parameters)
+                for request, request_with_ids in zip(requests, requests_with_ids)
+            ]
+        )
+
         zmq_context = zmq.Context()
-        proxy = InferenceHandler(_infer_fn, MY_MODEL_CONFIG, f"ipc://{tmp_path}/my", zmq_context)
+        proxy = InferenceHandler(
+            _infer_fn,
+            MY_MODEL_CONFIG,
+            shared_memory_socket=f"ipc://{tmp_path}/my",
+            data_store_socket=data_store_socket,
+            zmq_context=zmq_context,
+        )
         spy_send = _patch_inference_handler__recv_send(mocker, proxy, meta_requests.as_bytes())
         proxy.start()
 
@@ -97,7 +109,7 @@ def test_proxy_throws_exception_when_infer_func_returns_non_supported_type(tmp_p
             proxy.stop()
             if proxy.is_alive():
                 proxy.join(timeout=1)
-        shm_manager.dispose()
+        tensor_store.close()
         if zmq_context:
             zmq_context.term()
 
@@ -106,32 +118,45 @@ def test_proxy_throws_exception_when_infer_func_returns_non_supported_output_ite
     input1 = np.ones((128, 4), dtype="float32")
     input2 = np.zeros((128, 4), dtype="float32")
 
-    shm_manager = ShmManager()
-
-    requests = [Request(data={"input1": input1, "input2": input2}, parameters={})]
-    required_size_bytes = sum(
-        shm_manager.calc_serialized_size(input_data) for request in requests for input_data in request.values()
-    )
-    shm_manager.reset_buffer(required_size_bytes)
-    meta_requests = InferenceHandlerRequests(
-        requests=[
-            MetaRequestResponse(
-                data={input_name: shm_manager.append(input_data) for input_name, input_data in request.items()},
-            )
-            for request in requests
-        ]
-    )
+    # tensor store client
+    data_store_socket = (tmp_path / "data_store.socket").as_posix()
+    tensor_store = TensorStore(data_store_socket)  # authkey will be taken from current process
 
     zmq_context = None
     proxy = None
-
     try:
 
         def _infer_fn(_):
             return [{"output1": [1, 2, 3], "output2": np.array([1, 2, 3])}]
 
+        tensor_store.start()  # start tensor store side process - this way InferenceHandler will create client for it
+
+        requests = [Request(data={"input1": input1, "input2": input2}, parameters={})]
+        input_arrays_with_coords = [
+            (request_idx, input_name, tensor)
+            for request_idx, request in enumerate(requests)
+            for input_name, tensor in request.items()
+        ]
+        tensor_ids = tensor_store.put([tensor for _, _, tensor in input_arrays_with_coords])
+        requests_with_ids = [{}] * len(requests)
+        for (request_idx, input_name, _), tensor_id in zip(input_arrays_with_coords, tensor_ids):
+            requests_with_ids[request_idx][input_name] = tensor_id
+
+        meta_requests = InferenceHandlerRequests(
+            requests=[
+                MetaRequestResponse(data=request_with_ids, parameters=request.parameters)
+                for request, request_with_ids in zip(requests, requests_with_ids)
+            ]
+        )
+
         zmq_context = zmq.Context()
-        proxy = InferenceHandler(_infer_fn, MY_MODEL_CONFIG, f"ipc://{tmp_path}/my", zmq_context)
+        proxy = InferenceHandler(
+            _infer_fn,
+            MY_MODEL_CONFIG,
+            shared_memory_socket=f"ipc://{tmp_path}/my",
+            data_store_socket=data_store_socket,
+            zmq_context=zmq_context,
+        )
         spy_send = _patch_inference_handler__recv_send(mocker, proxy, meta_requests.as_bytes())
         proxy.start()
 
@@ -150,6 +175,6 @@ def test_proxy_throws_exception_when_infer_func_returns_non_supported_output_ite
             proxy.stop()
             if proxy.is_alive():
                 proxy.join(timeout=1)
-        shm_manager.dispose()
+        tensor_store.close()
         if zmq_context:
             zmq_context.term()

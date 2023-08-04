@@ -15,6 +15,8 @@
 
 This file is automatically copied during deployment on Triton.
 """
+import base64
+import itertools
 import json
 import traceback
 import typing
@@ -22,7 +24,7 @@ import typing
 import triton_python_backend_utils as pb_utils  # pytype: disable=import-error
 import zmq  # pytype: disable=import-error
 
-from .communication import InferenceHandlerRequests, InferenceHandlerResponses, MetaRequestResponse, ShmManager
+from .communication import InferenceHandlerRequests, InferenceHandlerResponses, MetaRequestResponse, TensorStore
 from .types import Request, Response
 
 
@@ -40,8 +42,8 @@ class TritonPythonModel:
         self.model_outputs = []
         self.model_outputs_dict = {}
 
-        self.shm_request_manager = ShmManager()
-        self.shm_response_manager = ShmManager()
+        self._tensor_store = None
+        self._last_response_ids = []
 
     def initialize(self, args):
         """Triton Inference Server Python Backend API called only once when the model is being loaded.
@@ -63,8 +65,9 @@ class TritonPythonModel:
             self.model_config = json.loads(args["model_config"])
             shared_memory_socket = self.model_config["parameters"]["shared-memory-socket"]["string_value"]
             logger.log_verbose(f"Connecting to IPC socket at {shared_memory_socket}")
-            instance_shared_memory_socket = self._get_instance_socket(shared_memory_socket)
-            self.socket.connect(instance_shared_memory_socket)
+
+            instance_data = self._get_instance_data(shared_memory_socket)
+            self.socket.connect(instance_data["shared-memory-socket"])
             logger.log_verbose(f"Connected to socket {shared_memory_socket}.")
 
             self.model_inputs = self.model_config["input"]
@@ -73,6 +76,14 @@ class TritonPythonModel:
 
             logger.log_verbose(f"Model inputs: {self.model_inputs}")
             logger.log_verbose(f"Model outputs: {self.model_outputs}")
+
+            data_store_socket = instance_data["data-store-socket"]
+            auth_key = base64.b64decode(instance_data["auth-key"])
+
+            self._tensor_store = TensorStore(data_store_socket, auth_key)
+            self._tensor_store.connect()
+
+            self._last_response_ids = []
 
         except Exception:
             msg = traceback.format_exc()
@@ -103,7 +114,7 @@ class TritonPythonModel:
                     request[model_input["name"]] = input_tensor.as_numpy()
             requests.append(Request(data=request, parameters=json.loads(triton_request.parameters())))
 
-        responses = self._exec_requests(requests, logger)
+        responses = self._exec_requests(requests)
 
         triton_responses = []
         for response in responses:
@@ -123,6 +134,7 @@ class TritonPythonModel:
     def finalize(self) -> None:
         """Finalize the model cleaning the buffers."""
         logger = pb_utils.Logger  # pytype: disable=module-attr
+        logger.log_verbose("Finalizing backend instance.")
         logger.log_verbose("Cleaning socket and context.")
         socket_close_timeout_s = 0
         if self.socket:
@@ -133,9 +145,10 @@ class TritonPythonModel:
         self.context = None
 
         logger.log_verbose("Removing allocated shared memory.")
-
-        self.shm_request_manager.dispose()
-        self.shm_response_manager.dispose()
+        for tensor_id in self._last_response_ids:
+            self._tensor_store.release_block(tensor_id)
+        self._tensor_store.close()
+        self._tensor_store = None
 
         logger.log_verbose("Finalized.")
 
@@ -148,43 +161,53 @@ class TritonPythonModel:
         """
         return self.model_config["max_batch_size"] > 0
 
-    def _get_instance_socket(self, shared_memory_socket):
+    def _get_instance_data(self, shared_memory_socket) -> typing.Dict[str, str]:
         handshake_socket = self.context.socket(zmq.REQ)
         handshake_socket.connect(shared_memory_socket)
         handshake_socket.send_string("get_instance_socket")
-        instance_shared_memory_socket = handshake_socket.recv().decode("utf-8")
+        instance_data_payload = handshake_socket.recv()
         handshake_socket.close()
-        return instance_shared_memory_socket
+        instance_data = json.loads(instance_data_payload.decode("utf-8"))
+        logger = pb_utils.Logger  # pytype: disable=module-attr
+        instance_data_copy = instance_data.copy()
+        if "auth-key" in instance_data_copy:
+            instance_data_copy["auth-key"] = "***"
+        logger.log_verbose(f"Obtained instance data: {instance_data_copy}")
+        return instance_data
 
-    def _exec_requests(self, requests: typing.List[Request], logger) -> typing.List[Response]:
-        logger.log_verbose("Execute batch processing.")
+    def _exec_requests(self, requests: typing.List[Request]) -> typing.List[Response]:
+        logger = pb_utils.Logger  # pytype: disable=module-attr
         try:
             # to avoid reallocation need to declare required size of the buffer here
             logger.log_verbose("Copying inputs to shared memory.")
-            required_size_bytes = sum(
-                self.shm_request_manager.calc_serialized_size(input_data)
-                for request in requests
-                for input_data in request.values()
-            )
-            self.shm_request_manager.reset_buffer(required_size_bytes)
+            for tensor_id in self._last_response_ids:
+                self._tensor_store.release_block(tensor_id)
+
+            input_arrays_with_coords = [
+                (request_idx, input_name, tensor)
+                for request_idx, request in enumerate(requests)
+                for input_name, tensor in request.items()
+            ]
+            tensor_ids = self._tensor_store.put([tensor for *_, tensor in input_arrays_with_coords])
+            requests_with_ids = [{} for _ in range(len(requests))]
+            for (request_idx, input_name, _), tensor_id in zip(input_arrays_with_coords, tensor_ids):
+                requests_with_ids[request_idx][input_name] = tensor_id
+
             meta_requests = InferenceHandlerRequests(
                 requests=[
-                    MetaRequestResponse(
-                        data={
-                            input_name: self.shm_request_manager.append(input_data)
-                            for input_name, input_data in request.items()
-                        },
-                        parameters=request.parameters,
-                    )
-                    for request in requests
+                    MetaRequestResponse(data=request_with_ids, parameters=request.parameters)
+                    for request, request_with_ids in zip(requests, requests_with_ids)
                 ]
             )
-            logger.log_verbose("Sending request to socket.")
+            logger.log_verbose(f"Sending request to socket: {meta_requests}")
             self.socket.send(meta_requests.as_bytes())
 
             logger.log_verbose("Waiting for response.")
             responses_payload = self.socket.recv()
             meta_responses = InferenceHandlerResponses.from_bytes(responses_payload)
+            self._last_response_ids = list(
+                itertools.chain(*[response.data.values() for response in meta_responses.responses])
+            )
 
             logger.log_verbose(f"Response: {meta_responses.responses}")
             if meta_responses.error:
@@ -194,7 +217,7 @@ class TritonPythonModel:
             responses = [
                 Response(
                     data={
-                        output_name: self.shm_response_manager.get(output_id)
+                        output_name: self._tensor_store.get(output_id)
                         for output_name, output_id in response.data.items()
                     }
                 )

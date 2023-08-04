@@ -40,12 +40,15 @@ def main():
     args = parser.parse_args()
 
     log_level = logging.DEBUG if args.verbose else logging.INFO
+    verbose_level = 3 if args.verbose else 0
     logging.basicConfig(level=log_level, format=DEFAULT_LOG_FORMAT)
     LOGGER.debug(f"CLI args: {args}")
 
     random.seed(args.seed)
 
-    triton_config = TritonConfig(grpc_port=find_free_port(), http_port=find_free_port(), metrics_port=find_free_port())
+    triton_config = TritonConfig(
+        grpc_port=find_free_port(), http_port=find_free_port(), metrics_port=find_free_port(), log_verbose=verbose_level
+    )
     LOGGER.debug(f"Using {triton_config}")
 
     with Triton(config=triton_config) as triton:

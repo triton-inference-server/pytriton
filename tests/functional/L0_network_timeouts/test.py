@@ -37,6 +37,7 @@ def main():
             "pytest",
             "-v",
             "--log-cli-level=DEBUG",
+            "--log-cli-format='%(asctime)s [%(levelname)s] [%(process)d:%(thread)d] %(message)s'",
             "--timeout=60",
             os.path.join(rel_path, "test_pytest.py"),
         ]

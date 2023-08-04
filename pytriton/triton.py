@@ -51,6 +51,7 @@ from pytriton.exceptions import PyTritonValidationError
 from pytriton.model_config.tensor import Tensor
 from pytriton.models.manager import ModelManager
 from pytriton.models.model import Model, ModelConfig, ModelEvent
+from pytriton.proxy.communication import TensorStore
 from pytriton.server.model_repository import TritonModelRepository
 from pytriton.server.python_backend_config import PythonBackendConfig
 from pytriton.server.triton_server import TritonServer
@@ -336,6 +337,7 @@ class Triton:
 
         model_repository = TritonModelRepository(path=self._config.model_repository, workspace=self._workspace)
         self._model_manager = ModelManager(model_repository)
+        self._tensor_store = TensorStore(self._workspace.path / "data_store.sock")
 
         self._triton_server_config = TritonServerConfig()
         config_data = self._config.to_dict()
@@ -400,6 +402,7 @@ class Triton:
 
     def run(self) -> None:
         """Run Triton Inference Server."""
+        self._tensor_store.start()
         if not self._triton_server.is_alive():
             self._model_manager.create_models()
             with self._cv:
@@ -422,6 +425,7 @@ class Triton:
         atexit.unregister(self.stop)
         self._triton_server.stop()
         self._model_manager.clean()
+        self._tensor_store.close()
         self._workspace.clean()
         with self._cv:
             self._cv.notify_all()

@@ -16,6 +16,15 @@ limitations under the License.
 
 # Changelog
 
+## Unreleased
+
+- Updated communication protocol between Proxy Backend and Inference Callable
+- Updated data sharing between Proxy Backend and Inference Callable
+
+[//]: <> (put here on external component update with short summary what change or link to changelog)
+
+- Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.33.0](https://github.com/triton-inference-server/server/releases/tag/v2.33.0)
+
 ## 0.2.3 (2023-07-21)
 
 - Improved verification of Proxy Backend environment when running under same Python interpreter
@@ -32,8 +41,6 @@ limitations under the License.
 - `ModelClient` and `FuturesModelClient` methods raise `PyTritonClientClosedError` when used after client is closed
 - Pinned tritonclient dependency due to issues with tritonclient >= 2.34 on systems with glibc version lower than 2.34
 - Added warning after Triton Server setup and teardown while using too verbose logging level as it may cause a significant performance drop in model inference
-
-- Updated communication protocol between Proxy Backend and Inference Callable
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 

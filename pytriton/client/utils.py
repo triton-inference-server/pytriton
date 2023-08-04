@@ -222,8 +222,7 @@ def wait_for_server_ready(
         except InferenceServerException as e:
             _LOGGER.warning(f"Exception while checking server readiness: {e}")
             return False
-        except (RpcError, ConnectionError, socket.gaierror) as e:  # GRPC and HTTP clients raises these errors
-            _LOGGER.debug(f"Exception while checking server readiness: {e}")
+        except (RpcError, ConnectionError, socket.gaierror):  # GRPC and HTTP clients raises these errors
             return False
         except Exception as e:
             _LOGGER.exception(f"Exception while checking server readiness: {e}")

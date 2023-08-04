@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
 import json
 import logging
+import multiprocessing
 import pathlib
 import sys
 import time
@@ -26,6 +28,7 @@ import zmq
 
 from pytriton.model_config.generator import ModelConfigGenerator
 from pytriton.model_config.triton_model_config import TensorSpec, TritonModelConfig
+from pytriton.proxy.communication import TensorStore
 from pytriton.proxy.types import Request
 from pytriton.triton import TRITONSERVER_DIST_DIR
 
@@ -66,6 +69,7 @@ def test_model_throws_exception(tmp_path, mocker):
         workspace = Workspace(pathlib.Path(tmp_path) / "w")
         ipc_socket_path = workspace.path / f"proxy_{model_name}.ipc"
         shared_memory_socket = f"ipc://{ipc_socket_path.as_posix()}"
+        data_store_socket = (workspace.path / "data_store.socket").as_posix()
 
         model_config = TritonModelConfig(
             model_name=model_name,
@@ -73,21 +77,39 @@ def test_model_throws_exception(tmp_path, mocker):
             outputs=[TensorSpec(name="output1", dtype=np.float32, shape=(-1,))],
             backend_parameters={"shared-memory-socket": shared_memory_socket},
         )
-        model_config_json = json.dumps(ModelConfigGenerator(model_config).get_config()).encode("utf-8")
+        model_config_json_payload = json.dumps(ModelConfigGenerator(model_config).get_config()).encode("utf-8")
 
         zmq_context = zmq.Context()
-        inference_handler = InferenceHandler(infer_fn, model_config, shared_memory_socket, zmq_context)
-        inference_handler.start()
 
-        with mocker.patch.object(TritonPythonModel, "_get_instance_socket", return_value=shared_memory_socket):
-            backend_initialization_args = {"model_config": model_config_json}
+        authkey = multiprocessing.current_process().authkey
+        tensor_store = TensorStore(data_store_socket, authkey)
+        tensor_store.start()
+
+        authkey = base64.b64encode(authkey).decode("utf-8")
+        instance_data = {
+            "shared-memory-socket": shared_memory_socket,
+            "data-store-socket": data_store_socket,
+            "auth-key": authkey,
+        }
+
+        with mocker.patch.object(TritonPythonModel, "_get_instance_data", return_value=instance_data):
+            backend_initialization_args = {"model_config": model_config_json_payload}
             backend_model = TritonPythonModel()
             backend_model.initialize(backend_initialization_args)
+
+            inference_handler = InferenceHandler(
+                infer_fn,
+                model_config,
+                shared_memory_socket=shared_memory_socket,
+                data_store_socket=data_store_socket,
+                zmq_context=zmq_context,
+            )
+            inference_handler.start()
 
             inputs = [Request({"input1": np.array([[1, 2, 3]], dtype=np.float32)}, {})]
 
             try:
-                result = backend_model._exec_requests(inputs, logger=Mock())
+                result = backend_model._exec_requests(inputs)
                 pytest.fail(f"Model raised exception, but exec_batch passed - result: {result}")
             except pb_utils.TritonModelException:  # pytype: disable=module-attr
                 LOGGER.info("Inference exception")

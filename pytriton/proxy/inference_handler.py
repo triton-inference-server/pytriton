@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ python model deployed on Triton and model in current environment.
 
 """
 import enum
+import itertools
 import logging
 import threading as th
 import traceback
@@ -43,7 +44,7 @@ from pytriton.proxy.communication import (
     InferenceHandlerRequests,
     InferenceHandlerResponses,
     MetaRequestResponse,
-    ShmManager,
+    TensorStore,
 )
 from pytriton.proxy.types import Request
 
@@ -69,6 +70,7 @@ class InferenceHandler(th.Thread):
         model_callable: Callable,
         model_config: TritonModelConfig,
         shared_memory_socket: str,
+        data_store_socket: str,
         zmq_context: zmq.Context,
     ):
         """Create a PythonBackend object.
@@ -77,6 +79,7 @@ class InferenceHandler(th.Thread):
             model_callable: A model callable to pass and receive the data
             model_config: Triton model configuration
             shared_memory_socket: Socket path for shared memory communication
+            data_store_socket: Socket path for data store communication
             zmq_context: zero mq context
         """
         super().__init__()
@@ -84,8 +87,7 @@ class InferenceHandler(th.Thread):
         self._model_callable = model_callable
         self.stopped = False
 
-        self.shm_request_manager = ShmManager()
-        self.shm_response_manager = ShmManager()
+        self._tensor_store = TensorStore(data_store_socket)
 
         self.zmq_context = zmq_context
         self.socket = None
@@ -100,6 +102,7 @@ class InferenceHandler(th.Thread):
         try:
             LOGGER.debug(f"Binding IPC socket at {self.shared_memory_socket}.")
             self.socket.bind(self.shared_memory_socket)
+            self._tensor_store.connect()
 
             while not self.stopped:
                 LOGGER.debug(f"Waiting for requests from proxy model for {model_name}.")
@@ -110,7 +113,7 @@ class InferenceHandler(th.Thread):
                 inputs = [
                     Request(
                         data={
-                            input_name: self.shm_request_manager.get(tensor_id)
+                            input_name: self._tensor_store.get(tensor_id)
                             for input_name, tensor_id in request.data.items()
                         },
                         parameters=request.parameters,
@@ -127,22 +130,21 @@ class InferenceHandler(th.Thread):
 
                     # to avoid reallocation need to declare required size of the buffer here
                     LOGGER.debug(f"Copying outputs to shared memory for {model_name}.")
-                    required_size_bytes = sum(
-                        self.shm_response_manager.calc_serialized_size(output_data)
-                        for response in responses
-                        for output_data in response.values()
-                    )
-                    self.shm_response_manager.reset_buffer(required_size_bytes)
+                    for tensor_id in itertools.chain(*[request.data.values() for request in requests]):
+                        self._tensor_store.release_block(tensor_id)
+
+                    output_arrays_with_coords = [
+                        (response_idx, output_name, tensor)
+                        for response_idx, response in enumerate(responses)
+                        for output_name, tensor in response.items()
+                    ]
+                    tensor_ids = self._tensor_store.put([tensor for _, _, tensor in output_arrays_with_coords])
+                    responses = [{} for _ in range(len(responses))]
+                    for (response_idx, output_name, _), tensor_id in zip(output_arrays_with_coords, tensor_ids):
+                        responses[response_idx][output_name] = tensor_id
+
                     responses = InferenceHandlerResponses(
-                        responses=[
-                            MetaRequestResponse(
-                                data={
-                                    output_name: str(self.shm_response_manager.append(np_array))
-                                    for output_name, np_array in response.items()
-                                }
-                            )
-                            for response in responses
-                        ]
+                        responses=[MetaRequestResponse(data=response) for response in responses]
                     )
                 except PyTritonUnrecoverableError:
                     error = traceback.format_exc()
@@ -170,9 +172,8 @@ class InferenceHandler(th.Thread):
             LOGGER.info("Closing socket")
             socket_close_timeout_s = 0
             self.socket.close(linger=socket_close_timeout_s)
-            LOGGER.info("Closing buffers")
-            self.shm_request_manager.dispose()
-            self.shm_response_manager.dispose()
+            LOGGER.info("Closing TensorStore")
+            self._tensor_store.close()
 
             LOGGER.info("Leaving proxy backend thread")
             self._notify_proxy_backend_observers(InferenceHandlerEvent.FINISHED, None)
