@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -82,6 +82,8 @@ class ModelConfigParser:
             DeviceKind(entry["kind"]): entry.get("count") for entry in model_config_dict.get("instance_group", [])
         }
 
+        decoupled = model_config_dict.get("model_transaction_policy", {}).get("decoupled", False)
+
         backend_parameters_config = model_config_dict.get("parameters", [])
         if isinstance(backend_parameters_config, list):
             # If the backend_parameters_config is a list of strings, use them as keys with empty values
@@ -121,6 +123,7 @@ class ModelConfigParser:
             inputs=inputs,
             outputs=outputs,
             instance_group=instance_group,
+            decoupled=decoupled,
             backend_parameters=backend_parameters,
             response_cache=response_cache,
         )

@@ -218,12 +218,16 @@ class Model:
             ModelConfig object with configuration for Python model deployment
         """
         if not self._triton_model_config:
+            if self.config.decoupled:
+                raise NotImplementedError("Decoupled mode is not supported yet.")
+
             triton_model_config = TritonModelConfig(
                 model_name=self.model_name,
                 model_version=self.model_version,
                 batching=self.config.batching,
                 batcher=self.config.batcher,
                 max_batch_size=self.config.max_batch_size,
+                decoupled=self.config.decoupled,
                 backend_parameters={"shared-memory-socket": self._shared_memory_socket},
                 instance_group={DeviceKind.KIND_CPU: len(self.infer_functions)},
             )

@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,6 +42,7 @@ full_model_config = TritonModelConfig(
         },
     ),
     instance_group={DeviceKind.KIND_CPU: 1, DeviceKind.KIND_GPU: 2},
+    decoupled=True,
     backend_parameters={
         "parameter1": "value1",
         "parameter2": "value2",

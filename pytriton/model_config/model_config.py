@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,9 +32,11 @@ class ModelConfig:
         max_batch_size: The maximal batch size that would be handled by model.
         batcher: Configuration of Dynamic Batching for the model.
         response_cache: Flag to enable/disable response cache for the model
+        decoupled: Flag to enable/disable decoupled from requests execution
     """
 
     batching: bool = True
     max_batch_size: int = 4
     batcher: DynamicBatcher = dataclasses.field(default_factory=DynamicBatcher)
     response_cache: bool = False
+    decoupled: bool = False

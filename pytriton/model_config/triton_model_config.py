@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -55,6 +55,7 @@ class TritonModelConfig:
     batching: bool = True
     batcher: Optional[DynamicBatcher] = None
     instance_group: Dict[DeviceKind, Optional[int]] = dataclasses.field(default_factory=lambda: {})
+    decoupled: bool = False
     backend_parameters: Dict[str, str] = dataclasses.field(default_factory=lambda: {})
     inputs: Optional[Sequence[TensorSpec]] = None
     outputs: Optional[Sequence[TensorSpec]] = None

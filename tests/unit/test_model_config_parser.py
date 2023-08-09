@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -269,6 +269,8 @@ def test_parse_from_dict_return_model_config_when_minimal_config_used():
     assert device_kind.value == DeviceKind.KIND_CPU.value
     assert device_count is None
 
+    assert not model_config.decoupled
+
     assert model_config.backend_parameters == {"shared-memory-socket": "ipc:///tmp/proxy_backend.ipc"}
     assert model_config.inputs[0] == TensorSpec(name="INPUT_0", dtype=np.int32, shape=(-1,))
     assert model_config.outputs[0] == TensorSpec(name="OUTPUT_0", dtype=np.int32, shape=(-1,))
@@ -288,6 +290,8 @@ def test_parse_from_dict_return_model_config_when_simple_config_used():
     device_count = list(model_config.instance_group.values())[0]
     assert device_kind.value == DeviceKind.KIND_CPU.value
     assert device_count is None
+
+    assert not model_config.decoupled
 
     assert model_config.backend_parameters == {"shared-memory-socket": "ipc:///tmp/proxy_backend.ipc"}
     assert model_config.inputs == [
@@ -312,6 +316,8 @@ def test_parse_from_dict_return_model_config_when_string_config_used():
     assert device_kind.value == DeviceKind.KIND_CPU.value
     assert device_count is None
 
+    assert not model_config.decoupled
+
     assert model_config.backend_parameters == {"shared-memory-socket": "ipc:///tmp/proxy_backend.ipc"}
     assert model_config.inputs == [
         TensorSpec(name="INPUT_0", dtype=np.bytes_, shape=(-1,)),
@@ -334,6 +340,8 @@ def test_parse_from_dict_return_model_config_when_add_model_without_batching_use
     assert device_kind.value == DeviceKind.KIND_CPU.value
     assert device_count is None
 
+    assert not model_config.decoupled
+
     assert model_config.backend_parameters == {"shared-memory-socket": "ipc:///tmp/proxy_backend.ipc"}
     assert model_config.inputs == [
         TensorSpec(name="INPUT_0", dtype=np.int32, shape=(1,)),
@@ -342,6 +350,30 @@ def test_parse_from_dict_return_model_config_when_add_model_without_batching_use
     assert model_config.outputs == [TensorSpec(name="OUTPUT_0", dtype=np.int32, shape=(1,))]
 
     assert model_config.batcher is None
+
+
+def test_parse_from_dict_return_model_config_when_decoupled_execution_is_enabled():
+    model_config_dict = {
+        **minimal_model_config,
+        **{
+            "model_transaction_policy": {"decoupled": True},
+        },
+    }
+
+    model_config = ModelConfigParser.from_dict(model_config_dict=model_config_dict)
+    assert model_config.decoupled
+
+
+def test_parse_from_dict_return_model_config_when_decoupled_execution_is_explicitly_disabled():
+    model_config_dict = {
+        **minimal_model_config,
+        **{
+            "model_transaction_policy": {"decoupled": False},
+        },
+    }
+
+    model_config = ModelConfigParser.from_dict(model_config_dict=model_config_dict)
+    assert not model_config.decoupled
 
 
 def test_parse_from_dict_return_model_config_when_add_model_without_dynamic_batching_used():
@@ -356,6 +388,8 @@ def test_parse_from_dict_return_model_config_when_add_model_without_dynamic_batc
     device_count = list(model_config.instance_group.values())[0]
     assert device_kind.value == DeviceKind.KIND_CPU.value
     assert device_count is None
+
+    assert not model_config.decoupled
 
     assert model_config.backend_parameters == {"shared-memory-socket": "ipc:///tmp/proxy_backend.ipc"}
     assert model_config.inputs == [
@@ -379,6 +413,8 @@ def test_parse_from_dict_return_model_config_when_add_model_with_simple_dynamic_
     device_count = list(model_config.instance_group.values())[0]
     assert device_kind.value == DeviceKind.KIND_CPU.value
     assert device_count is None
+
+    assert not model_config.decoupled
 
     assert model_config.backend_parameters == {"shared-memory-socket": "ipc:///tmp/proxy_backend.ipc"}
     assert model_config.inputs == [
@@ -410,6 +446,8 @@ def test_parse_from_dict_return_model_config_when_add_model_with_advanced_batche
     device_count = list(model_config.instance_group.values())[0]
     assert device_kind.value == DeviceKind.KIND_CPU.value
     assert device_count is None
+
+    assert not model_config.decoupled
 
     assert model_config.backend_parameters == {"shared-memory-socket": "ipc:///tmp/proxy_backend.ipc"}
     assert model_config.inputs == [
@@ -460,6 +498,8 @@ def test_parse_from_dict_return_model_config_when_response_cache_config_used():
     device_count = list(model_config.instance_group.values())[0]
     assert device_kind.value == DeviceKind.KIND_CPU.value
     assert device_count is None
+
+    assert not model_config.decoupled
 
     assert model_config.backend_parameters == {"shared-memory-socket": "ipc:///tmp/proxy_backend.ipc"}
     assert model_config.inputs[0] == TensorSpec(name="INPUT_0", dtype=np.int32, shape=(-1,))

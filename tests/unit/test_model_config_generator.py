@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -332,6 +332,22 @@ def test_set_instance_group_set_instance_configuration_when_single_multiple_conf
     }
 
 
+def test_transaction_policy_not_update_data_when_decoupled_execution_disabled():
+    model_config = TritonModelConfig(model_name="simple", decoupled=False)
+    generator = ModelConfigGenerator(model_config)
+    model_config_data = {}
+    generator._set_model_transaction_policy(model_config_data)
+    assert model_config_data == {}
+
+
+def test_transaction_policy_added_when_decoupled_execution_enabled():
+    model_config = TritonModelConfig(model_name="simple", decoupled=True)
+    generator = ModelConfigGenerator(model_config)
+    model_config_data = {}
+    generator._set_model_transaction_policy(model_config_data)
+    assert model_config_data == {"model_transaction_policy": {"decoupled": True}}
+
+
 def test_set_backend_parameters_not_update_data_when_parameters_not_provided():
     model_config = TritonModelConfig(model_name="simple")
     generator = ModelConfigGenerator(model_config)
@@ -569,4 +585,5 @@ def test_to_file_save_config_to_file_when_full_config_specified():
                 "parameter2": {"string_value": "value2"},
             },
             "response_cache": {"enable": True},
+            "model_transaction_policy": {"decoupled": True},
         }

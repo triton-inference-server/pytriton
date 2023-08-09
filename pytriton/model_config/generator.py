@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -101,10 +101,10 @@ class ModelConfigGenerator:
             Dict with model configuration data
         """
         model_config = {"name": self._config.model_name, "backend": self._config.backend}
-
         self._set_batching(model_config)
         self._set_model_signature(model_config)
         self._set_instance_group(model_config)
+        self._set_model_transaction_policy(model_config)
         self._set_backend_parameters(model_config)
         self._set_response_cache(model_config)
         return model_config
@@ -204,6 +204,15 @@ class ModelConfigGenerator:
 
         if instance_groups:
             model_config["instance_group"] = instance_groups
+
+    def _set_model_transaction_policy(self, model_config: Dict) -> None:
+        """Configure model transaction policy for model deployment on Triton Inference Server.
+
+        Args:
+            model_config: Dict with model config for Triton Inference Server
+        """
+        if self._config.decoupled:
+            model_config["model_transaction_policy"] = {"decoupled": True}
 
     def _set_backend_parameters(self, model_config: Dict) -> None:
         """Configure backend parameters for model deployment on Triton Inference Server.
