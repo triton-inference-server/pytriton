@@ -1,4 +1,4 @@
-# Copyright (c) 2022-23, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Runs inference session over NLP model
+Runs inference session over  NLP model
 """
 
 import logging
@@ -20,7 +20,7 @@ import pathlib
 import tempfile
 import textwrap
 from concurrent.futures import FIRST_COMPLETED, wait
-from typing import Callable, List
+from typing import Callable
 
 import numpy as np
 
@@ -33,37 +33,48 @@ from tests.utils import find_free_port
 
 logger = logging.getLogger(__package__)
 
+VOCABULARY_SIZE = 30522
+VALID_TOKEN_ID = 5
+MIN_SEQUENCE_LENGTH = 20
+MAX_SEQUENCE_LENGTH = 128
+RANDOM_SEED = 42
 
-def huggingface_distilbert(test_time_s: int, init_timeout_s: int, batch_size: int, sequence_length: int, verbose: bool):
-    import tensorflow  # pytype: disable=import-error
 
-    gpus = tensorflow.config.experimental.list_physical_devices("GPU")
-    for gpu in gpus:
-        tensorflow.config.experimental.set_memory_growth(gpu, True)
+def futures_stress_test(test_time_s: int, init_timeout_s: int, batch_size: int, seed: int, verbose: bool):
 
     model_name = "distilbert-base-uncased"
 
     model_spec = _model_spec()
 
-    logger.debug("generating dataset")
-    dataset = _dataset(
-        model_name=model_name,
-        dataset_name="imdb",
-        sequence_length=sequence_length,
-        input_names=[inpt.name for inpt in model_spec.inputs],
-        batch_size=1,
-    )
+    import random
+
+    random.seed(seed)
 
     def requests_generator():
-        for data_tensor in dataset:
-            input_ids = data_tensor["input_ids"].numpy()
-            attention_mask = data_tensor["attention_mask"].numpy()
-            for _ in range(batch_size):
-                yield {"input_ids": input_ids, "attention_mask": attention_mask}
+        while True:
+            inputs_len = random.randint(MIN_SEQUENCE_LENGTH, MAX_SEQUENCE_LENGTH)
+            input_ids = (
+                np.zeros(
+                    (
+                        1,
+                        inputs_len,
+                    ),
+                    dtype=np.int64,
+                )
+                + 5
+            )
+            attention_mask = np.ones(
+                (
+                    1,
+                    inputs_len,
+                ),
+                dtype=np.int64,
+            )
+            yield {"input_ids": input_ids, "attention_mask": attention_mask}
 
-    requests = list(requests_generator())
+    requests = requests_generator()
 
-    logger.debug("data generated")
+    logger.info("starting server")
 
     infer_fn = model_spec.create_infer_fn(model_name=model_name)
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -85,8 +96,6 @@ def huggingface_distilbert(test_time_s: int, init_timeout_s: int, batch_size: in
                     config=model_spec.model_config,
                 )
                 triton.run()
-
-                logger.debug("Triton server started")
 
                 # Send requests
                 url = f"http://localhost:{triton_config.http_port}"
@@ -117,9 +126,11 @@ def huggingface_distilbert(test_time_s: int, init_timeout_s: int, batch_size: in
                                         f"Result: {len(result)}."
                                     )
                         time_left_s = max(should_stop_at_s - time.time(), 0.0)
+                        if time_left_s % 10 == 0:
+                            logger.info(f"Time left: {time_left_s:0.1f}s")
                         if time_left_s <= 0:
                             break
-                logger.debug("Test finished")
+                logger.info(f"Test finished. Processed {number_of_processed_requests} requests")
 
         finally:
             if triton_log_path.exists():
@@ -127,23 +138,20 @@ def huggingface_distilbert(test_time_s: int, init_timeout_s: int, batch_size: in
                 server_logs = triton_log_path.read_text(errors="replace")
                 server_logs = "--- triton logs:\n\n" + textwrap.indent(server_logs, prefix=" " * 8)
                 logger.debug(server_logs)
+    logger.info("Test finished")
 
 
 def _create_hf_tensorflow_distilbert_base_uncased_fn(model_name: str) -> Callable:
-    from transformers.models.distilbert.modeling_tf_distilbert import (  # pytype: disable=import-error
-        TFDistilBertForMaskedLM,
-    )
-
-    model = TFDistilBertForMaskedLM.from_pretrained(model_name)
-    model.config.return_dict = True
-    model.config.use_cache = False
-
     @batch
     def _infer_fn(input_ids, attention_mask):
+        assert input_ids.shape == attention_mask.shape
+        import random
+
+        outputs_len = random.randint(20, 128)
+        result = np.zeros([input_ids.shape[0], outputs_len, VOCABULARY_SIZE], dtype=np.float32)
         logger.debug(f"input_ids: {input_ids.shape}")
         logger.debug(f"attention_mask: {attention_mask.shape}")
-        result = model(input_ids, attention_mask)
-        return {"logits": result.logits.numpy()}
+        return {"logits": result}
 
     return _infer_fn
 
@@ -172,31 +180,3 @@ def _model_spec() -> TestModelSpec:
         ),
     )
     return model_spec
-
-
-def _dataset(model_name: str, dataset_name: str, sequence_length: int, input_names: List[str], batch_size: int):
-    from datasets import load_dataset  # pytype: disable=import-error
-    from transformers import AutoTokenizer, DataCollatorWithPadding, TensorType  # pytype: disable=import-error
-
-    dataset = load_dataset(dataset_name)["train"]
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-    def _preprocess_text_dataset(examples):
-        return tokenizer(examples["text"], truncation=True, max_length=sequence_length)
-
-    tokenized_dataset = dataset.map(_preprocess_text_dataset, batched=True)
-    dataset = tokenized_dataset.remove_columns([c for c in tokenized_dataset.column_names if c not in input_names])
-
-    data_collator = DataCollatorWithPadding(
-        tokenizer=tokenizer,
-        padding="max_length",
-        max_length=sequence_length,
-        return_tensors=TensorType.NUMPY,
-    )
-
-    return dataset.to_tf_dataset(
-        columns=dataset.column_names,
-        shuffle=True,
-        batch_size=batch_size,
-        collate_fn=data_collator,
-    )

@@ -21,6 +21,7 @@ limitations under the License.
 - Introduced `strict` flag in `Triton.bind` which enables data types and shapes validation of inference callable outputs
   against model config
 - Added `AsyncioModelClient` which works in FastAPI and other async frameworks
+- Fixed `FuturesModelClient` to prevent raising `gevent.exceptions.InvalidThreadUseError`
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 

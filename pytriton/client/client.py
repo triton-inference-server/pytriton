@@ -32,13 +32,15 @@ import itertools
 import logging
 import socket
 import sys
-import threading
 import time
 import urllib
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Future
+from queue import Queue
+from threading import Thread
 from typing import Dict, Optional, Tuple, Union
 
 import async_timeout
+import gevent
 import numpy as np
 import tritonclient.grpc
 import tritonclient.grpc.aio
@@ -1019,6 +1021,14 @@ class AsyncioModelClient(BaseModelClient):
         return kwargs
 
 
+_INIT = "init"
+_WAIT_FOR_MODEL = "wait_for_model"
+_MODEL_CONFIG = "model_config"
+_INFER_BATCH = "infer_batch"
+_INFER_SAMPLE = "infer_sample"
+_CLOSE = "close"
+
+
 class FuturesModelClient:
     """A client for interacting with a model deployed on the Triton Inference Server using concurrent.futures.
 
@@ -1059,11 +1069,18 @@ class FuturesModelClient:
         self._url = url
         self._model_name = model_name
         self._model_version = model_version
-        self._thread_pool_executor = ThreadPoolExecutor(max_workers=max_workers)
-        self._lock = threading.Lock()
-        self._thread_clients = {}
+        self._threads = []
+        self._max_workers = max_workers
+        if self._max_workers is not None and self._max_workers <= 0:
+            raise ValueError("max_workers must be greater than 0")
+        kwargs = {}
+        if self._max_workers is not None:
+            kwargs["maxsize"] = self._max_workers
+        self._queue = Queue(**kwargs)
+        self._queue.put((_INIT, None, None))
         self._init_timeout_s = _DEFAULT_FUTURES_INIT_TIMEOUT_S if init_timeout_s is None else init_timeout_s
         self._inference_timeout_s = inference_timeout_s
+        self._closed = False
 
     def __enter__(self):
         """Create context for using FuturesModelClient as a context manager."""
@@ -1073,7 +1090,7 @@ class FuturesModelClient:
         """Close resources used by FuturesModelClient instance when exiting from the context."""
         self.close()
 
-    def close(self, wait=True, *, cancel_futures=False):
+    def close(self, wait=True):
         """Close resources used by FuturesModelClient.
 
         This method closes the resources used by the FuturesModelClient instance, including the Triton Inference Server connections.
@@ -1081,22 +1098,20 @@ class FuturesModelClient:
 
         Args:
             wait: If True, then shutdown will not return until all running futures have finished executing.
-            cancel_futures: If True, then all pending futures that have not yet started executing will be cancelled.
-                If False, then pending futures are left in the queue and will be run if not cancelled before they
-                expire. This argument is ignored for Python < 3.9.
         """
+        if self._closed:
+            _LOGGER.warning("FuturesModelClient is already closed")
+            return
         _LOGGER.debug("Closing FuturesModelClient.")
-        if sys.version_info >= (3, 9) and cancel_futures:
-            # Cancel futures argument was introduced from Python version 3.9
-            self._thread_pool_executor.shutdown(wait=wait, cancel_futures=cancel_futures)
-        else:
-            if cancel_futures:
-                # Log a warning message that cancel_futures is not supported for older Python
-                _LOGGER.warning("cancel_futures argument is ignored for Python < 3.9")
-            self._thread_pool_executor.shutdown(wait=wait)
-        with self._lock:
-            for client in self._thread_clients.values():
-                client.close()
+
+        self._closed = True
+        for _ in range(len(self._threads)):
+            self._queue.put((_CLOSE, None, None))
+
+        if wait:
+            _LOGGER.debug("Waiting for futures to finish.")
+            for thread in self._threads:
+                thread.join()
 
     def wait_for_model(self, timeout_s: float) -> Future:
         """Returns a Future object which result will be None when the model is ready.
@@ -1118,10 +1133,10 @@ class FuturesModelClient:
         Returns:
             A Future object which result is None when the model is ready.
         """
-        try:
-            return self._thread_pool_executor.submit(lambda: self._get_client(lazy_init=True).wait_for_model(timeout_s))
-        except RuntimeError as e:
-            raise PyTritonClientClosedError("FutureModelClient is already closed") from e
+        return self._execute(
+            name=_WAIT_FOR_MODEL,
+            request=timeout_s,
+        )
 
     def model_config(self) -> Future:
         """Obtain the configuration of the model deployed on the Triton Inference Server.
@@ -1135,10 +1150,7 @@ class FuturesModelClient:
         Raises:
             PyTritonClientClosedError: If the FuturesModelClient is closed.
         """
-        try:
-            return self._thread_pool_executor.submit(lambda: self._get_client().model_config)
-        except RuntimeError as e:
-            raise PyTritonClientClosedError("FutureModelClient is already closed") from e
+        return self._execute(name=_MODEL_CONFIG)
 
     def infer_sample(
         self,
@@ -1180,14 +1192,10 @@ class FuturesModelClient:
         Raises:
             PyTritonClientClosedError: If the FuturesModelClient is closed.
         """
-        try:
-            return self._thread_pool_executor.submit(
-                lambda: self._get_client().infer_sample(
-                    *inputs, parameters=parameters, headers=headers, **named_inputs
-                ),
-            )
-        except RuntimeError as e:
-            raise PyTritonClientClosedError("FutureModelClient is already closed") from e
+        return self._execute(
+            name=_INFER_SAMPLE,
+            request=(inputs, parameters, headers, named_inputs),
+        )
 
     def infer_batch(
         self,
@@ -1231,26 +1239,98 @@ class FuturesModelClient:
         Raises:
             PyTritonClientClosedError: If the FuturesModelClient is closed.
         """
-        try:
-            return self._thread_pool_executor.submit(
-                lambda: self._get_client().infer_batch(*inputs, parameters=parameters, headers=headers, **named_inputs),
-            )
-        except RuntimeError as e:
-            raise PyTritonClientClosedError("FutureModelClient is already closed") from e
+        return self._execute(name=_INFER_BATCH, request=(inputs, parameters, headers, named_inputs))
 
-    def _get_client(self, lazy_init: bool = False):
-        thread_id = threading.get_ident()
-        with self._lock:
-            if thread_id not in self._thread_clients:
-                client = ModelClient(
-                    self._url,
-                    self._model_name,
-                    self._model_version,
-                    lazy_init=lazy_init,
-                    init_timeout_s=self._init_timeout_s,
-                    inference_timeout_s=self._inference_timeout_s,
-                )
-                self._thread_clients[thread_id] = client
-            else:
-                client = self._thread_clients[thread_id]
-        return client
+    def _execute(self, name, request=None):
+        if self._closed:
+            raise PyTritonClientClosedError("FutureModelClient is already closed")
+        self._extend_thread_pool()
+        future = Future()
+        self._queue.put((future, request, name))
+        return future
+
+    def _extend_thread_pool(self):
+        if self._closed:
+            return
+        if not self._queue.empty() and (self._max_workers is None or len(self._threads) < self._max_workers):
+            _LOGGER.debug("Create new thread")
+            thread = Thread(target=self._worker)
+            self._threads.append(thread)
+            thread.start()
+        else:
+            _LOGGER.debug("No need to create new thread")
+
+    def _client_request_executor(self, client, request, name):
+        _LOGGER.debug(f"Running {name} for {self._model_name}")
+        if name == _INFER_SAMPLE:
+            inputs, parameters, headers, named_inputs = request
+            return client.infer_sample(
+                *inputs,
+                parameters=parameters,
+                headers=headers,
+                **named_inputs,
+            )
+        elif name == _INFER_BATCH:
+            inputs, parameters, headers, named_inputs = request
+            return client.infer_batch(
+                *inputs,
+                parameters=parameters,
+                headers=headers,
+                **named_inputs,
+            )
+        elif name == _MODEL_CONFIG:
+            return client.model_config
+        elif name == _WAIT_FOR_MODEL:
+            timeout_s = request
+            return client.wait_for_model(timeout_s)
+        else:
+            raise PyTritonClientValueError(f"Unknown request name {name}")
+
+    def _create_client(self, lazy_init):
+        _LOGGER.debug(f"Creating ModelClient lazy_init={lazy_init}")
+        return ModelClient(
+            self._url,
+            self._model_name,
+            self._model_version,
+            lazy_init=lazy_init,
+            init_timeout_s=self._init_timeout_s,
+            inference_timeout_s=self._inference_timeout_s,
+        )
+
+    def _worker(self):
+        _LOGGER.debug("Starting worker thread")
+        # Work around for AttributeError: '_Threadlocal' object has no attribute 'hub'
+        # gevent/_hub_local.py", line 77, in gevent._gevent_c_hub_local.get_hub_noargs
+        gevent.get_hub()
+        while True:
+            future, request, name = self._queue.get()
+            if future == _CLOSE:
+                _LOGGER.debug("Closing thread")
+                self._queue.task_done()
+                break
+            if future == _INIT:
+                continue
+            try:
+                client = self._create_client(name == _WAIT_FOR_MODEL)
+                with client:
+                    while True:
+                        try:
+                            result = self._client_request_executor(client, request, name)
+                            _LOGGER.debug(f"Finished {name} for {self._model_name}")
+                            future.set_result(result)
+                            self._queue.task_done()
+                        except Exception as e:
+                            _LOGGER.error(f"Error {e} occurred during {name} for {self._model_name}")
+                            future.set_exception(e)
+                            self._queue.task_done()
+                            break
+                        future, request, name = self._queue.get()
+                        if future == _CLOSE:
+                            _LOGGER.debug("Closing thread")
+                            self._queue.task_done()
+                            return
+            except Exception as e:
+                _LOGGER.error(f"Error {e} occurred during {name} for {self._model_name}")
+                future.set_exception(e)
+                self._queue.task_done()
+        _LOGGER.debug("Finishing worker thread")

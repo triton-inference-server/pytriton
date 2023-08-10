@@ -718,7 +718,7 @@ async def test_async_grpc_client_infer_sample_fails_on_model_with_batching(mocke
     _LOGGER.debug("Exited client")
 
 
-@pytest.mark.async_timeout(0.5)
+@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_http_init_passes_timeout(mocker):
     async with AsyncioModelClient(
         "http://localhost:6669", "dummy", init_timeout_s=0.2, inference_timeout_s=0.1
@@ -727,7 +727,7 @@ async def test_async_http_init_passes_timeout(mocker):
             await client.wait_for_model(timeout_s=0.2)
 
 
-@pytest.mark.async_timeout(0.5)
+@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_grpc_init_passes_timeout(mocker):
     async with AsyncioModelClient(
         "grpc://localhost:6669", "dummy", init_timeout_s=0.2, inference_timeout_s=0.1
