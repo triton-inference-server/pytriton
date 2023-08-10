@@ -151,9 +151,6 @@ class BaseModelClient:
         # (InferenceClient uses gevent library which does not support closing twice from different threads)
         self._monkey_patch_client()
 
-        kwargs = self._get_init_extra_args()
-        self._client = self._triton_client_lib.InferenceServerClient(self._url, **kwargs)
-
         self._model_config = None
         self._model_ready = None
         self._lazy_init: bool = lazy_init
@@ -704,7 +701,8 @@ class AsyncioModelClient(BaseModelClient):
     async def close(self):
         """Close resources used by _ModelClientBase."""
         _LOGGER.debug("Closing InferenceServerClient")
-        await self._client.close()
+        await self._general_client.close()
+        await self._infer_client.close()
         _LOGGER.debug("InferenceServerClient closed")
 
     async def wait_for_model(self, timeout_s: float):
@@ -720,7 +718,9 @@ class AsyncioModelClient(BaseModelClient):
         """
         _LOGGER.debug(f"Waiting for model {self._model_name} to be ready")
         async with async_timeout.timeout(self._init_timeout_s):
-            await asyncio_wait_for_model_ready(self._client, self._model_name, self._model_version, timeout_s=timeout_s)
+            await asyncio_wait_for_model_ready(
+                self._general_client, self._model_name, self._model_version, timeout_s=timeout_s
+            )
         _LOGGER.debug(f"Model {self._model_name} is ready")
 
     @property
@@ -735,7 +735,11 @@ class AsyncioModelClient(BaseModelClient):
                     kwargs = self._get_model_config_extra_args()
                     _LOGGER.debug(f"Obtaining model config for {self._model_name}")
                     self._model_config = await asyncio_get_model_config(
-                        self._client, self._model_name, self._model_version, timeout_s=self._init_timeout_s, **kwargs
+                        self._general_client,
+                        self._model_name,
+                        self._model_version,
+                        timeout_s=self._init_timeout_s,
+                        **kwargs,
                     )
                     _LOGGER.debug(f"Obtained model config for {self._model_name}")
                 return self._model_config
@@ -894,7 +898,7 @@ class AsyncioModelClient(BaseModelClient):
                 timeout_s = max(0.0, should_finish_before_s - time.time())
                 _LOGGER.debug(f"Obtaining model config for {self._model_name}")
                 self._model_config = await asyncio_get_model_config(
-                    self._client, self._model_name, self._model_version, timeout_s=timeout_s
+                    self._general_client, self._model_name, self._model_version, timeout_s=timeout_s
                 )
                 _LOGGER.debug(f"Model config for {self._model_name} obtained")
         except asyncio.TimeoutError as e:
@@ -919,7 +923,7 @@ class AsyncioModelClient(BaseModelClient):
         try:
             _LOGGER.debug(f"Sending InferRequest for {self._model_name}")
             kwargs = self._get_infer_extra_args()
-            response = await self._client.infer(
+            response = await self._infer_client.infer(
                 model_name=self._model_name,
                 model_version=self._model_version or "",
                 inputs=inputs_wrapped,
