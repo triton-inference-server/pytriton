@@ -16,7 +16,7 @@ limitations under the License.
 
 # Changelog
 
-## (unreleased)
+## 0.2.4 (2023-08-10)
 
 - Introduced `strict` flag in `Triton.bind` which enables data types and shapes validation of inference callable outputs
   against model config
