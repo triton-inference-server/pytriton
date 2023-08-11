@@ -843,11 +843,12 @@ limitations under the License.
 <h1 id="changelog">Changelog</h1>
 <h2 id="024-2023-08-10">0.2.4 (2023-08-10)</h2>
 <ul>
-<li>Introduced <code>strict</code> flag in <code>Triton.bind</code> which enables data types and shapes validation of inference callable outputs
+<li>new: Introduced <code>strict</code> flag in <code>Triton.bind</code> which enables data types and shapes validation of inference callable outputs
   against model config</li>
-<li>Added <code>AsyncioModelClient</code> which works in FastAPI and other async frameworks</li>
+<li>new: <code>AsyncioModelClient</code> which works in FastAPI and other async frameworks</li>
+<li>fix: <code>FuturesModelClient</code> do not raise <code>gevent.exceptions.InvalidThreadUseError</code></li>
 <li>
-<p>Fixed <code>FuturesModelClient</code> to prevent raising <code>gevent.exceptions.InvalidThreadUseError</code></p>
+<p>fix: Do not throw TimeoutError if could not connect to server during model verification</p>
 </li>
 <li>
 <p>Version of <a href="https://github.com/triton-inference-server/">Triton Inference Server</a> embedded in wheel: <a href="https://github.com/triton-inference-server/server/releases/tag/v2.33.0">2.33.0</a></p>
