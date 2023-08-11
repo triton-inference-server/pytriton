@@ -31,6 +31,7 @@ import logging
 import os
 import pathlib
 import pkgutil
+import re
 import signal
 import sys
 import threading
@@ -244,10 +245,21 @@ class TritonServer:
             endpoint url in form of {protocol}://{host}:{port}
         """
         protocols = {"http": "http", "grpc": "grpc", "metrics": "http"}
+
+        def _obtain_address(key_names):
+            for key_name in key_names:
+                address = self._server_config[key_name]
+                if address and not re.match(r"^0+.0+.0+.0+$", address):
+                    break
+            else:
+                address = TRITON_LOCAL_IP
+
+            return address
+
         addresses = {
-            "http": self._server_config["http-address"] or TRITON_LOCAL_IP,
-            "grpc": self._server_config["grpc-address"] or TRITON_LOCAL_IP,
-            "metrics": self._server_config["metrics-address"] or self._server_config["http-address"] or TRITON_LOCAL_IP,
+            "http": _obtain_address(["http-address"]),
+            "grpc": _obtain_address(["grpc-address"]),
+            "metrics": _obtain_address(["metrics-address", "http-address"]),
         }
         ports = {
             "http": self._server_config["http-port"] or DEFAULT_HTTP_PORT,

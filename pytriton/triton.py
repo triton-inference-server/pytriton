@@ -62,7 +62,8 @@ from pytriton.utils.workspace import Workspace
 LOGGER = logging.getLogger(__name__)
 
 TRITONSERVER_DIST_DIR = get_root_module_path() / "tritonserver"
-MONITORING_PERIOD_SEC = 10
+MONITORING_PERIOD_SEC = 10.0
+WAIT_FORM_MODEL_TIMEOUT_S = 60.0
 INITIAL_BACKEND_SHM_SIZE = 4194304  # 4MB, Python Backend default is 64MB, but is automatically increased
 GROWTH_BACKEND_SHM_SIZE = 1048576  # 1MB, Python Backend default is 64MB
 
@@ -430,7 +431,7 @@ class Triton:
         LOGGER.debug("Stopped Triton Inference server and proxy backends")
         self._log_level_checker.check(skip_update=True)
 
-    def serve(self, monitoring_period_sec: int = MONITORING_PERIOD_SEC) -> None:
+    def serve(self, monitoring_period_sec: float = MONITORING_PERIOD_SEC) -> None:
         """Run Triton Inference Server and lock thread for serving requests/response.
 
         Args:
@@ -522,12 +523,21 @@ class Triton:
 
         self._log_level_checker.check()
 
-        for model in self._model_manager.models:
-            with ModelClient(
-                url=server_url, model_name=model.model_name, model_version=str(model.model_version)
-            ) as client:
-                client.wait_for_model(timeout_s=120)
+        try:
+            for model in self._model_manager.models:
+                with ModelClient(
+                    url=server_url, model_name=model.model_name, model_version=str(model.model_version)
+                ) as client:
+                    # This waits for only tritonserver and lightweight proxy backend to be ready
+                    # timeout should be short as model is loaded before execution of Triton.start() method
+                    client.wait_for_model(timeout_s=WAIT_FORM_MODEL_TIMEOUT_S)
+        except TimeoutError:
+            LOGGER.warning(
+                f"Could not verify locally if models are ready using {server_url}. "
+                "Please, check the server logs for details."
+            )
 
+        for model in self._model_manager.models:
             LOGGER.info(f"Infer function available as model: `{MODEL_URL.format(model_name=model.model_name)}`")
             LOGGER.info(f"  Status:         `GET  {MODEL_READY_URL.format(model_name=model.model_name)}`")
             LOGGER.info(f"  Model config:   `GET  {MODEL_CONFIG_URL.format(model_name=model.model_name)}`")

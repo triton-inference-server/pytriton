@@ -211,7 +211,7 @@ class BaseModelClient:
         triton_client_init_kwargs = self._get_init_extra_args()
 
         _LOGGER.debug(
-            f"Creating InferenceServerClient for {parsed_url.scheme}://{url} with {triton_client_init_kwargs}"
+            f"Creating InferenceServerClient for {parsed_url.scheme}://{self._url} with {triton_client_init_kwargs}"
         )
         return self._triton_client_lib.InferenceServerClient(self._url, **triton_client_init_kwargs)
 
