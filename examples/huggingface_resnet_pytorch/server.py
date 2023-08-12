@@ -36,9 +36,8 @@ model = model.to(DEVICE)
 
 
 @batch
-def _infer_fn(**image):
-    image = image["image"]
-    logger.debug(f"Image data: {image.shape} ({image.size})")  # noqa
+def _infer_fn(image: np.ndarray):
+    logger.debug(f"Image data: {image.shape} ({image.size})")
     images = []
     for img in image:
         img = Image.open(io.BytesIO(img.tobytes()))

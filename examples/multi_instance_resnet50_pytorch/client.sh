@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+#!/bin/bash
+# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,11 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-set -xe
-
-THIS_SCRIPT_DIR="$(realpath --relative-to="${PWD}" "$(dirname "$0")")"
-TEST_MODULE="${THIS_SCRIPT_DIR//\//.}.test"
-
-python -m"${TEST_MODULE}" \
-    --timeout-s 300
+perf_analyzer -u 127.0.0.1:8000 \
+  -i http \
+  -m ResNet50 \
+  --measurement-mode count_windows \
+  --measurement-request-count 100 \
+  --concurrency-range 64:64:64 \
+  -v
