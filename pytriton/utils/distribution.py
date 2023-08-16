@@ -60,6 +60,6 @@ def get_libs_path():
     if is_editable_install():
         libs_path = pytriton_module_path / "tritonserver/external_libs"
     else:
-        libs_path = pytriton_module_path.parent / "pytriton.libs"
-    LOGGER.debug("Obtained pytriton.libs path: %s", libs_path)
+        libs_path = pytriton_module_path.parent / "nvidia_pytriton.libs"
+    LOGGER.debug("Obtained nvidia_pytriton.libs path: %s", libs_path)
     return libs_path

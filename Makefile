@@ -36,7 +36,7 @@ export PRINT_HELP_PYSCRIPT
 
 BROWSER := python -c "$$BROWSER_PYSCRIPT"
 PIP_INSTALL := pip install --extra-index-url https://pypi.ngc.nvidia.com
-TRITONSERVER_IMAGE_VERSION = 23.04
+TRITONSERVER_IMAGE_VERSION = 23.07
 TRITONSERVER_IMAGE_NAME = nvcr.io/nvidia/tritonserver:$(TRITONSERVER_IMAGE_VERSION)-pyt-python-py3
 TRITONSERVER_OUTPUT_DIR = pytriton/tritonserver
 # to set PLATFORM from outside, use: make PLATFORM=linux/aarch64;

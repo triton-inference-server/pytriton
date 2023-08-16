@@ -1,5 +1,5 @@
 <!--
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ pip install torch
 Or you can use NVIDIA PyTorch container:
 
 ```shell
-docker run -it --gpus 1 --shm-size 8gb -v {repository_path}:{repository_path} -w {repository_path} nvcr.io/nvidia/pytorch:23.04-py3 bash
+docker run -it --gpus 1 --shm-size 8gb -v {repository_path}:{repository_path} -w {repository_path} nvcr.io/nvidia/pytorch:23.07-py3 bash
 ```
 
 If you select to use container we recommend to install
@@ -98,7 +98,7 @@ export DOCKER_IMAGE_NAME_WITH_TAG=localhost:5000/resnet-pytorch-example:latest
 
 ```shell
 # Export the base image used for build
-export FROM_IMAGE_NAME=nvcr.io/nvidia/pytorch:23.04-py3
+export FROM_IMAGE_NAME=nvcr.io/nvidia/pytorch:23.07-py3
 ./examples/huggingface_resnet_pytorch/kubernetes/build_and_push.sh
 ```
 

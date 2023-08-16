@@ -56,10 +56,10 @@ def test_get_libs_path(mocker):
         "pytriton.utils.distribution.get_root_module_path",
         return_value=pathlib.Path(f"{site.getsitepackages()[0]}/pytriton"),
     )
-    assert get_libs_path() == pathlib.Path(f"{site.getsitepackages()[0]}/pytriton.libs")
+    assert get_libs_path() == pathlib.Path(f"{site.getsitepackages()[0]}/nvidia_pytriton.libs")
 
     mocker.patch(
         "pytriton.utils.distribution.get_root_module_path",
         return_value=pathlib.Path(f"{site.getusersitepackages()}/pytriton"),
     )
-    assert get_libs_path() == pathlib.Path(f"{site.getusersitepackages()}/pytriton.libs")
+    assert get_libs_path() == pathlib.Path(f"{site.getusersitepackages()}/nvidia_pytriton.libs")

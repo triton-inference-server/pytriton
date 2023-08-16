@@ -29,7 +29,7 @@ from tests.utils import (
 
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 METADATA = {
-    "image_name": "nvcr.io/nvidia/nemo:22.07",
+    "image_name": "nvcr.io/nvidia/nemo:23.06",
 }
 
 

@@ -26,7 +26,7 @@ DIST_DIR="$(dirname "${WHEEL_PATH}")"
 DOCKER_PLATFORM=${4}
 # get arch from DOCKER_PLATFORM
 ARCH=$(echo "${DOCKER_PLATFORM}" | cut -d'/' -f2)
-WHEEL_PLATFORM=manylinux_2_31_${ARCH}
+WHEEL_PLATFORM=manylinux_2_35_${ARCH}
 
 DOCKER_CONTAINER_ID=$(docker create --rm --pull always --platform ${DOCKER_PLATFORM} -w "${PWD}" "${TRITON_DOCKER_IMAGE}" bash -c "sleep 1h")
 docker start "${DOCKER_CONTAINER_ID}"

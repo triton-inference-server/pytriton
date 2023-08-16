@@ -184,7 +184,7 @@ class BaseModelClient:
             # https://github.com/python/cpython/commit/5a88d50ff013a64fbdb25b877c87644a9034c969
             if sys.version_info < (3, 9) and not parsed_url.scheme and "://" in parsed_url.path:
                 raise ValueError(f"Invalid url {url}. Only grpc and http are supported.")
-            if (sys.version_info < (3, 9) and not parsed_url.scheme and "://" not in parsed_url.path) or (
+            if (not parsed_url.scheme and "://" not in parsed_url.path) or (
                 sys.version_info >= (3, 9) and parsed_url.scheme and not parsed_url.netloc
             ):
                 _LOGGER.debug(f"Adding http scheme to {url}")

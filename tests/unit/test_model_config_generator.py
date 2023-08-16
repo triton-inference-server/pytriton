@@ -546,8 +546,8 @@ def test_to_file_save_config_to_file_when_full_config_specified():
                 "preferred_batch_size": [16, 32],
                 "max_queue_delay_microseconds": "100",
                 "preserve_ordering": True,
-                "priority_levels": 3,
-                "default_priority_level": 1,
+                "priority_levels": "3",
+                "default_priority_level": "1",
                 "default_queue_policy": {
                     "allow_timeout_override": True,
                     "timeout_action": "DELAY",

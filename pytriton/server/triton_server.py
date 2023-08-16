@@ -52,7 +52,7 @@ from .triton_server_config import TritonServerConfig
 LOGGER = logging.getLogger(__name__)
 SERVER_OUTPUT_TIMEOUT_SECS = 30
 _PROXY_REQUIRED_MODULES = ["numpy", "zmq"]
-_PYTRITON_STARTED_IN_PY38 = (3, 8) <= sys.version_info < (3, 9)
+_PYTRITON_STARTED_IN_PY310 = (3, 10) <= sys.version_info < (3, 11)
 
 silence_3rd_party_loggers()
 
@@ -69,17 +69,17 @@ def get_triton_python_backend_python_env() -> pathlib.Path:
         Path to the python environment with python 3.8
     """
     env_path = pathlib.Path(sys.exec_prefix)
-    if not _PYTRITON_STARTED_IN_PY38:
+    if not _PYTRITON_STARTED_IN_PY310:
         venv_path = PYTRITON_CACHE_DIR / TRITON_PYTHON_BACKEND_INTERPRETER_DIRNAME
         if not venv_path.exists():
             raise RuntimeError(
                 f"venv for python backend not found at {venv_path}. "
-                f"Please run pytriton in python 3.8 environment to create the venv. "
+                f"Please run pytriton in python 3.10 environment to create the venv. "
                 f"Refer to https://github.com/triton-inference-server/pytriton/blob/main/docs/installation.md for more details."
             )
         env_path = venv_path
 
-        env_site_dirs = [(env_path / "lib" / "python3.8" / "site-packages").as_posix()]
+        env_site_dirs = [(env_path / "lib" / "python3.10" / "site-packages").as_posix()]
 
         installed_modules = [module_info.name for module_info in pkgutil.iter_modules(env_site_dirs)]
         missing_modules = list(set(_PROXY_REQUIRED_MODULES) - set(installed_modules))
@@ -289,7 +289,7 @@ class TritonServer:
         env_path = get_triton_python_backend_python_env()
         python_bin_directory = env_path / "bin"
         env["PATH"] = f"{python_bin_directory.as_posix()}:{env['PATH']}"
-        env["PYTHONPATH"] = f"{os.pathsep}".join(sys.path) if _PYTRITON_STARTED_IN_PY38 else ""
+        env["PYTHONPATH"] = f"{os.pathsep}".join(sys.path) if _PYTRITON_STARTED_IN_PY310 else ""
 
         return env
 

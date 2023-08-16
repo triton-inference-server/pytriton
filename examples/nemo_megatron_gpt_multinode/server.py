@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import logging
 
 import torch  # pytype: disable=import-error
 from nemo.collections.nlp.modules.common.text_generation_utils import generate  # pytype: disable=import-error
-from nemo.collections.nlp.parts.nlp_overrides import NLPDDPPlugin  # pytype: disable=import-error
+from nemo.collections.nlp.parts.nlp_overrides import NLPDDPStrategy  # pytype: disable=import-error
 from pytorch_lightning.trainer.trainer import Trainer  # pytype: disable=import-error
 
 from pytriton.model_config import ModelConfig
@@ -90,7 +90,7 @@ def main():
     logger.info(f" devices: {args.gpus}")
     logger.info(f" nodes: {args.nodes}")
     trainer = Trainer(
-        plugins=[NLPDDPPlugin()],
+        strategy=NLPDDPStrategy(),
         devices=args.gpus,
         num_nodes=args.nodes,
         accelerator="gpu",
