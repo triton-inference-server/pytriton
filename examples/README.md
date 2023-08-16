@@ -33,7 +33,7 @@ The list of example models deployments:
 - [Linear RAPIDS/CuPy model Jupyter Notebook](../examples/linear_cupy_notebook)
 - [Linear PyTorch model](../examples/identity_python)
 - [Multi-Layer TensorFlow2](../examples/mlp_random_tensorflow2)
-- [Multi Instance deployment for Linear PyTorch model](../examples/multi_instance_linear_pytorch)
+- [Multi Instance deployment for ResNet50 PyTorch model](../examples/multi_instance_resnet50_pytorch)
 - [Multi Model deployment for Python models](../examples/multiple_models_python)
 - [NeMo Megatron GPT model with multi-node support](../examples/nemo_megatron_gpt_multinode)
 - [OPT JAX from HuggingFace with multi-node support](../examples/huggingface_opt_multinode_jax)

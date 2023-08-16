@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import sys
-from concurrent.futures import ThreadPoolExecutor
+from threading import Thread
 
 import numpy as np
 import pytest
@@ -68,8 +67,8 @@ LOGGER = logging.getLogger("test_sync_client")
 
 def test_wait_for_model_raise_error_when_invalid_url_provided():
     with pytest.raises(PyTritonClientInvalidUrlError, match="Invalid url"):
-        client = FuturesModelClient(["localhost:8001"], "dummy")  # pytype: disable=wrong-arg-types
-        client.wait_for_model(timeout_s=0.1).result()
+        with FuturesModelClient(["localhost:8001"], "dummy") as client:  # pytype: disable=wrong-arg-types
+            client.wait_for_model(timeout_s=0.1).result()
 
 
 @patch_server_model_addsub_no_batch_ready
@@ -77,8 +76,7 @@ def test_wait_for_model_passes_timeout_to_client(mocker):
     spy_client_close = mocker.spy(ModelClient, ModelClient.close.__name__)
     mock_client_wait_for_model = mocker.patch.object(ModelClient, ModelClient.wait_for_model.__name__)
     mock_client_wait_for_model.return_value = True
-    spy_thread_pool_executor_shutdown = mocker.spy(ThreadPoolExecutor, ThreadPoolExecutor.shutdown.__name__)
-    spy_thread_pool_executor_submit = mocker.spy(ThreadPoolExecutor, ThreadPoolExecutor.submit.__name__)
+    spy__thread_start = mocker.spy(Thread, Thread.start.__name__)
     with FuturesModelClient(
         GRPC_LOCALHOST_URL,
         ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
@@ -90,27 +88,7 @@ def test_wait_for_model_passes_timeout_to_client(mocker):
         assert result is True
     spy_client_close.assert_called_once()
     mock_client_wait_for_model.assert_called_with(15)
-    spy_thread_pool_executor_shutdown.assert_called_once()
-    spy_thread_pool_executor_submit.assert_called_once()
-
-
-@patch_server_model_addsub_no_batch_ready
-def test_init_passes_max_workers_to_thread_pool_executor(mocker):
-    # Disable sync client exit
-    mock_client = mocker.patch.object(ModelClient, ModelClient.__exit__.__name__)
-    mock_threads_init = mocker.patch.object(ThreadPoolExecutor, "__init__", autospec=True)
-    mock_threads_init.return_value = None
-    # Disable thread pool executor shutdown
-    mocker.patch.object(FuturesModelClient, FuturesModelClient.__exit__.__name__)
-    client = FuturesModelClient(
-        GRPC_LOCALHOST_URL,
-        ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
-        str(ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_version),
-        max_workers=2,
-    )
-
-    mock_threads_init.assert_called_once_with(client._thread_pool_executor, max_workers=2)
-    mock_client.assert_not_called()
+    spy__thread_start.assert_called_once()
 
 
 @patch_server_model_addsub_no_batch_ready
@@ -147,7 +125,6 @@ def test_infer_sample_returns_values_creates_client(mocker):
 
     mock_client_wait_for_model = mocker.patch.object(ModelClient, ModelClient._wait_and_init_model_config.__name__)
     mock_client_infer_sample = mocker.patch.object(ModelClient, ModelClient.infer_sample.__name__)
-    mock_thread_pool_executor_shutdown = mocker.patch.object(ThreadPoolExecutor, ThreadPoolExecutor.shutdown.__name__)
 
     mock_client_infer_sample.return_value = c
     with FuturesModelClient(
@@ -157,7 +134,6 @@ def test_infer_sample_returns_values_creates_client(mocker):
     mock_client_wait_for_model.assert_called_once_with(init_t_timeout_s)
     mock_client_infer_sample.assert_called_once_with(parameters=None, headers=None, a=a, b=b)
     # Check the Python version and use different assertions for cancel_futures
-    mock_thread_pool_executor_shutdown.assert_called_once_with(wait=True)
     assert result == c
 
 
@@ -168,7 +144,6 @@ def test_infer_sample_returns_values_creates_client_close_wait(mocker):
     c = np.array([3], dtype=np.float32)
 
     mock_client_infer_sample = mocker.patch.object(ModelClient, ModelClient.infer_sample.__name__)
-    mock_thread_pool_executor_shutdown = mocker.patch.object(ThreadPoolExecutor, ThreadPoolExecutor.shutdown.__name__)
 
     # Prevent exit from closing the client
     mocker.patch.object(FuturesModelClient, FuturesModelClient.__exit__.__name__)
@@ -176,13 +151,8 @@ def test_infer_sample_returns_values_creates_client_close_wait(mocker):
     mock_client_infer_sample.return_value = c
     client = FuturesModelClient(GRPC_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name)
     result = client.infer_sample(a, b).result()
-    client.close(wait=True, cancel_futures=True)
+    client.close(wait=True)
     mock_client_infer_sample.assert_called_once_with(a, b, parameters=None, headers=None)
-    # Check the Python version and use different assertions for cancel_futures
-    if sys.version_info >= (3, 9):
-        mock_thread_pool_executor_shutdown.assert_called_once_with(wait=True, cancel_futures=True)
-    else:
-        mock_thread_pool_executor_shutdown.assert_called_once_with(wait=True)
     assert result == c
 
 
@@ -270,9 +240,6 @@ def test_init_http_passes_timeout(mocker):
     with FuturesModelClient("http://localhost:6669", "dummy", init_timeout_s=0.2, inference_timeout_s=0.1) as client:
         with pytest.raises(PyTritonClientTimeoutError):
             client.wait_for_model(timeout_s=0.2).result()
-        one_of_model_clients = list(client._thread_clients.values())[0]
-        assert one_of_model_clients._init_timeout_s == 0.2
-        assert one_of_model_clients._inference_timeout_s == 0.1
 
 
 @pytest.mark.timeout(5)
@@ -280,9 +247,22 @@ def test_init_grpc_passes_timeout_5(mocker):
     with FuturesModelClient("grpc://localhost:6669", "dummy", init_timeout_s=0.2, inference_timeout_s=0.1) as client:
         with pytest.raises(PyTritonClientTimeoutError):
             client.wait_for_model(timeout_s=0.2).result()
-        one_of_model_clients = list(client._thread_clients.values())[0]
-        assert one_of_model_clients._init_timeout_s == 0.2
-        assert one_of_model_clients._inference_timeout_s == 0.1
+
+
+@pytest.mark.timeout(5)
+def test_init_grpc_spaws_5_threads(mocker):
+    spy_thread_start = mocker.spy(Thread, Thread.start.__name__)
+
+    with FuturesModelClient("grpc://localhost:6669", "dummy", init_timeout_s=1, inference_timeout_s=0.1) as client:
+        timeout_s = 0.2
+        with pytest.raises(PyTritonClientTimeoutError):
+            # The list function is used to force the evaluation of the list comprehension before iterating over the futures and
+            # calling their result method. This is done to ensure that all the calls occur before the iteration starts,
+            # and to verify that five threads are created.
+            futures = list([client.wait_for_model(timeout_s=timeout_s) for _ in range(5)])  # noqa: C411
+            for future in futures:
+                future.result()
+        assert spy_thread_start.call_count == 5
 
 
 def test_http_client_raises_error_when_used_after_close(mocker):

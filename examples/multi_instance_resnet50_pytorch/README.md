@@ -1,5 +1,5 @@
 <!--
-Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,19 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# Multi-Instance Deployment of Linear PyTorch Model
+# Multi-Instance Deployment of ResNet50 PyTorch Model
 
 ## Overview
 
-The example presents a deployment of Multi-Instance Linear PyTorch model. The model is deployed multiple times what
-improve
-the throughput of the model when GPU is underutilized or when hybrid deployment is used (CPU and GPU instances at the
-same time).
+The example presents a deployment of Multi-Instance ResNet50 PyTorch model. The model is deployed multiple times what
+improve the throughput of the model when GPU is underutilized. The model by default is deployed on same GPU twice.
 
 Example consists of following scripts:
 
+- `install.sh` - install additional dependencies for downloading model from HuggingFace
 - `server.py` - start the model with Triton Inference Server
-- `client.py` - execute HTTP/gRPC requests to the deployed model
+- `client.sh` - execute Perf Analyzer to measure the performance
 
 ## Requirements
 
@@ -49,16 +48,21 @@ If you select to use container we recommend to install
 The step-by-step guide:
 
 1. Install PyTriton following the [installation instruction](../../README.md#installation)
-2. In current terminal start the model on Triton using `server.py`
+2. Install the additional packages using `install.sh`
+
+```shell
+./install.sh
+```
+
+3. In current terminal start the model on Triton using `server.py`
 
 ```shell
 ./server.py
 ```
 
-3. Open new terminal tab (ex. `Ctrl + T` on Ubuntu) or window
-4. Go to the example directory
-5. Run the `client.py` to perform queries on model:
-
+4. Open new terminal tab (ex. `Ctrl + T` on Ubuntu) or window
+5. Go to the example directory
+6. Run the `client.sh` to run performance measurement on model:
 ```shell
-./client.py
+./client.sh
 ```

@@ -16,13 +16,23 @@ limitations under the License.
 
 # Changelog
 
-## (unreleased)
+## Unreleased
 
-- Introduced `strict` flag in `Triton.bind` which enables data types and shapes validation of inference callable outputs
-  against model config
-- Added `AsyncioModelClient` which works in FastAPI and other async frameworks
+- change: Upgraded Triton Inference Server binaries to version 2.36.0. Note that this Triton Inference Server requires glibc 2.35+ or a more recent version.
 - Updated communication protocol between Proxy Backend and Inference Callable
 - Updated data sharing between Proxy Backend and Inference Callable
+
+[//]: <> (put here on external component update with short summary what change or link to changelog)
+
+- Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.36.0](https://github.com/triton-inference-server/server/releases/tag/v2.36.0)
+
+## 0.2.4 (2023-08-10)
+
+- new: Introduced `strict` flag in `Triton.bind` which enables data types and shapes validation of inference callable outputs
+  against model config
+- new: `AsyncioModelClient` which works in FastAPI and other async frameworks
+- fix: `FuturesModelClient` do not raise `gevent.exceptions.InvalidThreadUseError`
+- fix: Do not throw TimeoutError if could not connect to server during model verification
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 

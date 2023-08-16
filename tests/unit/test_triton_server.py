@@ -44,3 +44,21 @@ def test_triton_endpoints():
     assert triton_server.get_endpoint("grpc") == "grpc://127.0.0.1:8001"
     assert triton_server.get_endpoint("http") == "http://192.168.0.1:8000"
     assert triton_server.get_endpoint("metrics") == "http://192.168.0.1:8002"
+
+    config = TritonServerConfig()
+    config.update_config({"http_address": "0.0.0.0", "model-repository": "/tmp/repo"})
+    triton_server = triton_server = TritonServer(
+        path=TRITONSERVER_DIST_DIR / "bin/tritonserver", libs_path=get_libs_path(), config=config
+    )
+    assert triton_server.get_endpoint("grpc") == "grpc://127.0.0.1:8001"
+    assert triton_server.get_endpoint("http") == "http://127.0.0.1:8000"
+    assert triton_server.get_endpoint("metrics") == "http://127.0.0.1:8002"
+
+    config = TritonServerConfig()
+    config.update_config({"http_address": "0.00.00.000", "model-repository": "/tmp/repo"})
+    triton_server = triton_server = TritonServer(
+        path=TRITONSERVER_DIST_DIR / "bin/tritonserver", libs_path=get_libs_path(), config=config
+    )
+    assert triton_server.get_endpoint("grpc") == "grpc://127.0.0.1:8001"
+    assert triton_server.get_endpoint("http") == "http://127.0.0.1:8000"
+    assert triton_server.get_endpoint("metrics") == "http://127.0.0.1:8002"

@@ -17,6 +17,7 @@
 import gc
 import logging
 import threading
+import unittest
 from unittest.mock import ANY
 
 import async_timeout
@@ -171,7 +172,10 @@ async def test_async_http_client_init_obtain_expected_model_config_when_lazy_ini
     client = AsyncioModelClient("http://localhost:8000", ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name, lazy_init=False)
     await client.__aenter__()
     await client.__aexit__(None, None, None)
-    spy_client_init.assert_called_with(client._client, "localhost:8000", conn_timeout=60.0)
+    assert spy_client_init.mock_calls == [
+        unittest.mock.call(client._general_client, "localhost:8000", conn_timeout=60.0),
+        unittest.mock.call(client._infer_client, "localhost:8000", conn_timeout=60.0),
+    ]
     assert await client.model_config == ADD_SUB_WITH_BATCHING_MODEL_CONFIG
 
 
@@ -251,7 +255,7 @@ async def test_async_http_client_infer_sample_returns_expected_result_when_infer
     server_result = {name: data[np.newaxis, ...] for name, data in expected_result.items()}
 
     async with AsyncioModelClient(HTTP_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
-        mock_infer = mocker.patch.object(client._client, "infer")
+        mock_infer = mocker.patch.object(client._infer_client, "infer")
         mock_infer.return_value = wrap_to_http_infer_result(ADD_SUB_WITH_BATCHING_MODEL_CONFIG, "0", server_result)
         result = await client.infer_sample(a, b)
 
@@ -290,7 +294,7 @@ async def test_async_http_client_infer_sample_returns_expected_result_when_posit
     server_result = expected_result
 
     async with AsyncioModelClient(HTTP_LOCALHOST_URL, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name) as client:
-        mock_infer = mocker.patch.object(client._client, "infer")
+        mock_infer = mocker.patch.object(client._infer_client, "infer")
         mock_infer.return_value = wrap_to_http_infer_result(ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG, "0", server_result)
         result = await client.infer_sample(a, b)
 
@@ -327,7 +331,7 @@ async def test_async_http_client_infer_batch_returns_expected_result_when_positi
     server_result = expected_result
 
     async with AsyncioModelClient(HTTP_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
-        mock_infer = mocker.patch.object(client._client, "infer")
+        mock_infer = mocker.patch.object(client._infer_client, "infer")
         mock_infer.return_value = wrap_to_http_infer_result(ADD_SUB_WITH_BATCHING_MODEL_CONFIG, "0", server_result)
         result = await client.infer_batch(a, b)
 
@@ -365,7 +369,7 @@ async def test_async_http_client_infer_sample_returns_expected_result_when_named
     server_result = {"add": a + b, "sub": a - b}
 
     async with AsyncioModelClient(HTTP_LOCALHOST_URL, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name) as client:
-        mock_infer = mocker.patch.object(client._client, "infer")
+        mock_infer = mocker.patch.object(client._infer_client, "infer")
         mock_infer.return_value = wrap_to_http_infer_result(ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG, "0", server_result)
 
         inputs_dict = {"a": a, "b": b}
@@ -404,7 +408,7 @@ async def test_async_http_client_infer_batch_returns_expected_result_when_named_
     server_result = expected_result
 
     async with AsyncioModelClient(HTTP_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
-        mock_infer = mocker.patch.object(client._client, "infer")
+        mock_infer = mocker.patch.object(client._infer_client, "infer")
         mock_infer.return_value = wrap_to_http_infer_result(ADD_SUB_WITH_BATCHING_MODEL_CONFIG, "0", server_result)
 
         inputs_dict = {"a": a, "b": b}
@@ -491,7 +495,8 @@ async def test_async_http_client_infer_raises_error_when_no_args_provided(mocker
 @pytest.mark.filterwarnings("error::pytest.PytestUnraisableExceptionWarning")
 async def test_asynciodel_of_inference_client_does_not_raise_error():
     def _del(client):
-        del client._client
+        del client._general_client
+        del client._infer_client
 
     async def _create_client_and_delete():
         client = AsyncioModelClient(HTTP_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name)
@@ -517,7 +522,7 @@ async def test_async_grpc_client_infer_sample_returns_expected_result_when_infer
     patch_grpc_client__model_up_and_ready(
         mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG, AsyncioGrpcInferenceServerClient
     )
-    mock_infer = mocker.patch.object(client._client, "infer")
+    mock_infer = mocker.patch.object(client._infer_client, "infer")
     mock_infer.return_value = wrap_to_http_infer_result(ADD_SUB_WITH_BATCHING_MODEL_CONFIG, "0", expected_result)
     _LOGGER.debug("Entering client")
     await client.__aenter__()
@@ -694,7 +699,7 @@ async def test_async_grpc_client_infer_sample_fails_on_model_with_batching(mocke
     _LOGGER.debug("Creating client")
     patch_client__server_up_and_ready(mocker, AsyncioGrpcInferenceServerClient)
     patch_grpc_client__model_up_and_ready(mocker, model_config, AsyncioGrpcInferenceServerClient)
-    mock_infer = mocker.patch.object(client._client, "infer")
+    mock_infer = mocker.patch.object(client._infer_client, "infer")
 
     def _model_infer_mock(*args, **kwargs):
         raise PyTritonClientValueError("Dummy exception")
@@ -713,7 +718,7 @@ async def test_async_grpc_client_infer_sample_fails_on_model_with_batching(mocke
     _LOGGER.debug("Exited client")
 
 
-@pytest.mark.async_timeout(0.5)
+@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_http_init_passes_timeout(mocker):
     async with AsyncioModelClient(
         "http://localhost:6669", "dummy", init_timeout_s=0.2, inference_timeout_s=0.1
@@ -722,7 +727,7 @@ async def test_async_http_init_passes_timeout(mocker):
             await client.wait_for_model(timeout_s=0.2)
 
 
-@pytest.mark.async_timeout(0.5)
+@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_grpc_init_passes_timeout(mocker):
     async with AsyncioModelClient(
         "grpc://localhost:6669", "dummy", init_timeout_s=0.2, inference_timeout_s=0.1
