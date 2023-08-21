@@ -28,6 +28,7 @@ python model deployed on Triton and model in current environment.
 
 """
 import enum
+import inspect
 import itertools
 import logging
 import threading as th
@@ -37,7 +38,7 @@ from typing import Callable
 
 import zmq  # pytype: disable=import-error
 
-from pytriton.exceptions import PyTritonUnrecoverableError
+from pytriton.exceptions import PyTritonRuntimeError, PyTritonUnrecoverableError
 from pytriton.model_config.triton_model_config import TritonModelConfig
 from pytriton.proxy.communication import (
     InferenceHandlerRequests,
@@ -60,6 +61,40 @@ class InferenceHandlerEvent(enum.Enum):
 
 
 InferenceEventsHandler = typing.Callable[["InferenceHandler", InferenceHandlerEvent, typing.Optional[typing.Any]], None]
+
+
+class _ResponsesIterator:
+    """Iterator for gathering all responses (also from generator)."""
+
+    def __init__(self, responses, decoupled: bool = False):
+        """Init _ResponsesIterator object.
+
+        Args:
+            responses: responses from model callable
+            decoupled: is model decoupled
+        """
+        self._is_generator = inspect.isgenerator(responses)
+        if self._is_generator and not decoupled:
+            raise PyTritonRuntimeError(
+                "Results generator is not supported for non-decoupled models. "
+                "Don't know how to aggregate partial results from generator into single response. "
+                "Enable streaming in model configuration or return list of responses."
+            )
+        self._responses = responses
+        self._iterator = None
+
+    def __iter__(self):
+        """Return iterator."""
+        if self._is_generator:
+            self._iterator = self._responses
+        else:
+            self._iterator = iter([self._responses]) if self._responses is not None else iter([])
+            self._responses = None
+        return self
+
+    def __next__(self):
+        """Return next response."""
+        return next(self._iterator)
 
 
 class InferenceHandler(th.Thread):
@@ -129,32 +164,43 @@ class InferenceHandler(th.Thread):
                     LOGGER.debug(f"Processing inference callback for {model_name}.")
                     responses = self._model_callable(inputs)
 
-                    LOGGER.debug(f"Validating outputs for {self._model_config.model_name}.")
-                    validate_outputs(
-                        model_config=self._model_config,
-                        model_outputs=self._model_outputs,
-                        outputs=responses,
-                        strict=self._strict,
-                    )
+                    responses_iterator = _ResponsesIterator(responses, decoupled=self._model_config.decoupled)
+                    for responses in responses_iterator:
+                        LOGGER.debug(f"Validating outputs for {self._model_config.model_name}.")
+                        validate_outputs(
+                            model_config=self._model_config,
+                            model_outputs=self._model_outputs,
+                            outputs=responses,
+                            strict=self._strict,
+                            requests_number=len(requests),
+                        )
+                        LOGGER.debug(f"Copying outputs to shared memory for {model_name}.")
+                        output_arrays_with_coords = [
+                            (response_idx, output_name, tensor)
+                            for response_idx, response in enumerate(responses)
+                            for output_name, tensor in response.items()
+                        ]
+                        tensor_ids = self._tensor_store.put([tensor for _, _, tensor in output_arrays_with_coords])
+                        responses = [{} for _ in range(len(responses))]
+                        for (response_idx, output_name, _), tensor_id in zip(output_arrays_with_coords, tensor_ids):
+                            responses[response_idx][output_name] = tensor_id
 
-                    # to avoid reallocation need to declare required size of the buffer here
-                    LOGGER.debug(f"Copying outputs to shared memory for {model_name}.")
-                    for tensor_id in itertools.chain(*[request.data.values() for request in requests]):
-                        self._tensor_store.release_block(tensor_id)
-
-                    output_arrays_with_coords = [
-                        (response_idx, output_name, tensor)
-                        for response_idx, response in enumerate(responses)
-                        for output_name, tensor in response.items()
-                    ]
-                    tensor_ids = self._tensor_store.put([tensor for _, _, tensor in output_arrays_with_coords])
-                    responses = [{} for _ in range(len(responses))]
-                    for (response_idx, output_name, _), tensor_id in zip(output_arrays_with_coords, tensor_ids):
-                        responses[response_idx][output_name] = tensor_id
+                        responses = InferenceHandlerResponses(
+                            responses=[
+                                MetaRequestResponse(idx=idx, data=response, eos=False)
+                                for idx, response in enumerate(responses)
+                            ],
+                        )
+                        LOGGER.debug(f"Sending response: {responses}")
+                        self.socket.send(responses.as_bytes())
+                        self.socket.recv()  # wait for ack
 
                     responses = InferenceHandlerResponses(
-                        responses=[MetaRequestResponse(data=response) for response in responses]
+                        responses=[MetaRequestResponse(idx=idx, eos=True) for idx in range(len(requests))]
                     )
+                    LOGGER.debug(f"Send eos response to proxy model for {model_name}.")
+                    self.socket.send(responses.as_bytes())
+
                 except PyTritonUnrecoverableError:
                     error = traceback.format_exc()
                     responses = InferenceHandlerResponses(error=error)
@@ -165,13 +211,17 @@ class InferenceHandler(th.Thread):
                     )
                     self.stopped = True
                     self._notify_proxy_backend_observers(InferenceHandlerEvent.UNRECOVERABLE_ERROR, error)
+                    LOGGER.debug(f"Send response to proxy model for {model_name}.")
+                    self.socket.send(responses.as_bytes())
                 except Exception:
                     error = traceback.format_exc()
                     responses = InferenceHandlerResponses(error=error)
                     LOGGER.error(f"Error occurred during calling model callable: {error}")
+                    self.socket.send(responses.as_bytes())
+                finally:
+                    for tensor_id in itertools.chain(*[request.data.values() for request in requests]):
+                        self._tensor_store.release_block(tensor_id)
 
-                LOGGER.debug(f"Send response to proxy model for {model_name}.")
-                self.socket.send(responses.as_bytes())
         except zmq.error.ContextTerminated:
             LOGGER.info("Context was terminated. InferenceHandler will be closed.")
         except Exception as exception:

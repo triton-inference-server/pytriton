@@ -45,7 +45,30 @@ def test_validate_outputs_throws_exception_when_outputs_is_not_a_list():
         ValueError,
         match=r"Outputs returned by `Foo` model callable must be list of response dicts with numpy arrays",
     ):
-        validate_outputs(model_config=MY_MODEL_CONFIG, model_outputs=MY_MODEL_OUTPUTS, outputs=outputs, strict=False)
+        validate_outputs(
+            model_config=MY_MODEL_CONFIG,
+            model_outputs=MY_MODEL_OUTPUTS,
+            outputs=outputs,
+            strict=False,
+            requests_number=1,
+        )
+
+
+def test_validate_outputs_throws_exception_when_outputs_number_is_not_equal_to_requests_number():
+    outputs = [{"output1": np.array([1, 2, 3]), "output2": np.array([1, 2, 3])}]
+
+    with pytest.raises(
+        ValueError,
+        match=r"Number of outputs returned by `Foo` inference callable "
+        r"\(1\) does not match number of requests \(2\) received from Triton\.",
+    ):
+        validate_outputs(
+            model_config=MY_MODEL_CONFIG,
+            model_outputs=MY_MODEL_OUTPUTS,
+            outputs=outputs,
+            strict=False,
+            requests_number=2,
+        )
 
 
 def test_validate_outputs_throws_exception_when_outputs_is_not_a_list_of_dicts():
@@ -55,7 +78,13 @@ def test_validate_outputs_throws_exception_when_outputs_is_not_a_list_of_dicts()
         ValueError,
         match=r"Outputs returned by `Foo` model callable must be list of response dicts with numpy arrays",
     ):
-        validate_outputs(model_config=MY_MODEL_CONFIG, model_outputs=MY_MODEL_OUTPUTS, outputs=outputs, strict=False)
+        validate_outputs(
+            model_config=MY_MODEL_CONFIG,
+            model_outputs=MY_MODEL_OUTPUTS,
+            outputs=outputs,
+            strict=False,
+            requests_number=len(outputs),
+        )
 
 
 def test_validate_outputs_call_validate_outputs_data_if_strict_is_false(mocker):
@@ -63,7 +92,13 @@ def test_validate_outputs_call_validate_outputs_data_if_strict_is_false(mocker):
     mock_validate_outputs_data = mocker.patch("pytriton.proxy.validators.validate_output_data")
     mock_validate_output_dtype_and_shape = mocker.patch("pytriton.proxy.validators.validate_output_dtype_and_shape")
 
-    validate_outputs(model_config=MY_MODEL_CONFIG, model_outputs=MY_MODEL_OUTPUTS, outputs=outputs, strict=False)
+    validate_outputs(
+        model_config=MY_MODEL_CONFIG,
+        model_outputs=MY_MODEL_OUTPUTS,
+        outputs=outputs,
+        strict=False,
+        requests_number=len(outputs),
+    )
 
     assert mock_validate_outputs_data.called is True
     assert mock_validate_output_dtype_and_shape.called is False
@@ -74,7 +109,13 @@ def test_validate_outputs_call_validate_outputs_data_if_strict_is_true(mocker):
     mock_validate_outputs_data = mocker.patch("pytriton.proxy.validators.validate_output_data")
     mock_validate_output_dtype_and_shape = mocker.patch("pytriton.proxy.validators.validate_output_dtype_and_shape")
 
-    validate_outputs(model_config=MY_MODEL_CONFIG, model_outputs=MY_MODEL_OUTPUTS, outputs=outputs, strict=True)
+    validate_outputs(
+        model_config=MY_MODEL_CONFIG,
+        model_outputs=MY_MODEL_OUTPUTS,
+        outputs=outputs,
+        strict=True,
+        requests_number=len(outputs),
+    )
 
     assert mock_validate_outputs_data.called is True
     assert mock_validate_output_dtype_and_shape.called is True

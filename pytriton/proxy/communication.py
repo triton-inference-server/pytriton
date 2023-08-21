@@ -232,8 +232,10 @@ def calc_serialized_size_of_numpy_with_struct_header(tensor: np.ndarray) -> List
 class MetaRequestResponse:
     """Data class for storing input/output data and parameters."""
 
-    data: Dict[str, str]
+    idx: int
+    data: Optional[Dict[str, str]] = None
     parameters: Optional[Dict[str, Union[str, int, bool]]] = None
+    eos: Optional[bool] = None
 
 
 @dataclasses.dataclass
@@ -253,6 +255,7 @@ class InferenceHandlerRequests:
         return cls(
             requests=[
                 MetaRequestResponse(
+                    idx=request.get("idx"),
                     data=request.get("data", {}),
                     parameters=request.get("parameters"),
                 )
@@ -265,6 +268,7 @@ class InferenceHandlerRequests:
         requests = {
             "requests": [
                 {
+                    "idx": request.idx,
                     "data": request.data,
                     "parameters": request.parameters,
                 }
@@ -290,7 +294,10 @@ class InferenceHandlerResponses:
         """
         responses = json.loads(content)
         return cls(
-            responses=[MetaRequestResponse(response.get("data", {})) for response in responses.get("responses", [])],
+            responses=[
+                MetaRequestResponse(idx=response.get("idx"), data=response.get("data", {}), eos=response.get("eos"))
+                for response in responses.get("responses", [])
+            ],
             error=responses.get("error"),
         )
 
@@ -298,7 +305,9 @@ class InferenceHandlerResponses:
         """Serializes InferenceHandlerResponses object to bytes."""
         result = {"error": self.error}
         if self.responses:
-            result["responses"] = [{"data": response.data} for response in self.responses]
+            result["responses"] = [
+                {"idx": response.idx, "data": response.data, "eos": response.eos} for response in self.responses
+            ]
         return json.dumps(result).encode("utf-8")
 
 

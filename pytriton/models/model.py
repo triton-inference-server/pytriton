@@ -218,9 +218,6 @@ class Model:
             ModelConfig object with configuration for Python model deployment
         """
         if not self._triton_model_config:
-            if self.config.decoupled:
-                raise NotImplementedError("Decoupled mode is not supported yet.")
-
             triton_model_config = TritonModelConfig(
                 model_name=self.model_name,
                 model_version=self.model_version,

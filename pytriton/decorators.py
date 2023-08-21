@@ -200,22 +200,28 @@ def batch(wrapped, instance, args, kwargs):
     new_kwargs.update(inputs)
     outputs = wrapped(*args, **new_kwargs)
 
-    outputs = convert_output(outputs, wrapped, instance)
-    output_names = outputs.keys()
+    def _split_result(_result):
+        outputs = convert_output(_result, wrapped, instance)
+        output_names = outputs.keys()
 
-    out_list = []
-    start_idx = 0
-    for request in req_list:
-        # get batch_size of first input for each request - assume that all inputs have same batch_size
-        first_input = next(iter(request.values()))
-        request_batch_size = first_input.shape[0]
-        req_output_dict = {}
-        for _output_ind, output_name in enumerate(output_names):
-            req_output = outputs[output_name][start_idx : start_idx + request_batch_size, ...]
-            req_output_dict[output_name] = req_output
-        out_list.append(req_output_dict)
-        start_idx += request_batch_size
-    return out_list
+        out_list = []
+        start_idx = 0
+        for request in req_list:
+            # get batch_size of first input for each request - assume that all inputs have same batch_size
+            first_input = next(iter(request.values()))
+            request_batch_size = first_input.shape[0]
+            req_output_dict = {}
+            for _output_ind, output_name in enumerate(output_names):
+                req_output = outputs[output_name][start_idx : start_idx + request_batch_size, ...]
+                req_output_dict[output_name] = req_output
+            out_list.append(req_output_dict)
+            start_idx += request_batch_size
+        return out_list
+
+    if inspect.isgenerator(outputs):
+        return (_split_result(_result) for _result in outputs)
+    else:
+        return _split_result(outputs)
 
 
 def group_by_values(*keys, pad_fn: typing.Optional[typing.Callable[[InferenceRequests], InferenceRequests]] = None):

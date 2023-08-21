@@ -29,7 +29,6 @@ import zmq
 from pytriton.model_config.generator import ModelConfigGenerator
 from pytriton.model_config.triton_model_config import TensorSpec, TritonModelConfig
 from pytriton.proxy.communication import TensorStore
-from pytriton.proxy.types import Request
 from pytriton.triton import TRITONSERVER_DIST_DIR
 
 LOGGER = logging.getLogger("tests.test_model_error_handling")
@@ -39,7 +38,82 @@ logging.basicConfig(
 )
 
 
-def test_model_throws_exception(tmp_path, mocker):
+class Tensor:
+    def __init__(self, name, data):
+        self._name = name
+        self._data = data
+
+    def name(self):
+        return self._name
+
+    def as_numpy(self):
+        return self._data
+
+
+class InferenceRequest:
+    def __init__(self, model_name, inputs, requested_output_names, parameters=None):
+        self.model_name = model_name
+        self._inputs = inputs
+        self.requested_output_names = requested_output_names
+        self._parameters = parameters or {}
+
+    def inputs(self):
+        return self._inputs
+
+    def parameters(self):
+        return json.dumps(self._parameters)
+
+    def get_response_sender(self):
+        return None
+
+
+def _error_infer_fn(*_, **__):
+    # Wrapper raises division by zero error
+    time.sleep(0.2)
+    return 2 / 0
+
+
+def _error_infer_gen_fn(*_, **__):
+    # Wrapper raises division by zero error
+    time.sleep(0.2)
+    raise RuntimeError("division by zero")
+
+
+def _get_proxy_backend(mocker, model_config, shared_memory_socket, data_store_socket):
+    from pytriton.proxy.model import TritonPythonModel
+
+    authkey = multiprocessing.current_process().authkey
+    authkey = base64.b64encode(authkey).decode("utf-8")
+    instance_data = {
+        "shared-memory-socket": shared_memory_socket,
+        "data-store-socket": data_store_socket,
+        "auth-key": authkey,
+    }
+
+    mocker.patch.object(TritonPythonModel, "_get_instance_data", return_value=instance_data)
+
+    model_config_json_payload = json.dumps(ModelConfigGenerator(model_config).get_config()).encode("utf-8")
+    backend_initialization_args = {"model_config": model_config_json_payload}
+
+    backend_model = None
+    try:
+        backend_model = TritonPythonModel()
+        backend_model.initialize(backend_initialization_args)
+        return backend_model
+    except Exception:
+        if backend_model:
+            backend_model.finalize()
+        raise
+
+
+@pytest.mark.parametrize(
+    "infer_fn,decoupled",
+    [
+        (_error_infer_fn, False),
+        (_error_infer_gen_fn, True),
+    ],
+)
+def test_model_throws_exception(tmp_path, mocker, infer_fn, decoupled):
 
     # add python backend folder to find triton_python_backend_utils from model.py
     python_backend_path = TRITONSERVER_DIST_DIR / "backends" / "python"
@@ -57,13 +131,7 @@ def test_model_throws_exception(tmp_path, mocker):
         pb_utils.Logger = Mock()
 
         from pytriton.proxy.inference_handler import InferenceHandler
-        from pytriton.proxy.model import TritonPythonModel
         from pytriton.utils.workspace import Workspace
-
-        def infer_fn(_):
-            # Wrapper raises division by zero error
-            time.sleep(0.2)
-            return 2 / 0
 
         model_name = "model1"
         workspace = Workspace(pathlib.Path(tmp_path) / "w")
@@ -76,8 +144,8 @@ def test_model_throws_exception(tmp_path, mocker):
             inputs=[TensorSpec(name="input1", dtype=np.float32, shape=(-1,))],
             outputs=[TensorSpec(name="output1", dtype=np.float32, shape=(-1,))],
             backend_parameters={"shared-memory-socket": shared_memory_socket},
+            decoupled=decoupled,
         )
-        model_config_json_payload = json.dumps(ModelConfigGenerator(model_config).get_config()).encode("utf-8")
 
         zmq_context = zmq.Context()
 
@@ -85,45 +153,42 @@ def test_model_throws_exception(tmp_path, mocker):
         tensor_store = TensorStore(data_store_socket, authkey)
         tensor_store.start()
 
-        authkey = base64.b64encode(authkey).decode("utf-8")
-        instance_data = {
-            "shared-memory-socket": shared_memory_socket,
-            "data-store-socket": data_store_socket,
-            "auth-key": authkey,
-        }
+        backend_model = _get_proxy_backend(mocker, model_config, shared_memory_socket, data_store_socket)
 
-        with mocker.patch.object(TritonPythonModel, "_get_instance_data", return_value=instance_data):
-            backend_initialization_args = {"model_config": model_config_json_payload}
-            backend_model = TritonPythonModel()
-            backend_model.initialize(backend_initialization_args)
+        inference_handler = InferenceHandler(
+            infer_fn,
+            model_config,
+            shared_memory_socket=shared_memory_socket,
+            data_store_socket=data_store_socket,
+            zmq_context=zmq_context,
+            strict=False,
+        )
+        inference_handler.start()
 
-            inference_handler = InferenceHandler(
-                infer_fn,
-                model_config,
-                shared_memory_socket=shared_memory_socket,
-                data_store_socket=data_store_socket,
-                zmq_context=zmq_context,
-                strict=False,
-            )
-            inference_handler.start()
+        requests = [
+            InferenceRequest(
+                model_name=model_name,
+                inputs=[Tensor("input1", np.array([[1, 2, 3]], dtype=np.float32))],
+                requested_output_names=["output1"],
+            ),
+        ]
 
-            inputs = [Request({"input1": np.array([[1, 2, 3]], dtype=np.float32)}, {})]
-
-            try:
-                result = backend_model._exec_requests(inputs)
-                pytest.fail(f"Model raised exception, but exec_batch passed - result: {result}")
-            except pb_utils.TritonModelException:  # pytype: disable=module-attr
-                LOGGER.info("Inference exception")
-                msg = traceback.format_exc()
-                LOGGER.info(msg)
-                assert "division by zero" in msg
-            except Exception:
-                msg = traceback.format_exc()
-                pytest.fail(f"Wrong exception raised: {msg}")
-            finally:
-                zmq_context.term()
-                inference_handler.stop()
-                backend_model.finalize()
+        try:
+            result = backend_model.execute(requests)
+            pytest.fail(f"Model raised exception, but exec_batch passed - result: {result}")
+        except pb_utils.TritonModelException:  # pytype: disable=module-attr
+            LOGGER.info("Inference exception")
+            msg = traceback.format_exc()
+            LOGGER.info(msg)
+            assert "division by zero" in msg
+        except Exception:
+            msg = traceback.format_exc()
+            pytest.fail(f"Wrong exception raised: {msg}")
+        finally:
+            zmq_context.term()
+            inference_handler.stop()
+            backend_model.finalize()
+            tensor_store.close()
 
     finally:
         sys.path.pop()

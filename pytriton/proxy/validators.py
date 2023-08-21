@@ -19,7 +19,7 @@ import numpy as np
 LOGGER = logging.getLogger(__name__)
 
 
-def validate_outputs(model_config, model_outputs, outputs, strict):
+def validate_outputs(model_config, model_outputs, outputs, strict: bool, requests_number: int):
     """Validate outputs of model.
 
     Args:
@@ -27,6 +27,7 @@ def validate_outputs(model_config, model_outputs, outputs, strict):
         model_outputs: Mapped outputs configuration
         outputs: Returned outputs from inference callable
         strict: Enable/disable strict validation against model config
+        requests_number: Number of requests
 
     Raises:
         ValueError if outputs are incorrect
@@ -35,6 +36,11 @@ def validate_outputs(model_config, model_outputs, outputs, strict):
         raise ValueError(
             f"Outputs returned by `{model_config.model_name}` model callable "
             "must be list of response dicts with numpy arrays"
+        )
+    if len(outputs) != requests_number:
+        raise ValueError(
+            f"Number of outputs returned by `{model_config.model_name}` inference callable "
+            f"({len(outputs)}) does not match number of requests ({requests_number}) received from Triton."
         )
 
     LOGGER.debug(f"Outputs: {outputs}")

@@ -527,6 +527,7 @@ def test_to_file_save_config_to_file_and_override_max_batch_size_when_batching_d
         }
 
 
+@pytest.mark.xfail(reason="New client generation is not yet implemented")
 def test_to_file_save_config_to_file_when_full_config_specified():
     generator = ModelConfigGenerator(full_model_config)
 

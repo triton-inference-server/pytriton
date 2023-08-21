@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Inference decorators tests."""
+import inspect
 import typing
 
 import numpy as np
@@ -55,7 +56,7 @@ input_requests = [
 
 input_requests_for_sample = [Request({"b": np.array([[7, 5], [8, 6]]), "a": np.array([[1], [1]])}, {})]
 
-input_requests_for_batching = [
+three_request_for_batching = [
     Request({"b": np.array([[7, 5], [8, 6]]), "a": np.array([[1], [1]])}, {}),
     Request({"b": np.array([[1, 2], [1, 2], [11, 12]]), "a": np.array([[1], [1], [1]])}, {}),
     Request({"b": np.array([[1, 2]]), "a": np.array([[1]])}, {}),
@@ -134,9 +135,10 @@ def test_batch():
 
         return {"a": inputs["a"] * 2, "b": inputs["b"] * 3}
 
-    results = batched_fun(input_requests_for_batching)
+    results = batched_fun(three_request_for_batching)
+    assert not inspect.isgenerator(results)
 
-    for input, output in zip(input_requests_for_batching, results):
+    for input, output in zip(three_request_for_batching, results):
         assert np.all(input["a"] * 2 == output["a"]) and np.all(input["b"] * 3 == output["b"])
 
 
@@ -149,13 +151,37 @@ def test_batch_output_list():
 
         return [inputs["a"] * 2, inputs["b"] * 3]
 
-    context = _prepare_context_for_input(input_requests_for_batching, batched_fun)
+    context = _prepare_context_for_input(three_request_for_batching, batched_fun)
 
     batched_fun.__triton_context__ = context
-    results = batched_fun(input_requests_for_batching)
+    results = batched_fun(three_request_for_batching)
+    assert not inspect.isgenerator(results)
 
-    for input, output in zip(input_requests_for_batching, results):
+    for input, output in zip(three_request_for_batching, results):
         assert np.all(input["a"] * 2 == output["a"]) and np.all(input["b"] * 3 == output["b"])
+
+
+def test_batch_with_generator_fn():
+    @batch
+    def _infer_gen_fn(**inputs):
+        yield {"a": inputs["a"] * 2, "b": inputs["b"] * 3}
+        yield {"a": inputs["a"] * 2, "b": inputs["b"] * 3}
+
+    results_gen = _infer_gen_fn(three_request_for_batching)
+    assert inspect.isgenerator(results_gen)
+
+    results = next(results_gen)
+    assert len(three_request_for_batching) == len(results)
+    for request, result in zip(three_request_for_batching, results):
+        assert np.all(request["a"] * 2 == result["a"]) and np.all(request["b"] * 3 == result["b"])
+
+    results = next(results_gen)
+    assert len(three_request_for_batching) == len(results)
+    for request, result in zip(three_request_for_batching, results):
+        assert np.all(request["a"] * 2 == result["a"]) and np.all(request["b"] * 3 == result["b"])
+
+    with pytest.raises(StopIteration):
+        next(results_gen)
 
 
 def test_sample():
@@ -166,7 +192,7 @@ def test_sample():
 
     results = sample_fun(input_requests_for_sample)
 
-    for input, output in zip(input_requests_for_batching, results):
+    for input, output in zip(three_request_for_batching, results):
         assert np.all(input["a"] * 2 == output["a"]) and np.all(input["b"] * 3 == output["b"])
 
 
