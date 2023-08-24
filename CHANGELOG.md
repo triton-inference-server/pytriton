@@ -16,6 +16,16 @@ limitations under the License.
 
 # Changelog
 
+## 0.2.5 (2023-08-24)
+
+- new: Allow to execute multiple PyTriton instances in the same process and/or host
+- fix: Invalid flags for Proxy Backend configuration passed to Triton
+
+
+[//]: <> (put here on external component update with short summary what change or link to changelog)
+
+- Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.33.0](https://github.com/triton-inference-server/server/releases/tag/v2.33.0)
+
 ## 0.2.4 (2023-08-10)
 
 - new: Introduced `strict` flag in `Triton.bind` which enables data types and shapes validation of inference callable outputs
