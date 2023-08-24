@@ -86,7 +86,11 @@ def main():
         action="store_true",
         help="Enable verbose logging",
     )
-
+    parser.add_argument(
+        "--end-strings",
+        nargs="+",
+        default=["\n"],
+    )
     args = parser.parse_args()
 
     log_level = logging.DEBUG if args.verbose else logging.INFO
@@ -122,7 +126,7 @@ def main():
         result_dict = client.infer_batch(
             tasks=tasks,
             prompts=prompts,
-            min_length=_param(np.int32, 0),
+            min_length=_param(np.int32, 20),
             max_length=_param(np.int32, args.output_len),
             use_greedy=_param(np.bool_, True),
             temperature=_param(np.float32, 1.0),
@@ -132,6 +136,7 @@ def main():
             add_BOS=_param(np.bool_, True),
             all_probs=_param(np.bool_, False),
             compute_logprob=_param(np.bool_, False),
+            end_strings=np.tile(_str_list2numpy(args.end_strings), (batch_size, 1)),
         )
 
     sentences = np.char.decode(result_dict["sentences"].astype("bytes"), "utf-8")
