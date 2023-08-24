@@ -15,7 +15,10 @@
 """Text generation server with NeMo Megatron GPT model."""
 import argparse
 import logging
+import os
+import yaml
 from pathlib import Path
+from typing import Union
 
 import torch  # pytype: disable=import-error
 from nemo.collections.nlp.modules.common.text_generation_utils import generate  # pytype: disable=import-error
@@ -38,6 +41,12 @@ if not torch.cuda.is_available():
 ENDPOINT_BIND_ADDRESS = "0.0.0.0"
 HTTP_PORT = 8000
 DEFAULT_LOG_FORMAT = "%(asctime)s - %(levelname)8s - %(process)8d - %(threadName)s - %(name)s: %(message)s"
+
+
+def init_triton_config_from_file(yaml_config: Union[str, os.PathLike]) -> TritonConfig:
+    with open(yaml_config) as f:
+        data = yaml.safe_load(f)
+    return TritonConfig(**data)
 
 
 def main():
@@ -87,8 +96,21 @@ def main():
         action="store_true",
         help="Enable verbose logging",
     )
-
+    parser.add_argument(
+        "--triton-config",
+        type=Path,
+        help="A path to YAML config for Triton. You may find allowed fields in `pytriton.triton.TritonConfig`",
+    )
+    parser.add_argument(
+        "--model-name",
+        default="GPT",
+        help="A name of a Megatron model inside Triton.",
+    )
     args = parser.parse_args()
+    for arg_name in ["triton_config", "model_path"]:
+        arg_value = getattr(args, arg_name)
+        if arg_value is not None:
+            setattr(args, arg_name, arg_value.resolve())
 
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=log_level, format=DEFAULT_LOG_FORMAT, force=True)
@@ -124,9 +146,11 @@ def main():
     app_state = setup_distributed_environment(trainer)
     if app_state.global_rank == 0:
 
-        infer_callable = NemoGptCallable(model_name="GPT", model=model)
-
-        triton_config = TritonConfig(http_address=ENDPOINT_BIND_ADDRESS, http_port=HTTP_PORT)
+        infer_callable = NemoGptCallable(model_name=args.model_name, model=model)
+        if args.triton_config is None:
+            triton_config = TritonConfig(http_address=ENDPOINT_BIND_ADDRESS, http_port=HTTP_PORT)
+        else:
+            triton_config = init_triton_config_from_file(args.yaml_config)
         with Triton(config=triton_config) as triton:
             triton.bind(
                 model_name=infer_callable.model_name,
