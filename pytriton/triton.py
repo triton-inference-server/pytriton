@@ -32,6 +32,7 @@ for models inference.
             triton.serve()
 """
 import atexit
+import codecs
 import dataclasses
 import logging
 import os
@@ -343,16 +344,17 @@ class Triton:
         self._triton_server_config = TritonServerConfig()
         config_data = self._config.to_dict()
 
-        self._python_backend_config = PythonBackendConfig()
-        backend_config_data = {
-            "shm_default_byte_size": INITIAL_BACKEND_SHM_SIZE,
+        python_backend_config = PythonBackendConfig()
+        python_backend_config_data = {
+            "shm-region-prefix-name": self._shm_prefix(),
+            "shm-default-byte-size": INITIAL_BACKEND_SHM_SIZE,
             "shm-growth-byte-size": GROWTH_BACKEND_SHM_SIZE,
         }
-        for name, value in backend_config_data.items():
+        for name, value in python_backend_config_data.items():
             if name not in PythonBackendConfig.allowed_keys() or value is None:
                 continue
 
-            self._python_backend_config[name] = value
+            python_backend_config[name] = value
 
         for name, value in config_data.items():
             if name not in TritonServerConfig.allowed_keys() or value is None:
@@ -360,8 +362,7 @@ class Triton:
 
             self._triton_server_config[name] = value
 
-        self._triton_server_config["backend_config"] = self._python_backend_config.to_cli_string()
-
+        self._triton_server_config["backend_config"] = python_backend_config.to_list_args()
         self._triton_server_config["model_repository"] = model_repository.path.as_posix()
         self._triton_server_config["backend_directory"] = (TRITONSERVER_DIST_DIR / "backends").as_posix()
         if "cache_directory" not in self._triton_server_config:
@@ -562,3 +563,13 @@ class Triton:
             raise PyTritonValidationError(
                 "Model name can only contain alphanumeric characters, dots, underscores and dashes"
             )
+
+    def _shm_prefix(self) -> str:
+        """Generate unique prefix for shm memory.
+
+        Returns:
+            String with prefix
+        """
+        hash = codecs.encode(os.urandom(4), "hex").decode()
+        pid = os.getpid()
+        return f"pytrtion{pid}-{hash}"
