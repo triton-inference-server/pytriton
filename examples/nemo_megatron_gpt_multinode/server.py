@@ -15,10 +15,11 @@
 """Text generation server with NeMo Megatron GPT model."""
 import argparse
 import logging
+from pathlib import Path
 
 import torch  # pytype: disable=import-error
 from nemo.collections.nlp.modules.common.text_generation_utils import generate  # pytype: disable=import-error
-from nemo.collections.nlp.parts.nlp_overrides import NLPDDPPlugin  # pytype: disable=import-error
+from nemo.collections.nlp.parts.nlp_overrides import NLPDDPStrategy  # pytype: disable=import-error
 from pytorch_lightning.trainer.trainer import Trainer  # pytype: disable=import-error
 
 from pytriton.model_config import ModelConfig
@@ -56,7 +57,8 @@ def main():
         type=int,
         help="Number of nodes to load model on",
     )
-    parser.add_argument(
+    model_location = parser.add_mutually_exclusive_group()
+    model_location.add_argument(
         "--model-repo-id",
         default="nvidia/nemo-megatron-gpt-1.3B",
         help="Model repository id on HuggingFace Hub",
@@ -64,6 +66,11 @@ def main():
     parser.add_argument(
         "--model-filename",
         help="Path to the model nemo file in HF hub. If not provided first on the list .nemo file will be used.",
+    )
+    model_location.add_argument(
+        "--model-path",
+        help="Path to the model nemo file in local file system. This argument has a higher priority "
+        "than `--model-repo-id`.",
     )
     parser.add_argument("--prompt-model-path", help="Path to the model prompt nemo file")
     parser.add_argument(
@@ -89,17 +96,29 @@ def main():
     logger.info("Initialize trainer:")
     logger.info(f" devices: {args.gpus}")
     logger.info(f" nodes: {args.nodes}")
-    trainer = Trainer(
-        plugins=[NLPDDPPlugin()],
-        devices=args.gpus,
-        num_nodes=args.nodes,
-        accelerator="gpu",
-        logger=False,
-        precision=16,
+
+    strategy = NLPDDPStrategy(
+        no_ddp_communication_hook=True,  # we don't use DDP for async grad allreduce
+        gradient_as_bucket_view=False,
+        find_unused_parameters=False,
     )
 
-    model_path = download_hf_model(args.model_repo_id, args.model_filename)
-    model = load_model(model_path, trainer, prompt_learning_model_path=args.prompt_model_path)
+    trainer = Trainer(
+        plugins=[],
+        strategy=strategy,
+        devices=args.gpus,
+        accelerator="gpu",
+        num_nodes=args.nodes,
+        precision=16,
+        logger=False,
+        enable_checkpointing=False,
+        replace_sampler_ddp=False,
+    )
+    if args.model_path is not None:
+        model = load_model(args.model_path, trainer, prompt_learning_model_path=args.prompt_model_path)
+    else:
+        model_path = download_hf_model(args.model_repo_id, args.model_filename)
+        model = load_model(model_path, trainer, prompt_learning_model_path=args.prompt_model_path)
 
     app_state = setup_distributed_environment(trainer)
     if app_state.global_rank == 0:

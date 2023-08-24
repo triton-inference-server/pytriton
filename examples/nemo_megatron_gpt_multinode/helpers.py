@@ -13,6 +13,7 @@
 # limitations under the License.
 import importlib
 import logging
+import os
 import pathlib
 import socket
 import typing
@@ -179,6 +180,8 @@ def load_model(
     LOGGER.debug(f"Loading {model_path} on {worker_name}")
 
     save_restore_connector = NLPSaveRestoreConnector()
+    if os.path.isdir(model_path):
+        save_restore_connector.model_extracted_dir = model_path.as_posix()
     pretrained_cfg = save_restore_connector.restore_from(
         None, model_path.as_posix(), return_config=True, trainer=trainer
     )

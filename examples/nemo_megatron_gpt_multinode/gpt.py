@@ -82,12 +82,13 @@ class NemoGptCallable:
 
         tasks = _str_ndarray2list(inputs.pop("tasks"))
         prompts = _str_ndarray2list(inputs.pop("prompts"))
-
         length_params = LengthParam(**{k: v for k, v in inputs.items() if k in typing.get_type_hints(LengthParam)})
+        end_strings = inputs.pop("end_strings")
+        end_strings = [end_strings.decode(encoding="utf-8")]
         sampling_params = SamplingParam(
             **{k: v for k, v in inputs.items() if k in typing.get_type_hints(SamplingParam)}
         )
-
+        sampling_params["end_strings"] = end_strings
         if tasks[0] == "text_generation":
             generate_fn = self._text_generate_fn
         else:
