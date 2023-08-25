@@ -106,8 +106,14 @@ def main():
         default="GPT",
         help="A name of a Megatron model inside Triton.",
     )
+    parser.add_argument(
+        "--workspace",
+        type=Path,
+        help="Path to a directory where workspace has to be created (optional)."
+        "If not provided workspace with random name will be created in ~/.cache/pytriton directory."
+    )
     args = parser.parse_args()
-    for arg_name in ["triton_config", "model_path"]:
+    for arg_name in ["triton_config", "model_path", "workspace"]:
         arg_value = getattr(args, arg_name)
         if arg_value is not None:
             setattr(args, arg_name, arg_value.resolve())
@@ -151,7 +157,7 @@ def main():
             triton_config = TritonConfig(http_address=ENDPOINT_BIND_ADDRESS, http_port=HTTP_PORT)
         else:
             triton_config = init_triton_config_from_file(args.yaml_config)
-        with Triton(config=triton_config) as triton:
+        with Triton(config=triton_config, workspace=args.workspace) as triton:
             triton.bind(
                 model_name=infer_callable.model_name,
                 infer_func=infer_callable.infer,
