@@ -136,7 +136,8 @@ def main():
             add_BOS=_param(np.bool_, True),
             all_probs=_param(np.bool_, False),
             compute_logprob=_param(np.bool_, False),
-            end_strings=np.tile(_str_list2numpy(args.end_strings), (batch_size, 1)),
+            end_strings=np.tile(np.char.encode(np.array(args.end_strings)[np.newaxis, np.newaxis, ...], "utf-8"), (batch_size, 1, 1)),
+            #end_strings=np.tile(np.char.encode(np.array(args.end_strings)[np.newaxis, ...], "utf-8"), (batch_size, 1)),
         )
 
     sentences = np.char.decode(result_dict["sentences"].astype("bytes"), "utf-8")
