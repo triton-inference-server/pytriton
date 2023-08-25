@@ -156,7 +156,7 @@ def main():
         if args.triton_config is None:
             triton_config = TritonConfig(http_address=ENDPOINT_BIND_ADDRESS, http_port=HTTP_PORT)
         else:
-            triton_config = init_triton_config_from_file(args.yaml_config)
+            triton_config = init_triton_config_from_file(args.triton_config)
         with Triton(config=triton_config, workspace=args.workspace) as triton:
             triton.bind(
                 model_name=infer_callable.model_name,
