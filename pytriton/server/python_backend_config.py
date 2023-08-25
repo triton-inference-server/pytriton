@@ -18,10 +18,10 @@ Use to configure the CLI argument for Python Backend passed on Triton Inference 
     Examples of use:
 
         config = PythonBackendConfig()
-        config["shm_default_byte_size"] = 33554432
-        config.to_cli_string() # python,shm-default-byte-size=33554432
+        config["shm-default-byte-size"] = 33554432
+        config.to_list_args() # ["python,shm-default-byte-size=33554432"]
 """
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from pytriton.exceptions import PyTritonError
 
@@ -33,13 +33,14 @@ class PythonBackendConfig:
     """
 
     backend_arg_keys = [
+        "shm-region-prefix-name",
         "shm-default-byte-size",
         "shm-growth-byte-size",
     ]
 
     def __init__(self):
         """Construct PythonBackendConfig."""
-        self._backend_args = {k: None for k in self.backend_arg_keys}
+        self._backend_args = {}
 
     @classmethod
     def allowed_keys(cls):
@@ -71,24 +72,20 @@ class PythonBackendConfig:
             for key in params:
                 self[key.strip().replace("_", "-")] = params[key]
 
-    def to_cli_string(self) -> str:
-        """Utility function to convert a config into a string of arguments to the server with CLI.
+    def to_list_args(self) -> List[str]:
+        """Utility function to convert a config into a list of arguments to the server with CLI.
 
         Returns:
             The command consisting of all set arguments to the Python Backend.
-            e.g. 'python,shm-default-byte-size=33554432'
+            e.g. ['python,shm-default-byte-size=33554432']
         """
         cli_items = []
         for key, val in self._backend_args.items():
             if val is None:
                 continue
-            if isinstance(val, (tuple, list)):
-                for sub_val in val:
-                    cli_items.append(f"{key}={sub_val}")
-            else:
-                cli_items.append(f"{key}={val}")
-        cli_args = ",".join(cli_items)
-        return f"python,{cli_args}"
+            cli_items.append(f"python,{key}={val}")
+
+        return cli_items
 
     def copy(self) -> "PythonBackendConfig":
         """Create copy of config.
@@ -117,9 +114,10 @@ class PythonBackendConfig:
         Returns:
             The value that the argument is set to in this config
         """
-        return self._backend_args[key.strip().replace("_", "-")]
+        kebab_cased_key = key.strip().replace("_", "-")
+        return self._backend_args.get(kebab_cased_key, None)
 
-    def __setitem__(self, key: str, value: Any) -> None:
+    def __setitem__(self, key: str, value: Union[str, int]) -> None:
         """Sets an arguments value in config after checking if defined/supported.
 
         Args:
@@ -129,13 +127,15 @@ class PythonBackendConfig:
         Raises:
             PyTritonError: if key is unsupported or undefined in the config class
         """
+        assert isinstance(value, int) or isinstance(value, str)
+
         kebab_cased_key = key.strip().replace("_", "-")
-        if kebab_cased_key in self._backend_args:
+        if kebab_cased_key in self.backend_arg_keys:
             self._backend_args[kebab_cased_key] = value
         else:
             raise PyTritonError(f"The argument {key!r} to the Python Backend is not supported by the pytriton.")
 
-    def __contains__(self, key) -> bool:
+    def __contains__(self, key: str) -> bool:
         """Checks if an argument is defined in the PythonBackendConfig.
 
         Args:

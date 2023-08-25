@@ -120,7 +120,7 @@ class TritonServerConfig:
 
     def __init__(self):
         """Construct TritonServerConfig."""
-        self._server_args = {k: None for k in self.server_arg_keys}
+        self._server_args = {}
 
     @classmethod
     def allowed_keys(cls):
@@ -208,7 +208,8 @@ class TritonServerConfig:
         Returns:
             The value that the argument is set to in this config
         """
-        return self._server_args[key.strip().replace("_", "-")]
+        kebab_cased_key = key.strip().replace("_", "-")
+        return self._server_args.get(kebab_cased_key, None)
 
     def __setitem__(self, key: str, value: Any) -> None:
         """Sets an arguments value in config after checking if defined/supported.
@@ -221,14 +222,14 @@ class TritonServerConfig:
             PyTritonError: if key is unsupported or undefined in the config class
         """
         kebab_cased_key = key.strip().replace("_", "-")
-        if kebab_cased_key in self._server_args:
+        if kebab_cased_key in self.server_arg_keys:
             self._server_args[kebab_cased_key] = value
         else:
             raise PyTritonError(
                 f"The argument {key!r} to the Triton Inference " "Server is not supported by the pytriton."
             )
 
-    def __contains__(self, key) -> bool:
+    def __contains__(self, key: str) -> bool:
         """Checks if an argument is defined in the TritonServerConfig.
 
         Args:

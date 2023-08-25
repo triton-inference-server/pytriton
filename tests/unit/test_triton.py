@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import pathlib
+import re
 from unittest.mock import PropertyMock
 
 import pytest
@@ -19,9 +20,11 @@ import pytest
 from pytriton.exceptions import PyTritonValidationError
 from pytriton.triton import GROWTH_BACKEND_SHM_SIZE, INITIAL_BACKEND_SHM_SIZE, Triton, TritonConfig
 
-EXPECTED_BACKEND_ARGS = (
-    f"python,shm-default-byte-size={INITIAL_BACKEND_SHM_SIZE},shm-growth-byte-size={GROWTH_BACKEND_SHM_SIZE}"
-)
+EXPECTED_BACKEND_ARGS = [
+    "python,shm-region-prefix-name=pytrtion[0-9]+",
+    f"python,shm-default-byte-size={INITIAL_BACKEND_SHM_SIZE}",
+    f"python,shm-growth-byte-size={GROWTH_BACKEND_SHM_SIZE}",
+]
 
 
 def test_triton_server_created_with_default_arguments():
@@ -29,7 +32,9 @@ def test_triton_server_created_with_default_arguments():
 
     assert triton._triton_server_config["model_repository"] is not None
     assert triton._triton_server_config["backend_directory"] is not None
-    assert triton._triton_server_config["backend_config"] == EXPECTED_BACKEND_ARGS
+    assert len(triton._triton_server_config["backend_config"]) == 3
+    for idx in range(len(EXPECTED_BACKEND_ARGS)):
+        assert re.match(EXPECTED_BACKEND_ARGS[idx], triton._triton_server_config["backend_config"][idx])
 
 
 def test_triton_server_created_with_custom_arguments():
@@ -40,7 +45,8 @@ def test_triton_server_created_with_custom_arguments():
     assert triton._triton_server_config["model_repository"] == "/tmp"
     assert triton._triton_server_config["allow_metrics"] is False
     assert triton._triton_server_config["backend_directory"] is not None
-    assert triton._triton_server_config["backend_config"] == EXPECTED_BACKEND_ARGS
+    for idx in range(len(EXPECTED_BACKEND_ARGS)):
+        assert re.match(EXPECTED_BACKEND_ARGS[idx], triton._triton_server_config["backend_config"][idx])
 
 
 def test_triton_server_created_with_custom_arguments_and_env_variables(mocker):
@@ -61,7 +67,8 @@ def test_triton_server_created_with_custom_arguments_and_env_variables(mocker):
     assert triton._triton_server_config["allow_metrics"] is False
     assert triton._triton_server_config["backend_directory"] is not None
     assert triton._triton_server_config["backend_config"] is not None
-    assert triton._triton_server_config["backend_config"] == EXPECTED_BACKEND_ARGS
+    for idx in range(len(EXPECTED_BACKEND_ARGS)):
+        assert re.match(EXPECTED_BACKEND_ARGS[idx], triton._triton_server_config["backend_config"][idx])
 
 
 def test_triton_bind_model_name_verification():

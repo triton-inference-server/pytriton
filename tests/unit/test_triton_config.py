@@ -41,8 +41,8 @@ def test_triton_config_serialization_handles_lists():
 def test_triton_config_serialize_backend_configuration():
     config = PythonBackendConfig()
     config["shm_default_byte_size"] = INITIAL_BACKEND_SHM_SIZE
-    cli_backend = config.to_cli_string()
-    assert f"python,shm-default-byte-size={INITIAL_BACKEND_SHM_SIZE}" == cli_backend
+    cli_backend = config.to_list_args()
+    assert [f"python,shm-default-byte-size={INITIAL_BACKEND_SHM_SIZE}"] == cli_backend
 
     triton_server_config = TritonServerConfig()
     triton_server_config["backend-config"] = cli_backend
