@@ -29,6 +29,8 @@ from helpers import cast_output, typedict2tensor  # pytype: disable=import-error
 
 
 _INPUT_PARAMETERS_NAMES = list(typing.get_type_hints(LengthParam)) + list(typing.get_type_hints(SamplingParam))
+_INPUT_PARAMETERS_NAMES_WITHOUT_END_STRINGS = _INPUT_PARAMETERS_NAMES.copy()
+_INPUT_PARAMETERS_NAMES_WITHOUT_END_STRINGS.remove("end_strings")
 
 
 class NemoGptCallable:
@@ -67,7 +69,7 @@ class NemoGptCallable:
 
     @batch
     @group_by_values("tasks", *_INPUT_PARAMETERS_NAMES, pad_fn=ConstantPadder(0))
-    @first_value(*_INPUT_PARAMETERS_NAMES)
+    @first_value(*_INPUT_PARAMETERS_NAMES_WITHOUT_END_STRINGS)
     def infer(self, **inputs: np.ndarray) -> typing.Dict[str, np.ndarray]:
         # Tell other ranks we're doing generate
         generate_num = 0
@@ -84,7 +86,8 @@ class NemoGptCallable:
         prompts = _str_ndarray2list(inputs.pop("prompts"))
         length_params = LengthParam(**{k: v for k, v in inputs.items() if k in typing.get_type_hints(LengthParam)})
         end_strings = inputs.pop("end_strings")
-        end_strings = [end_strings.decode(encoding="utf-8")]
+        #end_strings = [end_strings.decode(encoding="utf-8")]
+        end_strings = [es.decode("utf-8") for es in end_strings[0][0]]
         sampling_params = SamplingParam(
             **{k: v for k, v in inputs.items() if k in typing.get_type_hints(SamplingParam)}
         )

@@ -71,6 +71,7 @@ def main():
         "--model-path",
         help="Path to the model nemo file in local file system. This argument has a higher priority "
         "than `--model-repo-id`.",
+        type=Path,
     )
     parser.add_argument("--prompt-model-path", help="Path to the model prompt nemo file")
     parser.add_argument(
