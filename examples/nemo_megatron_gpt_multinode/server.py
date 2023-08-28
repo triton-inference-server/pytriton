@@ -46,6 +46,9 @@ DEFAULT_LOG_FORMAT = "%(asctime)s - %(levelname)8s - %(process)8d - %(threadName
 def init_triton_config_from_file(yaml_config: Union[str, os.PathLike]) -> TritonConfig:
     with open(yaml_config) as f:
         data = yaml.safe_load(f)
+    for key in ["model_repository", "log_file", "grpc_server_cert", "grpc_server_key", "grpc_root_cert"]:
+        if key in data:
+            data[key] = Path(data[key])
     return TritonConfig(**data)
 
 
