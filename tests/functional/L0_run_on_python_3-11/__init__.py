@@ -1,5 +1,4 @@
-#!/usr/bin/env bash
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-set -xe
-
-pip install -r "${FT_REPO_DIR:?UNSET_OR_EMPTY}/examples/pytorch/gpt/requirement.txt"
-export PYTHONPATH=${PYTHONPATH}:${FT_REPO_DIR}

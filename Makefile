@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-.PHONY: clean clean-build clean-tritonserver clean-pyc clean-docs clean-test docs lint test coverage release dist extract-triton install install-dev help
+.PHONY: clean clean-build clean-tritonserver clean-pyc clean-docs clean-test docs lint test coverage release dist build-triton extract-triton install install-dev help
 .DEFAULT_GOAL := help
 
 define BROWSER_PYSCRIPT
@@ -38,7 +38,9 @@ BROWSER := python -c "$$BROWSER_PYSCRIPT"
 PIP_INSTALL := pip install --extra-index-url https://pypi.ngc.nvidia.com
 TRITONSERVER_IMAGE_VERSION = 23.07
 TRITONSERVER_IMAGE_NAME = nvcr.io/nvidia/tritonserver:$(TRITONSERVER_IMAGE_VERSION)-pyt-python-py3
-TRITONSERVER_OUTPUT_DIR = pytriton/tritonserver
+TRITONSERVER_OUTPUT_DIR = ${PWD}/pytriton/tritonserver
+TRITONSERVER_BASENAME = pytriton
+PYTRITON_IMAGE_NAME = $(TRITONSERVER_BASENAME):$(TRITONSERVER_IMAGE_VERSION)
 # to set PLATFORM from outside, use: make PLATFORM=linux/aarch64;
 # correct values are: linux/x86_64 (default), linux/aarch64
 PLATFORM=linux/x86_64
@@ -96,16 +98,21 @@ coverage: ## check code coverage quickly with the default Python
 	coverage html
 	$(BROWSER) htmlcov/index.html
 
-dist: clean extract-triton ## builds source and wheel package
+dist: clean build-triton extract-triton ## builds source and wheel package
 	python3 -m build .
-	find ./dist -iname *-linux*.whl -type f -exec bash ./scripts/add_libs_to_wheel.sh $(TRITONSERVER_IMAGE_NAME) $(TRITONSERVER_OUTPUT_DIR) {} ${PLATFORM} \;
+	find ./dist -iname *-linux*.whl -type f -exec bash ./scripts/add_libs_to_wheel.sh $(PYTRITON_IMAGE_NAME) $(TRITONSERVER_OUTPUT_DIR) {} ${PLATFORM} \;
 	find ./dist -iname *-linux*.whl -type f -delete
 	ls -lh dist
 	twine check dist/*
 
-extract-triton:
+build-triton: ## build Triton with Python Stubs
+	bash ./scripts/build_triton.sh $(TRITONSERVER_IMAGE_NAME) $(PYTRITON_IMAGE_NAME) $(PLATFORM)
+	echo "export PYTRITON_IMAGE_NAME=$(PYTRITON_IMAGE_NAME)" > .env
+
+extract-triton: ## extract Triton binaries and libraries
 	# changing dst path, change also in clean-build and pyproject.toml
-	bash ./scripts/extract_triton.sh $(TRITONSERVER_IMAGE_NAME) $(TRITONSERVER_OUTPUT_DIR) $(PLATFORM)
+	bash ./scripts/extract_triton.sh $(PYTRITON_IMAGE_NAME) $(TRITONSERVER_OUTPUT_DIR) $(PLATFORM)
+
 
 install: clean extract-triton ## install the package to the active Python's site-packages
 	$(PIP_INSTALL) --upgrade pip

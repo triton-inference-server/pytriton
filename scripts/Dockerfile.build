@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,3 +11,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+ARG FROM_IMAGE
+FROM ${FROM_IMAGE}
+
+WORKDIR /opt/workspace
+
+ENV PYENV_ROOT=/root/.pyenv
+ENV PATH=$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH
+
+RUN apt update -y && apt install -y build-essential \
+  cmake \
+  make \
+  rapidjson-dev \
+  libarchive-dev \
+  zlib1g-dev \
+  libssl-dev \
+  libsqlite3-dev \
+  libbz2-dev \
+  libffi-dev \
+  libreadline-dev
+
+RUN curl https://pyenv.run | bash
+
+ADD scripts/build_python_stubs.sh /opt/workspace/build_python_stubs.sh
+RUN bash -xe /opt/workspace/build_python_stubs.sh

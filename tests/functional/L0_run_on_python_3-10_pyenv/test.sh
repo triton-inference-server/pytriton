@@ -20,7 +20,7 @@ TEST_MODULE="$(dirname "${THIS_SCRIPT_PATH}"|sed 's/\//./g').test"
 
 apt update
 # need git and build dependencies https://github.com/pyenv/pyenv/wiki#suggested-build-environment
-DEBIAN_FRONTEND=noninteractive apt install -y python3 python3-distutils python-is-python3 git \
+apt install -y python3 python3-distutils python-is-python3 git \
     build-essential libssl-dev zlib1g-dev \
     libbz2-dev libreadline-dev libsqlite3-dev curl \
     libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
@@ -29,21 +29,21 @@ curl https://pyenv.run | bash
 export PYENV_ROOT="$HOME/.pyenv"
 command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"
 eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
 
-# prepare python backend interpreter
-pyenv install 3.8
-pyenv global 3.8
-pip3 install virtualenv
-mkdir -p ~/.cache/pytriton/
-python -mvenv ~/.cache/pytriton/python_backend_interpreter --copies --clear
-source ~/.cache/pytriton/python_backend_interpreter/bin/activate
-pip3 install numpy pyzmq
+env PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install 3.10
+pyenv virtualenv 3.10 venv
+pyenv activate venv
 
-# return to model python interpreter
-deactivate
-pyenv global system
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pyenv virtualenv-prefix)/lib
 
-pip install numpy
+if [[ -d "${PYTRITON_DIST_DIR}" ]];then
+  export WHEEL_PATH=$(ls ${PYTRITON_DIST_DIR}/*pytriton*.whl)
+  pip install "${WHEEL_PATH}[dev]"
+else
+  pip install nvidia-pytriton
+fi
+
 python -m"${TEST_MODULE}" \
     --init-timeout-s 300 \
     --batch-size 32 \

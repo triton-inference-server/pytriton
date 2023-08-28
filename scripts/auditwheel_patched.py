@@ -21,10 +21,16 @@ import re
 
 import auditwheel.main  # noqa
 import auditwheel.policy.external_references
+from auditwheel.policy import _POLICIES as POLICIES
 
 # to not remove libpython from the wheel as it is python interpreter library required by python backend
 # used here: https://github.com/pypa/auditwheel/blob/main/src/auditwheel/policy/external_references.py#L28
 auditwheel.policy.external_references.LIBPYTHON_RE = re.compile(r"__libpython\d\.\d\.\d\.so")
+
+# Policies to ignore attaching Python libraries to wheel during fixing dependencies
+for p in POLICIES:
+    for version in ["3.8", "3.9", "3.10", "3.11"]:
+        p["lib_whitelist"].append(f"libpython{version}.so.1.0")
 
 if __name__ == "__main__":
     auditwheel.main.main()

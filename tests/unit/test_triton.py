@@ -18,7 +18,13 @@ from unittest.mock import PropertyMock
 import pytest
 
 from pytriton.exceptions import PyTritonValidationError
-from pytriton.triton import GROWTH_BACKEND_SHM_SIZE, INITIAL_BACKEND_SHM_SIZE, Triton, TritonConfig
+from pytriton.triton import (
+    GROWTH_BACKEND_SHM_SIZE,
+    INITIAL_BACKEND_SHM_SIZE,
+    TRITONSERVER_DIST_DIR,
+    Triton,
+    TritonConfig,
+)
 
 EXPECTED_BACKEND_ARGS = [
     "python,shm-region-prefix-name=pytrtion[0-9]+",
@@ -27,8 +33,18 @@ EXPECTED_BACKEND_ARGS = [
 ]
 
 
-def test_triton_server_created_with_default_arguments():
+def test_triton_is_alive_return_false_when_not_initialized():
     triton = Triton()
+
+    assert triton._triton_server is None
+    assert triton.is_alive() is False
+
+
+def test_triton_server_initialize_server_with_default_arguments(mocker):
+    mocker.patch.object(Triton, "_prepare_triton_inference_server").return_value = TRITONSERVER_DIST_DIR
+
+    triton = Triton()
+    triton._initialize_server()
 
     assert triton._triton_server_config["model_repository"] is not None
     assert triton._triton_server_config["backend_directory"] is not None
@@ -37,9 +53,12 @@ def test_triton_server_created_with_default_arguments():
         assert re.match(EXPECTED_BACKEND_ARGS[idx], triton._triton_server_config["backend_config"][idx])
 
 
-def test_triton_server_created_with_custom_arguments():
+def test_triton_server_initialize_server_with_custom_arguments(mocker):
+    mocker.patch.object(Triton, "_prepare_triton_inference_server").return_value = TRITONSERVER_DIST_DIR
+
     config = TritonConfig(id="CustomId", model_repository=pathlib.Path("/tmp"), allow_metrics=False)
     triton = Triton(config=config)
+    triton._initialize_server()
 
     assert triton._triton_server_config["id"] == "CustomId"
     assert triton._triton_server_config["model_repository"] == "/tmp"
@@ -49,7 +68,7 @@ def test_triton_server_created_with_custom_arguments():
         assert re.match(EXPECTED_BACKEND_ARGS[idx], triton._triton_server_config["backend_config"][idx])
 
 
-def test_triton_server_created_with_custom_arguments_and_env_variables(mocker):
+def test_triton_server_initialize_server_with_custom_arguments_and_env_variables(mocker):
     import os
 
     updated_environ = {
@@ -58,8 +77,11 @@ def test_triton_server_created_with_custom_arguments_and_env_variables(mocker):
         "PYTRITON_TRITON_CONFIG_MODEL_REPOSITORY": "/opt",
     }
     mocker.patch("os.environ", new_callable=PropertyMock(return_value=updated_environ))
+    mocker.patch.object(Triton, "_prepare_triton_inference_server").return_value = TRITONSERVER_DIST_DIR
+
     config = TritonConfig(id="CustomId", model_repository=pathlib.Path("/tmp"), allow_metrics=False)
     triton = Triton(config=config)
+    triton._initialize_server()
 
     assert triton._triton_server_config["id"] == "CustomId"
     assert triton._triton_server_config["model_repository"] == "/tmp"
@@ -71,7 +93,9 @@ def test_triton_server_created_with_custom_arguments_and_env_variables(mocker):
         assert re.match(EXPECTED_BACKEND_ARGS[idx], triton._triton_server_config["backend_config"][idx])
 
 
-def test_triton_bind_model_name_verification():
+def test_triton_bind_model_name_verification(mocker):
+    mocker.patch.object(Triton, "_prepare_triton_inference_server").return_value = TRITONSERVER_DIST_DIR
+
     triton = Triton()
     triton.bind("AB-cd_90.1", lambda: None, [], [])
 

@@ -63,3 +63,18 @@ def get_libs_path():
         libs_path = pytriton_module_path.parent / "nvidia_pytriton.libs"
     LOGGER.debug("Obtained nvidia_pytriton.libs path: %s", libs_path)
     return libs_path
+
+
+def get_stub_path(version: str):
+    """Obtains path stub file for provided Python interpreter version.
+
+    Args:
+        version: Python interpreter version
+
+    Returns:
+        Path to stub file for given Python version
+    """
+    pytriton_module_path = get_root_module_path()
+    stub_path = pytriton_module_path / "tritonserver" / "python_backend_stubs" / version / "triton_python_backend_stub"
+    LOGGER.debug("Obtained pytriton stubs path for %s: %s", version, stub_path)
+    return stub_path

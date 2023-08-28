@@ -89,13 +89,15 @@ def main():
     # wait for shutting down of server and proxy_backend
     monitoring = ProcessMonitoring(os.getpid())
     shutdown_timeout_s = args.shutdown_timeout_s
-    while (triton._triton_server.is_alive() or triton.is_alive()) and shutdown_timeout_s > 0:  # noqa
+    while (
+        triton._triton_server.is_alive() or triton.is_alive()  # noqa # pytype: disable=attribute-error
+    ) and shutdown_timeout_s > 0:
         time.sleep(5)
         shutdown_timeout_s -= 5
         monitoring.dump_state()
 
     assert shutdown_timeout_s > 0, "Timeout occurred - server or backend still alive"
-    assert not triton._triton_server.is_alive()  # noqa
+    assert not triton._triton_server.is_alive()  # noqa # pytype: disable=attribute-error
     assert not triton.is_alive()
 
 

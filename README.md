@@ -26,7 +26,9 @@ NVIDIA's [Triton Inference Server](https://github.com/triton-inference-server).
 - [Documentation](#documentation)
 - [How it works?](#how-it-works)
 - [Installation](#installation)
-  - [Installing using pip](#installing-using-pip)
+  - [Prerequisites](#prerequisites)
+  - [Install from `pypi`](#install-from-pypi)
+  - [Setting Up Python Environment](#setting-up-python-environment)
   - [Building binaries from source](#building-binaries-from-source)
 - [Quick Start](#quick-start)
 - [Architecture](#architecture)
@@ -55,16 +57,8 @@ framework-agnostic and can be used along with frameworks like PyTorch, TensorFlo
 
 ## Installation
 
-Before installing the library, ensure that you meet the following requirements:
-
-- An operating system with glibc >= 2.31. Triton Inference Server and PyTriton have only been rigorously tested on Ubuntu 20.04.
-  Other supported operating systems include Ubuntu 20.04+, Debian 11+, Rocky Linux 9+, and Red Hat Universal Base Image 9+.
-  - to check your glibc version, run `ldd --version`
-- Python version >= 3.8. If you are using Python 3.9+, see the section "[Installation on Python 3.9+](https://triton-inference-server.github.io/pytriton/latest/installation#installation-on-python-39)" for additional steps.
-- pip >= 20.3
-
-We assume that you are comfortable with the Python programming language
-and familiar with Machine Learning models. Using [Docker](https://www.docker.com/) is an option, but not mandatory.
+We assume that you are comfortable with the Python programming language and familiar with Machine Learning models.
+Using [Docker](https://www.docker.com/) is an option, but not mandatory.
 
 The library can be installed in:
 
@@ -72,30 +66,40 @@ The library can be installed in:
 - virtualenv
 - [Docker](https://www.docker.com/) image
 
-NVIDIA optimized Docker images for Python frameworks can be obtained
-from the [NVIDIA NGC Catalog](https://catalog.ngc.nvidia.com/containers).
+NVIDIA optimized Docker images for Python frameworks can be obtained from the [NVIDIA NGC Catalog](https://catalog.ngc.nvidia.com/containers).
 
-If you want to use the Docker runtime, we recommend that you
-install [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/overview.html) to
+If you want to use the Docker runtime, we recommend that you install [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/overview.html) to
 enable running model inference on NVIDIA GPU.
 
-### Installing using pip
+### Prerequisites
 
-You can install the package from [pypi.org](https://pypi.org/project/nvidia-pytriton/) by running the following command:
+Before installing the library, ensure that you meet the following requirements:
+
+- An operating system with glibc >= `2.35`.
+  - Triton Inference Server and PyTriton have **only** been rigorously tested on Ubuntu 22.04.
+  - Other supported operating systems include Ubuntu Debian 11+, Rocky Linux 9+, and Red Hat Universal Base Image 9+.
+  - To check your glibc version, run `ldd --version`
+- Python version >= `3.8`
+- Use `pip >= `20.3`
+- Install `libpython3.*.so` in the operating system (appropriate for Python version).
+
+### Install from `pypi`
+
+The PyTriton can be installed from [pypi.org](https://pypi.org/project/nvidia-pytriton/) by running the following command:
 
 ```shell
 pip install -U nvidia-pytriton
 ```
 
-**Important**: The `pip` version must be at least 20.3. To upgrade an older version of pip, run:
-
-```shell
-pip install -U pip
-```
+**Important**: The Triton Inference Server binary is installed as part of the PyTriton package.
 
 More details about installation can be found in the [documentation](https://triton-inference-server.github.io/pytriton/latest/installation/).
 
-**Important**: The Triton Inference Server binary is installed as part of the PyTriton package.
+
+### Setting Up Python Environment
+
+The PyTriton requires installation and linking `libpython3.*.so`. Read more in "[Setting Up Python Environment](https://triton-inference-server.github.io/pytriton/latest/installation#setting-up-python-environment)"
+for additional information how to configure system for different Python versions.
 
 ### Building binaries from source
 

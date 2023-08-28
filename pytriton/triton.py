@@ -38,6 +38,8 @@ import logging
 import os
 import pathlib
 import re
+import shutil
+import sys
 import threading
 import threading as th
 import typing
@@ -58,7 +60,7 @@ from pytriton.server.python_backend_config import PythonBackendConfig
 from pytriton.server.triton_server import TritonServer
 from pytriton.server.triton_server_config import TritonServerConfig
 from pytriton.utils.dataclasses import kwonly_dataclass
-from pytriton.utils.distribution import get_libs_path, get_root_module_path
+from pytriton.utils.distribution import get_libs_path, get_root_module_path, get_stub_path
 from pytriton.utils.workspace import Workspace
 
 LOGGER = logging.getLogger(__name__)
@@ -339,54 +341,17 @@ class Triton:
         self._config = TritonConfig(**config_dict)
         self._workspace = workspace if isinstance(workspace, Workspace) else Workspace(workspace)
 
-        model_repository = TritonModelRepository(path=self._config.model_repository, workspace=self._workspace)
-        self._model_manager = ModelManager(model_repository)
+        self._model_repository = TritonModelRepository(path=self._config.model_repository, workspace=self._workspace)
+        self._model_manager = ModelManager(self._model_repository)
+        self._triton_context = TritonContext()
         self._tensor_store = TensorStore(self._workspace.path / "data_store.sock")
 
-        self._triton_server_config = TritonServerConfig()
-        config_data = self._config.to_dict()
-
-        python_backend_config = PythonBackendConfig()
-        python_backend_config_data = {
-            "shm-region-prefix-name": self._shm_prefix(),
-            "shm-default-byte-size": INITIAL_BACKEND_SHM_SIZE,
-            "shm-growth-byte-size": GROWTH_BACKEND_SHM_SIZE,
-        }
-        for name, value in python_backend_config_data.items():
-            if name not in PythonBackendConfig.allowed_keys() or value is None:
-                continue
-
-            python_backend_config[name] = value
-
-        for name, value in config_data.items():
-            if name not in TritonServerConfig.allowed_keys() or value is None:
-                continue
-
-            self._triton_server_config[name] = value
-
-        self._triton_server_config["backend_config"] = python_backend_config.to_list_args()
-        self._triton_server_config["model_repository"] = model_repository.path.as_posix()
-        self._triton_server_config["backend_directory"] = (TRITONSERVER_DIST_DIR / "backends").as_posix()
-        if "cache_directory" not in self._triton_server_config:
-            self._triton_server_config["cache_directory"] = (get_root_module_path() / "tritonserver/caches").as_posix()
-
-        self._triton_server = TritonServer(
-            path=(TRITONSERVER_DIST_DIR / "bin/tritonserver").as_posix(),
-            libs_path=get_libs_path(),
-            config=self._triton_server_config,
-        )
+        self._triton_server = None
+        self._triton_server_config = None
 
         self._cv = th.Condition()
         with self._cv:
             self._stopped = True
-
-        self.triton_context = TritonContext()
-        url = (
-            self._triton_server.get_endpoint("http")
-            if (self._config.allow_http is None or self._config.allow_http)
-            else self._triton_server.get_endpoint("grpc")
-        )
-        self._log_level_checker = _LogLevelChecker(url)
 
     def __enter__(self) -> "Triton":
         """Enter the context.
@@ -406,6 +371,9 @@ class Triton:
 
     def run(self) -> None:
         """Run Triton Inference Server."""
+        if not self._triton_server:
+            self._initialize_server()
+
         self._tensor_store.start()
         if not self._triton_server.is_alive():
             self._model_manager.create_models()
@@ -420,14 +388,18 @@ class Triton:
     def stop(self) -> None:
         """Stop Triton Inference Server."""
         LOGGER.debug("Stopping Triton Inference server and proxy backends")
+
         with self._cv:
             if self._stopped:
                 LOGGER.debug("Triton Inference already stopped.")
                 return
             self._stopped = True
-        self._triton_server.unregister_on_exit(self._on_tritonserver_exit)
-        atexit.unregister(self.stop)
-        self._triton_server.stop()
+
+        if self._triton_server:
+            self._triton_server.unregister_on_exit(self._on_tritonserver_exit)
+            atexit.unregister(self.stop)
+            self._triton_server.stop()
+
         self._model_manager.clean()
         self._tensor_store.close()
         self._workspace.clean()
@@ -456,6 +428,9 @@ class Triton:
         Returns:
             True if server and loaded models are alive, False otherwise.
         """
+        if not self._triton_server:
+            return False
+
         if not self._triton_server.is_alive():
             return False
 
@@ -499,7 +474,7 @@ class Triton:
             outputs=outputs,
             config=config if config else ModelConfig(),
             workspace=self._workspace,
-            triton_context=self.triton_context,
+            triton_context=self._triton_context,
             strict=strict,
         )
         model.on_model_event(self._on_model_event)
@@ -567,6 +542,83 @@ class Triton:
             raise PyTritonValidationError(
                 "Model name can only contain alphanumeric characters, dots, underscores and dashes"
             )
+
+    def _initialize_server(self):
+        """Initialize Triton Inference Server before binary execution."""
+        self._triton_server_config = TritonServerConfig()
+        config_data = self._config.to_dict()
+
+        self._python_backend_config = PythonBackendConfig()
+        python_backend_config_data = {
+            "shm-region-prefix-name": self._shm_prefix(),
+            "shm-default-byte-size": INITIAL_BACKEND_SHM_SIZE,
+            "shm-growth-byte-size": GROWTH_BACKEND_SHM_SIZE,
+        }
+        for name, value in python_backend_config_data.items():
+            if name not in PythonBackendConfig.allowed_keys() or value is None:
+                continue
+
+            self._python_backend_config[name] = value
+
+        for name, value in config_data.items():
+            if name not in TritonServerConfig.allowed_keys() or value is None:
+                continue
+
+            self._triton_server_config[name] = value
+
+        triton_inference_server_path = self._prepare_triton_inference_server(workspace=self._workspace)
+
+        self._triton_server_config["backend_config"] = self._python_backend_config.to_list_args()
+
+        self._triton_server_config["model_repository"] = self._model_repository.path.as_posix()
+        self._triton_server_config["backend_directory"] = (triton_inference_server_path / "backends").as_posix()
+        if "cache_directory" not in self._triton_server_config:
+            self._triton_server_config["cache_directory"] = (triton_inference_server_path / "caches").as_posix()
+
+        self._triton_server = TritonServer(
+            path=(triton_inference_server_path / "bin" / "tritonserver").as_posix(),
+            libs_path=get_libs_path(),
+            config=self._triton_server_config,
+        )
+
+        url = (
+            self._triton_server.get_endpoint("http")
+            if (self._config.allow_http is None or self._config.allow_http)
+            else self._triton_server.get_endpoint("grpc")
+        )
+        self._log_level_checker = _LogLevelChecker(url)
+
+    def _prepare_triton_inference_server(self, workspace: Workspace) -> pathlib.Path:
+        """Prepare binaries and libraries of Triton Inference Server for execution.
+
+        Args:
+            workspace: Workspace initialized for PyTriton
+
+        Return:
+            Path where Triton binaries are ready for execution
+        """
+        triton_inference_server_path = workspace.path / "tritonserver"
+
+        LOGGER.debug("Preparing Triton Inference Server binaries and libs for execution.")
+        shutil.copytree(
+            TRITONSERVER_DIST_DIR,
+            triton_inference_server_path,
+            ignore=shutil.ignore_patterns("python_backend_stubs", "triton_python_backend_stub"),
+        )
+        LOGGER.debug(f"Triton Inference Server binaries copied to {triton_inference_server_path} without stubs.")
+
+        major = sys.version_info[0]
+        minor = sys.version_info[1]
+        version = f"{major}.{minor}"
+
+        src_stub_path = get_stub_path(version)
+        dst_stub_path = triton_inference_server_path / "backends" / "python" / "triton_python_backend_stub"
+
+        LOGGER.debug(f"Copying stub for version {version} from {src_stub_path} to {dst_stub_path}")
+        shutil.copy(src_stub_path, dst_stub_path)
+
+        LOGGER.debug(f"Triton Inference Server binaries ready in {triton_inference_server_path}")
+        return triton_inference_server_path
 
     def _shm_prefix(self) -> str:
         """Generate unique prefix for shm memory.

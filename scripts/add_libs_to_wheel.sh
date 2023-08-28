@@ -18,7 +18,7 @@ set -e
 
 SCRIPTS_DIR=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 
-TRITON_DOCKER_IMAGE="${1}"
+PYTRITON_IMAGE_NAME="${1}"
 TRITON_LOCAL_DIR=$(realpath "${2}")
 WHEEL_PATH=$(realpath "${3}")
 DIST_DIR="$(dirname "${WHEEL_PATH}")"
@@ -28,7 +28,7 @@ DOCKER_PLATFORM=${4}
 ARCH=$(echo "${DOCKER_PLATFORM}" | cut -d'/' -f2)
 WHEEL_PLATFORM=manylinux_2_35_${ARCH}
 
-DOCKER_CONTAINER_ID=$(docker create --rm --pull always --platform ${DOCKER_PLATFORM} -w "${PWD}" "${TRITON_DOCKER_IMAGE}" bash -c "sleep 1h")
+DOCKER_CONTAINER_ID=$(docker create --rm --platform ${DOCKER_PLATFORM} -w "${PWD}" "${PYTRITON_IMAGE_NAME}" bash -c "sleep 1h")
 docker start "${DOCKER_CONTAINER_ID}"
 
 docker exec "${DOCKER_CONTAINER_ID}" mkdir -p "${DIST_DIR}"

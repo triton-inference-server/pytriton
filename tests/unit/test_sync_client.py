@@ -99,9 +99,27 @@ EXPECTED_KWARGS_GRPC_DEFAULT = {
 }
 
 
+def test_sync_client_not_raise_error_when_valid_url():
+    ModelClient("localhost", "dummy")
+    ModelClient("localhost:8000", "dummy")
+    ModelClient("http://localhost", "dummy")
+    ModelClient("http://localhost:8000", "dummy")
+    ModelClient("grpc://localhost", "dummy")
+    ModelClient("grpc://localhost:8001", "dummy")
+
+
 def test_sync_client_init_raises_error_when_invalid_url_provided():
     with pytest.raises(PyTritonClientInvalidUrlError, match="Invalid url"):
         ModelClient(["localhost:8001"], "dummy")  # pytype: disable=wrong-arg-types
+
+    with pytest.raises(PyTritonClientInvalidUrlError, match="Invalid url"):
+        ModelClient("https://localhost:8000", "dummy")
+
+    with pytest.raises(PyTritonClientInvalidUrlError, match="Invalid url"):
+        ModelClient("invalid_scheme://localhost", "dummy")
+
+    with pytest.raises(PyTritonClientInvalidUrlError, match="Invalid url"):
+        ModelClient("http://localhost:foo", "dummy")
 
 
 def test_sync_grpc_client_init_raises_error_when_use_non_lazy_init_on_non_responding_server():

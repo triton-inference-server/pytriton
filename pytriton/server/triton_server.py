@@ -27,10 +27,10 @@ Use to start and maintain the Triton Inference Server process.
 """
 import ctypes.util
 import importlib
+import json
 import logging
 import os
 import pathlib
-import pkgutil
 import re
 import signal
 import sys
@@ -38,14 +38,7 @@ import threading
 import traceback
 from typing import Callable, Dict, Literal, Optional, Sequence, Union
 
-from pytriton.constants import (
-    DEFAULT_GRPC_PORT,
-    DEFAULT_HTTP_PORT,
-    DEFAULT_METRICS_PORT,
-    PYTRITON_CACHE_DIR,
-    TRITON_LOCAL_IP,
-    TRITON_PYTHON_BACKEND_INTERPRETER_DIRNAME,
-)
+from pytriton.constants import DEFAULT_GRPC_PORT, DEFAULT_HTTP_PORT, DEFAULT_METRICS_PORT, TRITON_LOCAL_IP
 from pytriton.utils.logging import silence_3rd_party_loggers
 
 from .triton_server_config import TritonServerConfig
@@ -70,29 +63,14 @@ def get_triton_python_backend_python_env() -> pathlib.Path:
         Path to the python environment with python 3.8
     """
     env_path = pathlib.Path(sys.exec_prefix)
-    if not _PYTRITON_STARTED_IN_PY310:
-        venv_path = PYTRITON_CACHE_DIR / TRITON_PYTHON_BACKEND_INTERPRETER_DIRNAME
-        if not venv_path.exists():
-            raise RuntimeError(
-                f"venv for python backend not found at {venv_path}. "
-                f"Please run pytriton in python 3.10 environment to create the venv. "
-                f"Refer to https://github.com/triton-inference-server/pytriton/blob/main/docs/installation.md for more details."
-            )
-        env_path = venv_path
-
-        env_site_dirs = [(env_path / "lib" / "python3.10" / "site-packages").as_posix()]
-
-        installed_modules = [module_info.name for module_info in pkgutil.iter_modules(env_site_dirs)]
-        missing_modules = list(set(_PROXY_REQUIRED_MODULES) - set(installed_modules))
-    else:
-        installed_modules = []
-        missing_modules = []
-        for module_name in _PROXY_REQUIRED_MODULES:
-            try:
-                importlib.import_module(module_name)
-                installed_modules.append(module_name)
-            except ImportError:
-                missing_modules.append(module_name)
+    installed_modules = []
+    missing_modules = []
+    for module_name in _PROXY_REQUIRED_MODULES:
+        try:
+            importlib.import_module(module_name)
+            installed_modules.append(module_name)
+        except ImportError:
+            missing_modules.append(module_name)
 
     if missing_modules:
         raise RuntimeError(
@@ -150,6 +128,7 @@ class TritonServer:
         else:
             env = self._get_env()
 
+            LOGGER.debug(f"Triton Server binary {self._server_path}. Environment:\n{json.dumps(env, indent=4)}")
             tritonserver_cmd, *rest = self._server_path.as_posix().split(" ", 1)
 
             import sh
@@ -301,7 +280,6 @@ class TritonServer:
         env_path = get_triton_python_backend_python_env()
         python_bin_directory = env_path / "bin"
         env["PATH"] = f"{python_bin_directory.as_posix()}:{env['PATH']}"
-        env["PYTHONPATH"] = f"{os.pathsep}".join(sys.path) if _PYTRITON_STARTED_IN_PY310 else ""
 
         return env
 

@@ -21,7 +21,9 @@ def test_triton_endpoints():
     config = TritonServerConfig()
     config.update_config({"grpc_port": 8011, "http_port": 8010, "model-repository": "/tmp/repo"})
     triton_server = TritonServer(
-        path=TRITONSERVER_DIST_DIR / "bin/tritonserver", libs_path=get_libs_path(), config=config
+        path=TRITONSERVER_DIST_DIR / "bin/tritonserver",
+        libs_path=get_libs_path(),
+        config=config,
     )
     assert triton_server.get_endpoint("grpc") == "grpc://127.0.0.1:8011"
     assert triton_server.get_endpoint("http") == "http://127.0.0.1:8010"
@@ -30,7 +32,9 @@ def test_triton_endpoints():
     config = TritonServerConfig()
     config.update_config({"grpc_address": "192.168.0.1", "model-repository": "/tmp/repo"})
     triton_server = triton_server = TritonServer(
-        path=TRITONSERVER_DIST_DIR / "bin/tritonserver", libs_path=get_libs_path(), config=config
+        path=TRITONSERVER_DIST_DIR / "bin/tritonserver",
+        libs_path=get_libs_path(),
+        config=config,
     )
     assert triton_server.get_endpoint("grpc") == "grpc://192.168.0.1:8001"
     assert triton_server.get_endpoint("http") == "http://127.0.0.1:8000"
@@ -39,7 +43,9 @@ def test_triton_endpoints():
     config = TritonServerConfig()
     config.update_config({"http_address": "192.168.0.1", "model-repository": "/tmp/repo"})
     triton_server = triton_server = TritonServer(
-        path=TRITONSERVER_DIST_DIR / "bin/tritonserver", libs_path=get_libs_path(), config=config
+        path=TRITONSERVER_DIST_DIR / "bin/tritonserver",
+        libs_path=get_libs_path(),
+        config=config,
     )
     assert triton_server.get_endpoint("grpc") == "grpc://127.0.0.1:8001"
     assert triton_server.get_endpoint("http") == "http://192.168.0.1:8000"

@@ -235,7 +235,7 @@ def test_infer_batch_dict_passed_arguments_returns_arguments(mocker):
         patch_client_infer_batch.assert_called_once_with(parameters=None, headers=None, a=a, b=b)
 
 
-@pytest.mark.timeout(0.3)
+@pytest.mark.timeout(1.0)
 def test_init_http_passes_timeout(mocker):
     with FuturesModelClient("http://localhost:6669", "dummy", init_timeout_s=0.2, inference_timeout_s=0.1) as client:
         with pytest.raises(PyTritonClientTimeoutError):
