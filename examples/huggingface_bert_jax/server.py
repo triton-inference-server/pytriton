@@ -62,7 +62,6 @@ with Triton() as triton:
             ),
         ],
         config=ModelConfig(max_batch_size=16),
-        strict=True,
     )
     logger.info("Serving inference")
     triton.serve()

@@ -114,6 +114,7 @@ def main():
                 inputs=infer_callable.inputs,
                 outputs=infer_callable.outputs,
                 config=ModelConfig(max_batch_size=128),
+                strict=False,
             )
 
             triton.serve()

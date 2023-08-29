@@ -108,7 +108,6 @@ def main():
                     max_queue_delay_microseconds=100,
                 ),
             ),
-            strict=True,
         )
         triton.serve()
 

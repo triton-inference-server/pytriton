@@ -94,7 +94,6 @@ def main():
                 max_batch_size=args.max_batch_size,
                 batcher=DynamicBatcher(max_queue_delay_microseconds=5000),  # 5ms
             ),
-            strict=True,
         )
         logger.info("Serving inference")
         triton.serve()

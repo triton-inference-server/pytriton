@@ -50,7 +50,6 @@ with Triton() as triton:
             Tensor(dtype=np.float32, shape=(-1,)),
         ],
         config=ModelConfig(max_batch_size=128),
-        strict=True,
     )
     logger.info("Serving models")
     triton.serve()

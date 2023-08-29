@@ -155,7 +155,6 @@ def main():
                 max_batch_size=MAX_BATCH_SIZE,
                 batcher=DynamicBatcher(max_queue_delay_microseconds=5000),
             ),
-            strict=True,
         )
         triton.serve()
 

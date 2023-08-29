@@ -52,7 +52,6 @@ def main():
                 Tensor(name="sub", dtype=np.float32, shape=(-1,)),
             ],
             config=ModelConfig(max_batch_size=128),
-            strict=True,
         )
         LOGGER.info("Serving model")
         triton.serve()

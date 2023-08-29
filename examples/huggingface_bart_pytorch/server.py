@@ -87,7 +87,6 @@ def main():
                 Tensor(name="label", dtype=bytes, shape=(1,)),
             ],
             config=ModelConfig(max_batch_size=args.max_batch_size),
-            strict=True,
         )
         logger.info("Serving inference")
         triton.serve()

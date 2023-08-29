@@ -18,8 +18,10 @@ limitations under the License.
 
 ## Unreleased
 
+- new: Support for multiple Python versions starting from 3.8+
 - new: Added support for [decoupled models](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/decoupled_models.md) enabling to support streaming models (alpha state)
 - change: Upgraded Triton Inference Server binaries to version 2.36.0. Note that this Triton Inference Server requires glibc 2.35+ or a more recent version.
+- change: Strict validation of inference callable result is enabled by default
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 
