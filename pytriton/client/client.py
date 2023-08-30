@@ -555,6 +555,9 @@ class ModelClient(BaseModelClient):
         return inputs_wrapped, outputs_wrapped
 
     def _infer(self, inputs: _IOType, parameters, headers) -> Dict[str, np.ndarray]:
+        if self.model_config.decoupled:
+            raise PyTritonClientInferenceServerError("Model config is decoupled. Use DecoupledModelClient instead.")
+
         inputs_wrapped, outputs_wrapped = self._create_request(inputs)
 
         try:
@@ -653,6 +656,9 @@ class DecoupledModelClient(ModelClient):
         self.queue = Queue()
 
     def _infer(self, inputs: _IOType, parameters, headers):
+        if not self.model_config.decoupled:
+            raise PyTritonClientInferenceServerError("Model config is coupled. Use ModelClient instead.")
+
         inputs_wrapped, outputs_wrapped = self._create_request(inputs)
         if parameters is not None:
             raise PyTritonClientValueError("DecoupledModelClient does not support parameters")
