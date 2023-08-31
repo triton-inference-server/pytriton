@@ -24,6 +24,7 @@ NVIDIA's [Triton Inference Server](https://github.com/triton-inference-server).
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
 - [Documentation](#documentation)
+- [Feature matrix](#feature-matrix)
 - [How it works?](#how-it-works)
 - [Installation](#installation)
   - [Prerequisites](#prerequisites)
@@ -33,7 +34,8 @@ NVIDIA's [Triton Inference Server](https://github.com/triton-inference-server).
 - [Quick Start](#quick-start)
 - [Architecture](#architecture)
 - [Examples](#examples)
-- [Profiling model](#profiling-model)
+  - [Streaming (alpha)](#streaming-alpha)
+  - [Profiling model](#profiling-model)
 - [Version management](#version-management)
 - [Useful Links](#useful-links)
 
@@ -44,6 +46,17 @@ NVIDIA's [Triton Inference Server](https://github.com/triton-inference-server).
 Read how to customize the Triton Inference Server, load models, deploy on clusters, and the API reference
 can be found in the [documentation](https://triton-inference-server.github.io/pytriton). The below sections provide
 brief information about the product and quick start guide.
+
+## Feature matrix
+
+| Feature | Description |
+| ------- | ----------- |
+| Native Python support | You can create any Python function and expose it as an HTTP/gRPC API. |
+| Framework-agnostic | You can run any Python code with any framework of your choice, such as: PyTorch, TensorFlow, or JAX. |
+| Performance optimization | You can benefit from dynamic batching, response cache, model pipelining, and GPU/CPU inference. |
+| Easy installation and setup | You can use a simple and familiar interface based on Flask/FastAPI for easy installation and setup.  |
+| Model clients   | You can access high-level model clients for HTTP/gRPC requests with configurable options and both synchronous and asynchronous API. |
+| Streaming (alpha) | You can stream partial responses from a model by serving it in a decoupled mode. |
 
 ## How it works?
 
@@ -297,6 +310,9 @@ the model prediction, the result is returned to the `Proxy Backend`, and a respo
 
 ![High Level Design](docs/assets/hld.svg)
 
+
+
+
 ## Examples
 
 The [examples](examples) page presents various cases of serving models using PyTriton. You can find simple examples of
@@ -304,13 +320,16 @@ running PyTorch, TensorFlow2, JAX, and simple Python models. Additionally, we ha
 learning, multi-node models, or deployment on Kubernetes using PyTriton. Each example contains instructions describing
 how to build and run the example. Learn more about how to use PyTriton by reviewing our [examples](examples).
 
-## Profiling model
+### Streaming (alpha)
+
+We introduced new alpha feature to PyTriton that allows to stream partial responses from a model. It is based on NVIDIA Triton Inference deocoupled models feature. Look at example in [examples/huggingface_dialogpt_streaming_pytorch](examples/huggingface_dialogpt_streaming_pytorch).
+
+### Profiling model
 
 The [Perf Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md) can be
 used to profile models served through PyTriton. We have prepared an example of
 using the Perf Analyzer to profile the BART PyTorch model. The example code can be found
 in [examples/perf_analyzer](examples/perf_analyzer).
-
 
 ## Version management
 
