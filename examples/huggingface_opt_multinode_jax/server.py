@@ -116,6 +116,7 @@ def run(model, params, number_of_gpus, max_batch_size, server_ip, port, number_o
                     Tensor(name="output", dtype=np.bytes_, shape=(1,)),
                 ],
                 config=ModelConfig(max_batch_size=max_batch_size),
+                strict=True,
             )
             # Serve model through Triton Inference Server
             LOGGER.info("Serving inference")

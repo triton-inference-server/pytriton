@@ -106,6 +106,7 @@ def main():
             config=ModelConfig(
                 max_batch_size=args.max_batch_size,
             ),
+            strict=True,
         )
         logger.info("Serving model")
         triton.serve()

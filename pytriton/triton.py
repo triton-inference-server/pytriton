@@ -447,7 +447,7 @@ class Triton:
         outputs: Sequence[Tensor],
         model_version: int = 1,
         config: Optional[ModelConfig] = None,
-        strict: bool = True,
+        strict: bool = False,
     ) -> None:
         """Create a model with given name and inference callable binding into Triton Inference Server.
 

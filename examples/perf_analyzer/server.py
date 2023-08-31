@@ -58,6 +58,7 @@ with Triton() as triton:
             Tensor(name="scores", dtype=np.float32, shape=(-1,)),
         ],
         config=ModelConfig(max_batch_size=8),
+        strict=True,
     )
     logger.info("Serving inference")
     triton.serve()

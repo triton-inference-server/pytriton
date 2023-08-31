@@ -845,11 +845,15 @@ class AsyncioModelClient(BaseModelClient):
             KeyboardInterrupt: If hosting process receives SIGINT
         """
         _LOGGER.debug(f"Waiting for model {self._model_name} to be ready")
-        async with async_timeout.timeout(self._init_timeout_s):
-            await asyncio_wait_for_model_ready(
-                self._general_client, self._model_name, self._model_version, timeout_s=timeout_s
-            )
-        _LOGGER.debug(f"Model {self._model_name} is ready")
+        try:
+            async with async_timeout.timeout(self._init_timeout_s):
+                await asyncio_wait_for_model_ready(
+                    self._general_client, self._model_name, self._model_version, timeout_s=timeout_s
+                )
+        except asyncio.TimeoutError as e:
+            message = f"Timeout while waiting for model {self._model_name} to be ready for {self._init_timeout_s}s"
+            _LOGGER.error(message)
+            raise PyTritonClientTimeoutError(message) from e
 
     @property
     async def model_config(self):

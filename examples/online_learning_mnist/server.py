@@ -152,6 +152,7 @@ def main():
                     Tensor(name="last_loss", dtype=np.float32, shape=(1,)),
                 ],
                 config=ModelConfig(max_batch_size=64),
+                strict=True,
             )
             triton.bind(
                 model_name="MnistInfer",
@@ -165,6 +166,7 @@ def main():
                     Tensor(name="predictions", dtype=np.float32, shape=(-1,)),
                 ],
                 config=ModelConfig(max_batch_size=64),
+                strict=True,
             )
 
             LOGGER.info("Serving model")

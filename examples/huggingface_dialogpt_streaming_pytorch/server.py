@@ -104,6 +104,7 @@ def main():
                 Tensor(name="response", dtype=bytes, shape=(1,)),
             ],
             config=ModelConfig(decoupled=True),
+            strict=True,
         )
         triton.serve()
 

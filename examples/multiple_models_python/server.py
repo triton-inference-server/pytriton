@@ -49,6 +49,7 @@ with Triton() as triton:
             Tensor(name="product", dtype=np.float32, shape=(-1,)),
         ],
         config=ModelConfig(max_batch_size=8),
+        strict=True,
     )
     logger.info("Loading Multiply4 model")
     triton.bind(
@@ -61,5 +62,6 @@ with Triton() as triton:
             Tensor(name="product", dtype=np.float32, shape=(-1,)),
         ],
         config=ModelConfig(max_batch_size=8),
+        strict=True,
     )
     triton.serve()
