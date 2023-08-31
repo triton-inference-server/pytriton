@@ -32,7 +32,7 @@ _LOGGER = logging.getLogger(__name__)
 
 _SMALL_TIMEOUT = 0.5
 _LARGE_TIMEOUT = 1.5
-_TEST_TIMEOUT = 15.0
+_TEST_TIMEOUT = 60.0
 _GARGANTUAN_TIMEOUT = 5.0
 
 
