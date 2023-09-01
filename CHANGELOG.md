@@ -16,7 +16,7 @@ limitations under the License.
 
 # Changelog
 
-## Unreleased
+## 0.3.0 (2023-09-01)
 
 - new: Support for multiple Python versions starting from 3.8+
 - new: Added support for [decoupled models](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/decoupled_models.md) enabling to support streaming models (alpha state)
