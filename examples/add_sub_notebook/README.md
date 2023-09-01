@@ -33,5 +33,5 @@ The step-by-step guide:
 2. In current terminal run jupyter notebook and open add_sub.ipynb file
 
 ```shell
-./jupyter notebook
+jupyter notebook
 ```

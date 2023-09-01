@@ -32,5 +32,5 @@ The step-by-step guide:
 2. In current terminal run jupyter notebook and open `linear.ipynb` file
 
 ```shell
-./jupyter notebook
+jupyter notebook
 ```
