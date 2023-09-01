@@ -49,6 +49,11 @@ def main():
         required=False,
     )
     parser.add_argument(
+        "--interactive",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         default=False,
@@ -58,17 +63,30 @@ def main():
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(name)s: %(message)s")
 
-    eos_token = b"<|endoftext|>"  # might need to change this depending on the model
-    chat_history_items = [b"Does money buy happines?"]  # initial prompt
+    if args.interactive:
+        first_input = (input("TYPE AND PRESS ENTER:")).encode("utf-8")
+    else:
+        first_input = b"Does money buy happines?"
+
+    chat_history_items = [first_input]  # initial prompt
     with DecoupledModelClient(args.url, args.model_name, init_timeout_s=args.init_timeout_s) as client:
         chat_history = b""
         print("(0) >", chat_history_items[0].decode("utf-8"))  # noqa: T201
-        for idx in range(1, args.iterations):
-            chat_history = eos_token.join(chat_history_items[:-1]) + (
-                eos_token if chat_history_items[:-1] else b""
-            )  # do not forget about ending eos token
 
-            print(f"({idx}) > ", end="", flush=True)  # noqa: T201
+        def idx_generator():
+            if args.interactive:
+                i = 1
+                while True:
+                    yield i
+                    i += 1
+            else:
+                yield from range(1, args.iterations)
+
+        chat_history = chat_history_items[0]
+        for idx in idx_generator():
+
+            if idx > 0:
+                print(f"({idx}) > ", end="", flush=True)  # noqa: T201
             for partial_result_dict in client.infer_sample(
                 new_inputs=np.array(chat_history_items[-1:]), chat_history=np.array([chat_history])
             ):
@@ -78,8 +96,10 @@ def main():
 
                 response_tokens = "".join(token.decode("utf-8") for token in response_tokens)
                 print(response_tokens, end="", flush=True)  # noqa: T201
-
             print("")  # noqa: T201
+            if args.interactive:
+                next_input = (input("TYPE AND PRESS ENTER:")).encode("utf-8")
+                chat_history_items.append(next_input)
 
 
 if __name__ == "__main__":
