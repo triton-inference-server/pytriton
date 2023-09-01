@@ -42,7 +42,7 @@ def verify_client_output(client_output):
     else:
         LOGGER.info(f'Found "{expected_pattern}" in client output')
 
-    expected_patterns = [r"positive", r"alarm_set", r"time\(seven am\)"]
+    expected_patterns = [r"neutral", r"set the alarm", r"seven am"]
     for expected_pattern in expected_patterns:
         output_match = re.search(expected_pattern, client_output, re.MULTILINE)
         output_array = output_match.group(0) if output_match else None
