@@ -18,7 +18,13 @@ export PLATFORM=$3
 
 set -x
 
-docker pull -q --platform "${PLATFORM}" "${PYTRITON_IMAGE_NAME}"
+# check if docker image name has docker registry prefix to not try to pull development image
+if [[ "${PYTRITON_IMAGE_NAME}" == *"/"* ]]; then
+  docker pull -q --platform "${PLATFORM}" "${PYTRITON_IMAGE_NAME}"
+fi
+
+# fetch base image earlier as in some environments there are issues with pulling base images while building
+docker pull -q --platform "${PLATFORM}" "${TRITON_SERVER_IMAGE}"
 
 if [[ "$(docker images -q "${PYTRITON_IMAGE_NAME}" 2> /dev/null)" == "" ]] || [[ "${PYTRITON_IMAGE_REBUILD}" == "1" ]]; then
   docker build --platform "${PLATFORM}" \
