@@ -109,7 +109,7 @@ build-triton: ## build Triton with Python Stubs
 	bash ./scripts/build_triton.sh $(TRITONSERVER_IMAGE_NAME) $(PYTRITON_IMAGE_NAME) $(PLATFORM)
 	echo "export PYTRITON_IMAGE_NAME=$(PYTRITON_IMAGE_NAME)" > .env
 
-extract-triton: ## extract Triton binaries and libraries
+extract-triton: build-triton ## extract Triton binaries and libraries
 	# changing dst path, change also in clean-build and pyproject.toml
 	bash ./scripts/extract_triton.sh $(PYTRITON_IMAGE_NAME) $(TRITONSERVER_OUTPUT_DIR) $(PLATFORM)
 
