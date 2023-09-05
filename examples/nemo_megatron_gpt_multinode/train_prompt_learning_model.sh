@@ -33,32 +33,33 @@ export MODEL_FILENAME=${MODEL_FILENAME:-nemo_gpt1.3B_fp16.nemo}
 LANGUAGE_MODEL_PATH=""  # will be updated by download_model function
 
 download_and_preprocess_data() {
-    # download data
-    mkdir -p ${SENTIMENT_DIR}
-    wget https://huggingface.co/datasets/financial_phrasebank/resolve/main/data/FinancialPhraseBank-v1.0.zip
-    unzip FinancialPhraseBank-v1.0.zip -d ${SENTIMENT_DIR}
-    rm FinancialPhraseBank-v1.0.zip
-
-    mkdir -p ${ASSISTANT_DIR}
-    wget https://github.com/xliuhw/NLU-Evaluation-Data/archive/master.zip
-    unzip master.zip -d ${ASSISTANT_DIR}
-    rm master.zip
-
-    # preprocess data
-    python3 ${NEMO_REPO_DIR}/scripts/dataset_processing/nlp/financial_phrase_bank/prompt_learning_financial_phrase_bank_preprocessing.py \
+    # download and preprocess data if not already present
+    if [ ! -d ${SENTIMENT_DIR} ]; then
+        mkdir -p ${SENTIMENT_DIR}
+        wget https://huggingface.co/datasets/financial_phrasebank/resolve/main/data/FinancialPhraseBank-v1.0.zip
+        unzip FinancialPhraseBank-v1.0.zip -d ${SENTIMENT_DIR}
+        rm FinancialPhraseBank-v1.0.zip
+        python3 ${NEMO_REPO_DIR}/scripts/dataset_processing/nlp/financial_phrase_bank/prompt_learning_financial_phrase_bank_preprocessing.py \
         --data-dir ${SENTIMENT_DIR}/FinancialPhraseBank-v1.0
-    head -4 ${SENTIMENT_DIR}/FinancialPhraseBank-v1.0/financial_phrase_bank_train.jsonl
+        head -4 ${SENTIMENT_DIR}/FinancialPhraseBank-v1.0/financial_phrase_bank_train.jsonl
+    fi
 
-    python3 ${NEMO_REPO_DIR}/scripts/dataset_processing/nlp/intent_and_slot/prompt_learning_assistant_preprocessing.py \
-        --source-dir ${ASSISTANT_DIR}/NLU-Evaluation-Data-master \
-        --nemo-format-dir ${ASSISTANT_DIR}/nemo-format \
-        --output-dir ${ASSISTANT_DIR}
-    head -5 ${ASSISTANT_DIR}/assistant_train.jsonl
-    echo '\n=====\n#Intents: ' $(wc -l < ${ASSISTANT_DIR}/nemo-format/dict.intents.csv)
-    cat ${ASSISTANT_DIR}/nemo-format/dict.intents.csv
+    if [ ! -d ${ASSISTANT_DIR} ]; then
+        mkdir -p ${ASSISTANT_DIR}
+        wget https://github.com/xliuhw/NLU-Evaluation-Data/archive/master.zip
+        unzip master.zip -d ${ASSISTANT_DIR}
+        rm master.zip
+        python3 ${NEMO_REPO_DIR}/scripts/dataset_processing/nlp/intent_and_slot/prompt_learning_assistant_preprocessing.py \
+            --source-dir ${ASSISTANT_DIR}/NLU-Evaluation-Data-master \
+            --nemo-format-dir ${ASSISTANT_DIR}/nemo-format \
+            --output-dir ${ASSISTANT_DIR}
+        head -5 ${ASSISTANT_DIR}/assistant_train.jsonl
+        echo '\n=====\n#Intents: ' $(wc -l < ${ASSISTANT_DIR}/nemo-format/dict.intents.csv)
+        cat ${ASSISTANT_DIR}/nemo-format/dict.intents.csv
 
-    echo '\n=====\n#Slots: ' $(wc -l < ${ASSISTANT_DIR}/nemo-format/dict.slots.csv)
-    cat ${ASSISTANT_DIR}/nemo-format/dict.slots.csv
+        echo '\n=====\n#Slots: ' $(wc -l < ${ASSISTANT_DIR}/nemo-format/dict.slots.csv)
+        cat ${ASSISTANT_DIR}/nemo-format/dict.slots.csv
+    fi
 }
 
 download_model() {
