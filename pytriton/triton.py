@@ -43,7 +43,7 @@ import sys
 import threading
 import threading as th
 import typing
-from typing import Callable, Dict, List, Optional, Sequence, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
 import typing_inspect
 
@@ -226,23 +226,15 @@ class TritonConfig:
         return dataclasses.asdict(self)
 
     @classmethod
-    def from_env(cls) -> "TritonConfig":
-        """Creates TritonConfig from environment variables.
+    def from_dict(cls, config: Dict[str, Any]) -> "TritonConfig":
+        """Creates a ``TritonConfig`` instance from an input dictionary. Values are converted into correct types.
 
-        Environment variables should start with `PYTRITON_TRITON_CONFIG_` prefix. For example:
-
-            PYTRITON_TRITON_CONFIG_GRPC_PORT=45436
-            PYTRITON_TRITON_CONFIG_LOG_VERBOSE=4
-
-        Typical use:
-
-            triton_config = TritonConfig.from_env()
+        Args:
+            config: a dictionary with all required fields
 
         Returns:
-            TritonConfig class instantiated from environment variables.
+            a ``TritonConfig`` instance
         """
-        prefix = "PYTRITON_TRITON_CONFIG_"
-        config = {name[len(prefix) :].lower(): value for name, value in os.environ.items() if name.startswith(prefix)}
         fields: Dict[str, dataclasses.Field] = {field.name: field for field in dataclasses.fields(cls)}
         unknown_config_parameters = {name: value for name, value in config.items() if name not in fields}
         for name, value in unknown_config_parameters.items():
@@ -262,6 +254,26 @@ class TritonConfig:
             name: _cast_value(fields[name], value) for name, value in config.items() if name in fields
         }
         return cls(**config_with_casted_values)
+
+    @classmethod
+    def from_env(cls) -> "TritonConfig":
+        """Creates TritonConfig from environment variables.
+
+        Environment variables should start with `PYTRITON_TRITON_CONFIG_` prefix. For example:
+
+            PYTRITON_TRITON_CONFIG_GRPC_PORT=45436
+            PYTRITON_TRITON_CONFIG_LOG_VERBOSE=4
+
+        Typical use:
+
+            triton_config = TritonConfig.from_env()
+
+        Returns:
+            TritonConfig class instantiated from environment variables.
+        """
+        prefix = "PYTRITON_TRITON_CONFIG_"
+        config = {name[len(prefix) :].lower(): value for name, value in os.environ.items() if name.startswith(prefix)}
+        return cls.from_dict(config)
 
 
 class _LogLevelChecker:

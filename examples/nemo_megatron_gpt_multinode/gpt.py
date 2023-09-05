@@ -67,7 +67,7 @@ class NemoGptCallable:
 
     @batch
     @group_by_values("tasks", *_INPUT_PARAMETERS_NAMES, pad_fn=ConstantPadder(0))
-    @first_value(*_INPUT_PARAMETERS_NAMES)
+    @first_value(*_INPUT_PARAMETERS_NAMES, strict=False)
     def infer(self, **inputs: np.ndarray) -> typing.Dict[str, np.ndarray]:
         # Tell other ranks we're doing generate
         generate_num = 0
@@ -82,19 +82,17 @@ class NemoGptCallable:
 
         tasks = _str_ndarray2list(inputs.pop("tasks"))
         prompts = _str_ndarray2list(inputs.pop("prompts"))
-
         length_params = LengthParam(**{k: v for k, v in inputs.items() if k in typing.get_type_hints(LengthParam)})
         sampling_params = SamplingParam(
             **{k: v for k, v in inputs.items() if k in typing.get_type_hints(SamplingParam)}
         )
-
         if tasks[0] == "text_generation":
             generate_fn = self._text_generate_fn
         else:
             generate_fn = self._task_generate_fn
             if generate_fn is None:
                 raise PyTritonInvalidOperationError(
-                    f"Model {self.model_name} does not support task {inputs['task']}. "
+                    f"Model {self.model_name} does not support task {tasks[0]}. "
                     "Only text_generation task is supported."
                 )
             prompts = self._format_prompts(tasks, prompts)

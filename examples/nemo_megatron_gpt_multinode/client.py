@@ -86,7 +86,6 @@ def main():
         action="store_true",
         help="Enable verbose logging",
     )
-
     args = parser.parse_args()
 
     log_level = logging.DEBUG if args.verbose else logging.INFO
@@ -122,7 +121,7 @@ def main():
         result_dict = client.infer_batch(
             tasks=tasks,
             prompts=prompts,
-            min_length=_param(np.int32, 0),
+            min_length=_param(np.int32, 20),
             max_length=_param(np.int32, args.output_len),
             use_greedy=_param(np.bool_, True),
             temperature=_param(np.float32, 1.0),

@@ -17,6 +17,7 @@ import pathlib
 import socket
 import typing
 import warnings
+from typing import Dict, Tuple, Type, Union
 
 import filelock
 import huggingface_hub  # pytype: disable=import-error
@@ -76,13 +77,26 @@ def typedict2tensor(
         else:
             raise PyTritonBadParameterError(f"Unknown type {type_}")
 
-    def _get_tensor_params(type_):
+    def _get_tensor_params(type_: Type) -> Dict[str, Union[Tuple[int, ...], type]]:
+        """
+        Returns a shape and a type of Triton tensor. The shape and the type are inferred from a
+        Python typing.
+
+        Args:
+            type_: a Python typing which should be a single type or a nested ``List``. If `type_` is a usual
+                type, then shape is ``(1,)``. If ``type_`` is a nested ``List``, then ``-1`` is added for each
+                ``List``. E.g., ``List[int]`` -> ``(1, -1)``, ``List[List[int]]`` -> ``(1, -1, -1)``. Additional
+                Please note that all shapes have additional ``(1,)`` leading dimension.
+
+        Returns:
+            a dictionary with 2 elements: ``"shape"`` and ``"type"``. ``"type"`` is a numpy type which corresponds
+            to ``type_``.
+        """
         count = 0
         while typing.get_origin(type_) is list:
             type_ = typing.get_args(type_)[0]
             count += 1
-        count -= 1  # we don't want to count the last dimension
-        shape = (-1,) * count if count > 0 else (1,)
+        shape = (1,) + (-1,) * count
         return {"shape": shape, "dtype": _map_type(type_)}
 
     overwrite_kwargs = overwrite_kwargs or {}
@@ -179,6 +193,8 @@ def load_model(
     LOGGER.debug(f"Loading {model_path} on {worker_name}")
 
     save_restore_connector = NLPSaveRestoreConnector()
+    if model_path.is_dir():
+        save_restore_connector.model_extracted_dir = model_path.as_posix()
     pretrained_cfg = save_restore_connector.restore_from(
         None, model_path.as_posix(), return_config=True, trainer=trainer
     )
