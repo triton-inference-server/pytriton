@@ -42,14 +42,18 @@ def verify_client_output(client_output):
     else:
         LOGGER.info(f'Found "{expected_pattern}" in client output')
 
-    expected_patterns = [r"neutral", r"set the alarm", r"seven am"]
-    for expected_pattern in expected_patterns:
-        output_match = re.search(expected_pattern, client_output, re.MULTILINE)
-        output_array = output_match.group(0) if output_match else None
-        if not output_array:
-            raise ValueError(f"Could not find {expected_pattern} in client output. Output: {client_output}")
+    # NeMo model might return neutral or positive sentiment for given task - both are acceptable in test
+    expected_patterns = [[r"neutral", r"positive"], [r"set the alarm"], [r"seven am"]]
+    for patterns in expected_patterns:
+        matches = [re.search(pattern, client_output, re.MULTILINE) for pattern in patterns]
+        output_array = [match.group(0) if match else None for match in matches]
+
+        if not any(output_array):
+            raise ValueError(
+                f'Could not find any of patterns "{", ".join(patterns)}" in client output. Output: {client_output}'
+            )
         else:
-            LOGGER.info(f'Found "{expected_pattern}" in client output')
+            LOGGER.info(f'Found at least one of patterns "{", ".join(patterns)}" in client output')
 
 
 def main():
