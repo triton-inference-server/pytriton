@@ -1,5 +1,5 @@
 <!--
-Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ helps, and we will always give credit.
 
 Report bugs at [https://github.com/triton-inference-server/pytriton/issues](https://github.com/triton-inference-server/pytriton/issues).
 
-If you are reporting a bug, include:
+When reporting a bug, please include the following information:
 
 * Your operating system name and version.
 * Any details about your local setup that might be helpful in troubleshooting.
@@ -38,7 +38,7 @@ wanted" is open to whoever wants to implement it.
 
 ### Implement Features
 
-Look through the GitHub issues for features. Anything tagged with "enhancement" and "help wanted" is open to whoever wants to implement it.
+Browse through the GitHub issues for features. Anything tagged with "enhancement" and "help wanted" is open to whoever wants to implement it.
 
 ### Write Documentation
 
@@ -63,9 +63,10 @@ the same license or a compatible license.
 
 Any contribution which contains commits that are not Signed-Off will not be accepted.
 
-To sign off on a commit, you simply use the `--signoff` (or `-s`) option when committing your changes:
-```
-$ git commit -s -m "Add cool feature.
+To sign off on a commit, simply use the `--signoff` (or `-s`) option when committing your changes:
+
+```shell
+$ git commit -s -m "Add a cool feature."
 ```
 
 This will append the following to your commit message:
@@ -74,7 +75,7 @@ This will append the following to your commit message:
 Signed-off-by: Your Name <your@email.com>
 ```
 
-By doing this, you certify the below:
+By doing this, you certify the following:
 
 ```
 Developer Certificate of Origin
@@ -103,6 +104,8 @@ By making a contribution to this project, I certify that:
 
 ## Get Started!
 
+### Local Development
+
 Ready to contribute? Here's how to set up the `PyTriton` for local development.
 
 1. Fork the `PyTriton` repo on GitHub.
@@ -112,34 +115,40 @@ Ready to contribute? Here's how to set up the `PyTriton` for local development.
 $ git clone git@github.com:your_name_here/pytriton.git
 ```
 
-3. Install your local copy into a virtualenv. Assuming you have virtualenvwrapper installed, this is how you set up your fork for local development:
+3. Install your local copy into a virtualenv. Assuming you have virtualenvwrapper installed, here's how you set up your fork for local development:
 
 ```shell
 $ mkvirtualenv pytriton
 $ cd pytriton/
 ```
 
-If you do not use virtualenvwrapper package, you can initialize virtual environment using pure python command:
+If you do not use the virtualenvwrapper package, you can initialize a virtual environment using the pure Python command:
 
 ```shell
 $ python -m venv pytriton
 $ cd pytriton/
 $ source bin/activate
 ```
-Once the virtualenv has been activated install the development dependencies:
+
+Once the virtualenv is activated, install the development dependencies:
 
 ```shell
 $ make install-dev
 ```
 
-
-4. Extract Triton Server to your environment so you are able to debug PyTriton while serving some models on Triton:
+4. Extract Triton Server to your environment so you can debug PyTriton while serving some models on Triton:
 
 ```shell
 $ make extract-triton
 ```
 
-5. Create a branch for local development:
+5. Install pre-commit hooks:
+
+```shell
+$ pre-commit install
+```
+
+6. Create a branch for local development:
 
 ```shell
 $ git checkout -b name-of-your-bugfix-or-feature
@@ -147,15 +156,21 @@ $ git checkout -b name-of-your-bugfix-or-feature
 
 Now you can make your changes locally.
 
-6. When you're done making changes, check that your changes pass linters and the
+7. When you're done making changes, check that your changes pass linters and the
    tests, including testing other Python versions with tox:
 
 ```shell
-$ make lint  # will run i.a. flake8 and pytype linters
-$ make test  # will run a test with on your current virtualenv
+$ make lint  # will run, among others, flake8 and pytype linters
+$ make test  # will run a test on your current virtualenv
 ```
 
-7. Commit your changes and push your branch to GitHub:
+  To run a subset of tests:
+
+```shell
+$ pytest tests.test_subset
+```
+
+8. Commit your changes and push your branch to GitHub:
 
 ```shell
 $ git add .
@@ -163,24 +178,15 @@ $ git commit -s -m "Your detailed description of your changes."
 $ git push origin name-of-your-bugfix-or-feature
 ```
 
-8. Submit a pull request through the GitHub website.
+9. Submit a pull request through the GitHub website.
 
 ### Pull Request Guidelines
 
 Before you submit a pull request, check that it meets these guidelines:
 
 1. The pull request should include tests.
-2. If the pull request adds functionality, you should update the docs. Put
-   your new functionality into a function with a docstring, and add the
-   feature to the list in README.md.
+2. If the pull request adds functionality, you should update the docs. Put your new functionality into a function with a docstring and add the feature to the list in README.md.
 
-### Tips
-
-To run a subset of tests:
-
-```shell
-$ pytest tests.test_subset
-```
 
 ## Documentation
 
