@@ -41,12 +41,12 @@ def test_tensor_store_create_and_close(tmp_path):
     try:
         current_process = psutil.Process()
         children = current_process.children(recursive=True)
-        assert len(children) == 1  # block store side process should be created
+        assert len(children) == 2  # block store + resource tracker side processes should be created
     finally:
         tensor_store.close()
 
     children = current_process.children(recursive=True)
-    assert len(children) == 0  # block store side process should be closed
+    assert len(children) == 1  # block store side process should be closed; resource_tracker should be still running
 
 
 def test_tensor_store_unregisters_shm_from_resource_tracker(tmp_path, mocker):

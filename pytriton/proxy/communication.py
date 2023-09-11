@@ -26,6 +26,7 @@ import json
 import logging
 import math
 import multiprocessing.managers
+import multiprocessing.popen_spawn_posix
 import multiprocessing.shared_memory
 import pathlib
 import signal
@@ -482,10 +483,19 @@ class BlocksStoreManager(multiprocessing.managers.BaseManager):
         )  # pytype: disable=attribute-error
 
 
-_DataBlocksServerProxy = multiprocessing.managers.MakeProxyType(  # pytype: disable=module-attr
-    "DataBlocksServerProxy",
-    ("release_block", "get_free_blocks", "_get_debug_status", "close"),
-)
+class _DataBlocksServerProxy(multiprocessing.managers.BaseProxy):
+    def release_block(self, /, *args, **kwargs):
+        return self._callmethod("release_block", args, kwargs)
+
+    def get_free_blocks(self, /, *args, **kwargs):
+        return self._callmethod("get_free_blocks", args, kwargs)
+
+    def _get_debug_status(self, /, *args, **kwargs):
+        return self._callmethod("_get_debug_status", args, kwargs)
+
+    def close(self, /, *args, **kwargs):
+        return self._callmethod("close", args, kwargs)
+
 
 BlocksStoreManager.register("blocks", _DataBlocksServer, proxytype=_DataBlocksServerProxy)
 
@@ -524,6 +534,66 @@ class _FileLock:
             _LOGGER.warning(f"Could not remove lock file {self._file_path}; {e}")
 
 
+class _Popen(multiprocessing.popen_spawn_posix.Popen):
+    def _launch(self, process_obj):
+        # Modified version of multiprocessing.popen_spawn_posix.Popen._launch
+        import io
+        import os
+        from multiprocessing import context, resource_tracker, spawn, util
+
+        tracker_fd = resource_tracker.getfd()
+        self._fds.append(tracker_fd)  # pytype: disable=attribute-error
+
+        # get prep_data + remove init_main_from* as they are not required for TensorStore process
+        prep_data = spawn.get_preparation_data(process_obj._name)
+        prep_data.pop("init_main_from_module", None)
+        prep_data.pop("init_main_from_path", None)
+
+        fp = io.BytesIO()
+        context.set_spawning_popen(self)
+        try:
+            context.reduction.dump(prep_data, fp)  # pytype: disable=module-attr
+            context.reduction.dump(process_obj, fp)  # pytype: disable=module-attr
+        finally:
+            context.set_spawning_popen(None)
+
+        parent_r = child_w = child_r = parent_w = None
+        try:
+            parent_r, child_w = os.pipe()
+            child_r, parent_w = os.pipe()
+            cmd = spawn.get_command_line(tracker_fd=tracker_fd, pipe_handle=child_r)
+            self._fds.extend([child_r, child_w])  # pytype: disable=attribute-error
+            self.pid = util.spawnv_passfds(
+                spawn.get_executable(), cmd, self._fds  # pytype: disable=attribute-error,wrong-arg-types
+            )
+            self.sentinel = parent_r
+            with open(parent_w, "wb", closefd=False) as f:
+                f.write(fp.getbuffer())
+        finally:
+            fds_to_close = []
+            for fd in (parent_r, parent_w):
+                if fd is not None:
+                    fds_to_close.append(fd)
+            self.finalizer = util.Finalize(self, util.close_fds, fds_to_close)  # pytype: disable=module-attr
+
+            for fd in (child_r, child_w):
+                if fd is not None:
+                    os.close(fd)
+
+
+class _SpawnProcess(multiprocessing.process.BaseProcess):
+    _start_method = "spawn"
+
+    @staticmethod
+    def _Popen(process_obj):  # noqa N802
+        return _Popen(process_obj)
+
+
+class _SpawnContext(multiprocessing.context.BaseContext):
+    _name = "spawn"
+    Process = _SpawnProcess
+
+
 class TensorStore:
     """Tensor store for storing and retrieving numpy arrays in/from shared memory."""
 
@@ -538,7 +608,7 @@ class TensorStore:
         """
         _update_logger()
         address = address.as_posix() if isinstance(address, pathlib.Path) else address
-        self._remote_blocks_store_manager = BlocksStoreManager(address, authkey=auth_key)
+        self._remote_blocks_store_manager = BlocksStoreManager(address, authkey=auth_key, ctx=_SpawnContext())
         self._remote_blocks_store = None
         self._manager_start_stop_filelock = _FileLock(f"{address}.lock")
 
