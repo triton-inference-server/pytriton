@@ -18,7 +18,8 @@ limitations under the License.
 
 ## (unreleased)
 
-- fix: potential unstability of shared memory management
+- Change: `KeyboardInterrupt` is now handled in `triton.serve()`. PyTriton hosting scripts return an exit code of 0 instead of 130 when they receive a SIGINT signal.
+- Fix: Addressed potential instability in shared memory management.
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 

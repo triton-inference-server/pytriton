@@ -418,8 +418,11 @@ class Triton:
         """
         self.run()
         with self._cv:
-            while self.is_alive():
-                self._cv.wait(timeout=monitoring_period_sec)
+            try:
+                while self.is_alive():
+                    self._cv.wait(timeout=monitoring_period_sec)
+            except KeyboardInterrupt:
+                LOGGER.info("SIGINT received, exiting.")
         self.stop()
 
     def is_alive(self) -> bool:
@@ -527,6 +530,7 @@ class Triton:
             """Read more about configuring and serving models in """
             """documentation: https://triton-inference-server.github.io/pytriton."""
         )
+        LOGGER.info("(Press CTRL+C to quit)")
 
     @classmethod
     def _validate_model_name(cls, model_name: str) -> None:
