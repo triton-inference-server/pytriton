@@ -530,7 +530,7 @@ class Triton:
             """Read more about configuring and serving models in """
             """documentation: https://triton-inference-server.github.io/pytriton."""
         )
-        LOGGER.info("(Press CTRL+C to quit)")
+        LOGGER.info(f"(Press CTRL+C or use the command `kill -SIGINT {os.getpid()}` to send a SIGINT signal and quit)")
 
     @classmethod
     def _validate_model_name(cls, model_name: str) -> None:
