@@ -57,8 +57,8 @@ def run(model, params, number_of_gpus, max_batch_size, server_ip, port, number_o
     LOGGER.info("Initialize model")
     infer = pjit(
         functools.partial(greedy_search, model),
-        in_axis_resources=(params_spec, PartitionSpec(None, None)),
-        out_axis_resources=None,
+        in_shardings=(params_spec, PartitionSpec(None, None)),
+        out_shardings=None,
         static_argnums=2,
     )
 

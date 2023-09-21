@@ -252,8 +252,8 @@ def shard_params(model, init_params, params_spec, mesh_devices):
         if init_params is None:
             params = pjit(
                 lambda: model.init_weights(model.key, model.input_shape),
-                in_axis_resources=None,
-                out_axis_resources=params_spec,
+                in_shardings=None,
+                out_shardings=params_spec,
             )()
         else:
             new_params = {}
@@ -266,8 +266,8 @@ def shard_params(model, init_params, params_spec, mesh_devices):
 
                 new_params[key] = pjit(
                     lambda x: x,
-                    in_axis_resources=None,
-                    out_axis_resources=params_spec[key],
+                    in_shardings=None,
+                    out_shardings=params_spec[key],
                 )(init_param)
             params = freeze(unflatten_dict(new_params))
             params_spec = freeze(unflatten_dict(params_spec))
