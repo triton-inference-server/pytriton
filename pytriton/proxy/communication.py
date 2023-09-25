@@ -358,7 +358,7 @@ class _SharedMemorySegment:
             free_blocks.append(BlockDescriptor(self.shared_memory.name, offset=offset, size=total_size - offset))
 
         self.free_blocks = free_blocks
-        self.max_free_block_size = max(block.size for block in self.free_blocks)
+        self.max_free_block_size = max(block.size for block in self.free_blocks) if self.free_blocks else 0
 
     def __contains__(self, block_id: str) -> bool:
         with self.used_blocks_lock:

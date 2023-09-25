@@ -19,7 +19,7 @@ import numpy as np
 import psutil
 import pytest
 
-from pytriton.proxy.communication import TensorStore, _DataBlocksServer
+from pytriton.proxy.communication import TensorStore, _DataBlocksServer, serialize_numpy_with_struct_header
 
 
 @pytest.fixture(scope="function")
@@ -111,32 +111,57 @@ def test_tensor_store_connection_timeout(tmp_path):
     tensor_store.connect(timeout_s=0.05)
 
 
-def test_tensor_store_get_return_equal_data_what_put(tensor_store):
-    a = np.zeros((10, 10), dtype=np.float32)
-    b = np.array([b"foo", b"longer_bar"])
-    c = np.array([b"foo", b"longer_bar"], dtype=object)
-    a_id, b_id, c_id = tensor_store.put([a, b, c])
-
-    a_retrieved = tensor_store.get(a_id)
-    b_retrieved = tensor_store.get(b_id)
-    c_retrieved = tensor_store.get(c_id)
-
-    np.testing.assert_equal(a, a_retrieved)
-    np.testing.assert_equal(b, b_retrieved)
-    np.testing.assert_equal(c, c_retrieved)
+# 12bytes is 3x4bytes (num of segments and 2 segments sizes - header + np array)
+_flat_array_header_size = len(serialize_numpy_with_struct_header(np.zeros((1,), dtype=np.int8))[0]) + 12
 
 
-def test_tensor_store_handle_tensors_larger_than_minimal_size(tensor_store):
-    minimal_segment_size_bytes = _DataBlocksServer._minimal_segment_size
-    a = np.zeros((minimal_segment_size_bytes // np.dtype(np.float32).itemsize * 3,), dtype=np.float32)
-    assert a.nbytes > minimal_segment_size_bytes
-    b = np.zeros((minimal_segment_size_bytes // np.dtype(np.float32).itemsize * 5), dtype=np.float32)
-    assert b.nbytes > minimal_segment_size_bytes
-    c = np.zeros(int(minimal_segment_size_bytes // np.dtype(np.float32).itemsize * 0.75), dtype=np.float32)
-    assert c.nbytes < minimal_segment_size_bytes
-    tensors = [a, b, c]
-    tensors_ids = tensor_store.put(tensors)
-    assert len(tensors) == len(tensors_ids)
-    for tensor, tensor_id in zip(tensors, tensors_ids):
-        tensor_retrieved = tensor_store.get(tensor_id)
-        np.testing.assert_equal(tensor, tensor_retrieved)
+@pytest.mark.parametrize(
+    "tensors, n_times",
+    (
+        # different dtypes
+        (
+            [
+                np.zeros((10, 10), dtype=np.float32),
+                np.array([b"foo", b"longer_bar"]),
+                np.array([b"foo", b"longer_bar"], dtype=object),
+            ],
+            1,
+        ),
+        # case when tensors are larger than minimal segment size
+        (
+            [
+                np.zeros(
+                    (_DataBlocksServer._minimal_segment_size // np.dtype(np.float32).itemsize * 3,), dtype=np.float32
+                ),
+                np.zeros(
+                    (_DataBlocksServer._minimal_segment_size // np.dtype(np.float32).itemsize * 5), dtype=np.float32
+                ),
+                np.zeros(
+                    int(_DataBlocksServer._minimal_segment_size // np.dtype(np.float32).itemsize * 0.75),
+                    dtype=np.float32,
+                ),
+            ],
+            1,
+        ),
+        # size match exactly single segment, thus free_blocks should be empty
+        (
+            [
+                np.zeros(
+                    (
+                        (_DataBlocksServer._minimal_segment_size - _flat_array_header_size)
+                        // np.dtype(np.int8).itemsize,
+                    ),
+                    dtype=np.int8,
+                ),
+            ],
+            2,
+        ),
+    ),
+)
+def test_tensor_store_get_put_equal(tensor_store, tensors, n_times):
+    for _ in range(n_times):
+        tensors_ids = tensor_store.put(tensors)
+        assert len(tensors) == len(tensors_ids)
+        for tensor, tensor_id in zip(tensors, tensors_ids):
+            tensor_retrieved = tensor_store.get(tensor_id)
+            np.testing.assert_equal(tensor, tensor_retrieved)
