@@ -71,34 +71,31 @@ def _infer_gen_fn(*_, **__):
 
 def _get_meta_requests_payload(_data_store_socket):
     tensor_store = TensorStore(_data_store_socket)
-    try:
-        LOGGER.debug(f"Connecting to tensor store {_data_store_socket} ...")
-        tensor_store.connect()  # to already started tensor store
-        requests = [
-            Request({"input1": np.ones((128, 4), dtype="float32"), "input2": np.ones((128, 4), dtype="float32")}),
-            Request({"input1": np.ones((128, 4), dtype="float32"), "input2": np.ones((128, 4), dtype="float32")}),
-        ]
-        input_arrays_with_coords = [
-            (request_idx, input_name, tensor)
-            for request_idx, request in enumerate(requests)
-            for input_name, tensor in request.items()
-        ]
-        LOGGER.debug("Putting tensors to tensor store ...")
-        tensor_ids = tensor_store.put([tensor for _, _, tensor in input_arrays_with_coords])
-        requests_with_ids = [{}] * len(requests)
-        for (request_idx, input_name, _), tensor_id in zip(input_arrays_with_coords, tensor_ids):
-            requests_with_ids[request_idx][input_name] = tensor_id
+    LOGGER.debug(f"Connecting to tensor store {_data_store_socket} ...")
+    tensor_store.connect()  # to already started tensor store
+    requests = [
+        Request({"input1": np.ones((128, 4), dtype="float32"), "input2": np.ones((128, 4), dtype="float32")}),
+        Request({"input1": np.ones((128, 4), dtype="float32"), "input2": np.ones((128, 4), dtype="float32")}),
+    ]
+    input_arrays_with_coords = [
+        (request_idx, input_name, tensor)
+        for request_idx, request in enumerate(requests)
+        for input_name, tensor in request.items()
+    ]
+    LOGGER.debug("Putting tensors to tensor store ...")
+    tensor_ids = tensor_store.put([tensor for _, _, tensor in input_arrays_with_coords])
+    requests_with_ids = [{}] * len(requests)
+    for (request_idx, input_name, _), tensor_id in zip(input_arrays_with_coords, tensor_ids):
+        requests_with_ids[request_idx][input_name] = tensor_id
 
-        meta_requests = InferenceHandlerRequests(
-            requests=[
-                MetaRequestResponse(idx, data=request_with_ids, parameters=request.parameters)
-                for idx, (request, request_with_ids) in enumerate(zip(requests, requests_with_ids))
-            ]
-        )
-        LOGGER.debug(f"Return meta requests: {meta_requests}")
-        return meta_requests.as_bytes()
-    finally:
-        tensor_store.close()
+    meta_requests = InferenceHandlerRequests(
+        requests=[
+            MetaRequestResponse(idx, data=request_with_ids, parameters=request.parameters)
+            for idx, (request, request_with_ids) in enumerate(zip(requests, requests_with_ids))
+        ]
+    )
+    LOGGER.debug(f"Return meta requests: {meta_requests}")
+    return meta_requests.as_bytes()
 
 
 @pytest.mark.parametrize(
