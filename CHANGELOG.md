@@ -16,6 +16,14 @@ limitations under the License.
 
 # Changelog
 
+## Unreleased
+
+- Change: `@batch` decorator raises a `ValueError` if any of the outputs have a different batch size than expected.
+
+[//]: <> (put here on external component update with short summary what change or link to changelog)
+
+- Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.36.0](https://github.com/triton-inference-server/server/releases/tag/v2.36.0)
+
 ## 0.3.1 (2023-09-26)
 
 - Change: `KeyboardInterrupt` is now handled in `triton.serve()`. PyTriton hosting scripts return an exit code of 0 instead of 130 when they receive a SIGINT signal.

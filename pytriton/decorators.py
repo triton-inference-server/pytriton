@@ -182,6 +182,11 @@ def batch(wrapped, instance, args, kwargs):
     received by Triton server.
     We assume that each request has the same set of keys (you can use group_by_keys decorator before
     using @batch decorator if your requests may have different set of keys).
+
+    Raises:
+        PyTritonValidationError: If the requests have different set of keys.
+        ValueError: If the output tensors have different than expected batch sizes. Expected batch size is
+            calculated as a sum of batch sizes of all requests.
     """
     req_list = args[0]
     input_names = req_list[0].keys()
@@ -204,12 +209,23 @@ def batch(wrapped, instance, args, kwargs):
         outputs = convert_output(_result, wrapped, instance)
         output_names = outputs.keys()
 
+        requests_total_batch_size = sum(get_inference_request_batch_size(req) for req in req_list)
+        not_matching_tensors_shapes = {
+            output_name: output_tensor.shape
+            for output_name, output_tensor in outputs.items()
+            if output_tensor.shape[0] != requests_total_batch_size
+        }
+        if not_matching_tensors_shapes:
+            raise ValueError(
+                f"Received output tensors with different batch sizes: {', '.join(': '.join(map(str, item)) for item in not_matching_tensors_shapes.items())}. "
+                f"Expected batch size: {requests_total_batch_size}. "
+            )
+
         out_list = []
         start_idx = 0
         for request in req_list:
             # get batch_size of first input for each request - assume that all inputs have same batch_size
-            first_input = next(iter(request.values()))
-            request_batch_size = first_input.shape[0]
+            request_batch_size = get_inference_request_batch_size(request)
             req_output_dict = {}
             for _output_ind, output_name in enumerate(output_names):
                 req_output = outputs[output_name][start_idx : start_idx + request_batch_size, ...]

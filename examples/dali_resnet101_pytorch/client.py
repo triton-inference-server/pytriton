@@ -15,6 +15,7 @@
 
 import argparse
 import logging
+import pathlib
 
 import numpy as np  # pytype: disable=import-error
 
@@ -33,15 +34,17 @@ def infer_model(input, args):
     with ModelClient(args.url, "ResNet101", init_timeout_s=args.init_timeout_s) as client:
         result_data = client.infer_batch(input)
 
-        original = result_data["original"]
-        segmented = result_data["segmented"]
+        original_batch = result_data["original"]
+        segmented_batch = result_data["segmented"]
 
         if args.dump_images:
-            for i, (orig, segm) in enumerate(zip(original, segmented)):
-                import cv2  # pytype: disable=import-error
+            pathlib.Path("test_video").mkdir(parents=True, exist_ok=True)
+            for batch_idx, (original, segmented) in enumerate(zip(original_batch, segmented_batch)):
+                for frame_idx, (orig, segm) in enumerate(zip(original, segmented)):
+                    import cv2  # pytype: disable=import-error
 
-                cv2.imwrite(f"test_video/orig{i}.jpg", orig)
-                cv2.imwrite(f"test_video/segm{i}.jpg", segm)
+                    cv2.imwrite(f"test_video/orig_{batch_idx:03d}_{frame_idx:04d}.jpg", orig)
+                    cv2.imwrite(f"test_video/segm_{batch_idx:03d}_{frame_idx:04d}.jpg", segm)
 
         logger.info("Processing finished.")
 

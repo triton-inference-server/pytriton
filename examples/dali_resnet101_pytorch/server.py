@@ -111,10 +111,11 @@ segmentation = SegmentationPyTorch(
 
 
 @batch
-def _infer_fn(**enc):
-    enc = enc["video"]
+def _infer_fn(**inputs):
+    encoded_video = inputs["video"]
 
-    image, input = preprocess(enc)
+    image, input = preprocess(encoded_video)
+    batch_size, frames_num = image.shape[:2]
 
     input = input.reshape(-1, *input.shape[-3:])  # NFCHW to NCHW (flattening first two dimensions)
     image = image.reshape(-1, *image.shape[-3:])  # NFHWC to NHWC (flattening first two dimensions)
@@ -123,8 +124,8 @@ def _infer_fn(**enc):
     out = postprocess(image, prob)
 
     return {
-        "original": image.cpu().numpy(),
-        "segmented": out.as_cpu().as_array(),
+        "original": image.cpu().numpy().reshape(batch_size, frames_num, *image.shape[-3:]),
+        "segmented": out.as_cpu().as_array().reshape(batch_size, frames_num, *image.shape[-3:]),
     }
 
 
@@ -148,8 +149,8 @@ def main():
                 Tensor(name="video", dtype=np.uint8, shape=(-1,)),  # Encoded video
             ],
             outputs=[
-                Tensor(name="original", dtype=np.uint8, shape=(-1, -1, -1)),
-                Tensor(name="segmented", dtype=np.uint8, shape=(-1, -1, -1)),
+                Tensor(name="original", dtype=np.uint8, shape=(-1, -1, -1, -1)),  # FHWC
+                Tensor(name="segmented", dtype=np.uint8, shape=(-1, -1, -1, -1)),  # FHWC
             ],
             config=ModelConfig(
                 max_batch_size=MAX_BATCH_SIZE,

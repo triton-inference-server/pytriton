@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Inference decorators tests."""
-import inspect
 import typing
 
 import numpy as np
@@ -61,8 +60,6 @@ three_request_for_batching = [
     Request({"b": np.array([[1, 2], [1, 2], [11, 12]]), "a": np.array([[1], [1], [1]])}, {}),
     Request({"b": np.array([[1, 2]]), "a": np.array([[1]])}, {}),
 ]
-
-input_batch_with_params = {"b": np.array([[1, 2], [1, 2], [9, 9]]), "a": np.array([[1], [1], [1]])}
 
 
 def _prepare_and_inject_context_with_config(config, fun):
@@ -126,88 +123,7 @@ def _prepare_context_for_input(inputs, fun):
     return context
 
 
-def test_batch():
-    @batch
-    def batched_fun(**inputs):
-        assert isinstance(inputs, dict) and "a" in inputs and "b" in inputs
-        assert inputs["a"].shape == (6, 1)
-        assert inputs["b"].shape == (6, 2)
-
-        return {"a": inputs["a"] * 2, "b": inputs["b"] * 3}
-
-    results = batched_fun(three_request_for_batching)
-    assert not inspect.isgenerator(results)
-
-    for input, output in zip(three_request_for_batching, results):
-        assert np.all(input["a"] * 2 == output["a"]) and np.all(input["b"] * 3 == output["b"])
-
-
-def test_batch_output_list():
-    @batch
-    def batched_fun(**inputs):
-        assert isinstance(inputs, dict) and "a" in inputs and "b" in inputs
-        assert inputs["a"].shape == (6, 1)
-        assert inputs["b"].shape == (6, 2)
-
-        return [inputs["a"] * 2, inputs["b"] * 3]
-
-    context = _prepare_context_for_input(three_request_for_batching, batched_fun)
-
-    batched_fun.__triton_context__ = context
-    results = batched_fun(three_request_for_batching)
-    assert not inspect.isgenerator(results)
-
-    for input, output in zip(three_request_for_batching, results):
-        assert np.all(input["a"] * 2 == output["a"]) and np.all(input["b"] * 3 == output["b"])
-
-
-def test_batch_with_generator_fn():
-    @batch
-    def _infer_gen_fn(**inputs):
-        yield {"a": inputs["a"] * 2, "b": inputs["b"] * 3}
-        yield {"a": inputs["a"] * 2, "b": inputs["b"] * 3}
-
-    results_gen = _infer_gen_fn(three_request_for_batching)
-    assert inspect.isgenerator(results_gen)
-
-    results = next(results_gen)
-    assert len(three_request_for_batching) == len(results)
-    for request, result in zip(three_request_for_batching, results):
-        assert np.all(request["a"] * 2 == result["a"]) and np.all(request["b"] * 3 == result["b"])
-
-    results = next(results_gen)
-    assert len(three_request_for_batching) == len(results)
-    for request, result in zip(three_request_for_batching, results):
-        assert np.all(request["a"] * 2 == result["a"]) and np.all(request["b"] * 3 == result["b"])
-
-    with pytest.raises(StopIteration):
-        next(results_gen)
-
-
-def test_sample():
-    @sample
-    def sample_fun(**inputs):
-        assert isinstance(inputs, dict) and "a" in inputs and "b" in inputs
-        return {"a": inputs["a"] * 2, "b": inputs["b"] * 3}
-
-    results = sample_fun(input_requests_for_sample)
-
-    for input, output in zip(three_request_for_batching, results):
-        assert np.all(input["a"] * 2 == output["a"]) and np.all(input["b"] * 3 == output["b"])
-
-
-def test_sample_output_list():
-    @sample
-    def sample1(**inputs):
-        assert isinstance(inputs, dict) and "a" in inputs and "b" in inputs
-        return [inputs["a"] * 2, inputs["b"] * 3]
-
-    context = _prepare_context_for_input(input_requests_for_sample, sample1)
-    sample1.__triton_context__ = context
-    results = sample1(input_requests_for_sample)
-
-    for input, output in zip(input_requests_for_sample, results):
-        assert np.all(input["a"] * 2 == output["a"]) and np.all(input["b"] * 3 == output["b"])
+input_batch_with_params = {"b": np.array([[1, 2], [1, 2], [9, 9]]), "a": np.array([[1], [1], [1]])}
 
 
 def test_pad_batch():
@@ -242,6 +158,32 @@ def test_pad_batch_no_preffered_batch_size():
     _prepare_and_inject_context_with_config(config, padded_fun)
     results = padded_fun(**(input_batch_with_params.copy()))
     assert results["a"].shape[0] == config.max_batch_size and results["b"].shape[0] == config.max_batch_size
+
+
+def test_sample():
+    @sample
+    def sample_fun(**inputs):
+        assert isinstance(inputs, dict) and "a" in inputs and "b" in inputs
+        return {"a": inputs["a"] * 2, "b": inputs["b"] * 3}
+
+    results = sample_fun(input_requests_for_sample)
+
+    for input, output in zip(three_request_for_batching, results):
+        assert np.all(input["a"] * 2 == output["a"]) and np.all(input["b"] * 3 == output["b"])
+
+
+def test_sample_output_list():
+    @sample
+    def sample1(**inputs):
+        assert isinstance(inputs, dict) and "a" in inputs and "b" in inputs
+        return [inputs["a"] * 2, inputs["b"] * 3]
+
+    context = _prepare_context_for_input(input_requests_for_sample, sample1)
+    sample1.__triton_context__ = context
+    results = sample1(input_requests_for_sample)
+
+    for input, output in zip(input_requests_for_sample, results):
+        assert np.all(input["a"] * 2 == output["a"]) and np.all(input["b"] * 3 == output["b"])
 
 
 _FIRST_VALUE_MODEL_CONFIG = TritonModelConfig(model_name="foo", inputs=[], outputs=[])

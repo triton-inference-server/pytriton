@@ -114,11 +114,13 @@ class OnlineLearning(threading.Thread):
         with self.lock:
             self.infer_model.load_state_dict(self.trained_model.state_dict())
 
-    @batch
-    def train(self, image, target):
+    def train(self, requests):
         """Train function is used in training endpoint."""
-        self.train_data_queue.put((image.copy(), target.copy()))
-        return {"last_loss": np.array([[self.last_loss]]).astype(np.float32)}
+        # concatenate all requests into one batch. No need for padding due to fixed image dimensions
+        images = np.concatenate([request["image"] for request in requests], axis=0)
+        targets = np.concatenate([request["target"] for request in requests], axis=0)
+        self.train_data_queue.put((images, targets))
+        return [{"last_loss": np.array([[self.last_loss]]).astype(np.float32)} for _ in requests]
 
     @batch
     def infer(self, image):
