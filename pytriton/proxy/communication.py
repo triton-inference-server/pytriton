@@ -787,21 +787,21 @@ class TensorStore:
                 frame = memoryview(frame)
 
             assert frame.contiguous, "Only contiguous arrays are supported"
-            struct.pack_into("<I", shm.buf, offset + total_size, frame.nbytes)
+            struct.pack_into("<I", shm.buf, offset + total_size, frame.nbytes)  # pytype: disable=wrong-arg-types
             total_size += struct.calcsize("<I")
             shm.buf[offset + total_size : offset + total_size + frame.nbytes] = frame.cast("B")
 
             total_size += frame.nbytes
 
-        struct.pack_into("<I", shm.buf, offset, total_size)
+        struct.pack_into("<I", shm.buf, offset, total_size)  # pytype: disable=wrong-arg-types
         return total_size
 
     def _handle_frames(self, shm: multiprocessing.shared_memory.SharedMemory, block_offset: int) -> List[memoryview]:
         frames = []
-        (total_size,) = struct.unpack_from("<I", shm.buf, block_offset)
+        (total_size,) = struct.unpack_from("<I", shm.buf, block_offset)  # pytype: disable=wrong-arg-types
         offset = struct.calcsize("<I")
         while offset < total_size:
-            (frame_size,) = struct.unpack_from("<I", shm.buf, block_offset + offset)
+            (frame_size,) = struct.unpack_from("<I", shm.buf, block_offset + offset)  # pytype: disable=wrong-arg-types
             offset += struct.calcsize("<I")
             frame = shm.buf[block_offset + offset : block_offset + offset + frame_size]
             offset += frame_size
