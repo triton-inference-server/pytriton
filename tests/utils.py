@@ -21,6 +21,7 @@ import select
 import socket
 import subprocess
 import threading
+import typing
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_LOG_FORMAT = "%(asctime)s - %(levelname)8s - %(process)8d - %(threadName)s - %(name)s: %(message)s"
@@ -90,7 +91,9 @@ class ScriptThread(threading.Thread):
         self.join()
         self._process_spawned_or_spawn_error_flag = None
 
-    def start(self, flag: threading.Event) -> None:
+    def start(self, flag: typing.Optional[threading.Event] = None) -> None:
+        if flag is None:
+            flag = threading.Event()
         self._logger.info(f"Starting {self.name} script with \"{' '.join(self.cmd)}\" cmd")
         self._process_spawned_or_spawn_error_flag = flag
         super().start()
