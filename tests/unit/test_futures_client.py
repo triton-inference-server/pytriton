@@ -14,8 +14,10 @@
 import logging
 from threading import Thread
 
+import gevent
 import numpy as np
 import pytest
+from gevent.hub import Hub as GeventHub
 
 from pytriton.client import FuturesModelClient, ModelClient
 from pytriton.client.exceptions import (
@@ -76,7 +78,10 @@ def test_wait_for_model_passes_timeout_to_client(mocker):
     spy_client_close = mocker.spy(ModelClient, ModelClient.close.__name__)
     mock_client_wait_for_model = mocker.patch.object(ModelClient, ModelClient.wait_for_model.__name__)
     mock_client_wait_for_model.return_value = True
-    spy__thread_start = mocker.spy(Thread, Thread.start.__name__)
+    spy_thread_start = mocker.spy(Thread, Thread.start.__name__)
+    spy_thread_join = mocker.spy(Thread, Thread.join.__name__)
+    spy_get_hub = mocker.spy(gevent, gevent.get_hub.__name__)
+    spy_hub_destroy = mocker.spy(GeventHub, GeventHub.destroy.__name__)
     with FuturesModelClient(
         GRPC_LOCALHOST_URL,
         ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
@@ -88,7 +93,10 @@ def test_wait_for_model_passes_timeout_to_client(mocker):
         assert result is True
     spy_client_close.assert_called_once()
     mock_client_wait_for_model.assert_called_with(15)
-    spy__thread_start.assert_called_once()
+    spy_thread_start.assert_called_once()
+    spy_thread_join.assert_called_once()
+    spy_get_hub.assert_called_once()
+    spy_hub_destroy.assert_called_once()
 
 
 @patch_server_model_addsub_no_batch_ready

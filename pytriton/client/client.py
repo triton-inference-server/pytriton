@@ -28,6 +28,7 @@ Mixing of argument passing conventions is not supported and will raise PyTritonC
 """
 
 import asyncio
+import contextlib
 import itertools
 import logging
 import socket
@@ -1151,6 +1152,15 @@ class AsyncioModelClient(BaseModelClient):
         return kwargs
 
 
+@contextlib.contextmanager
+def _hub_context():
+    hub = gevent.get_hub()
+    try:
+        yield hub
+    finally:
+        hub.destroy()
+
+
 _INIT = "init"
 _WAIT_FOR_MODEL = "wait_for_model"
 _MODEL_CONFIG = "model_config"
@@ -1192,7 +1202,7 @@ class FuturesModelClient:
             url: The Triton Inference Server url, e.g. `grpc://localhost:8001`.
             model_name: The name of the model to interact with.
             model_version: The version of the model to interact with. If None, the latest version will be used.
-            max_workers: The maximum number of threads that can be used to execute the given calls. If None, the `min(32, os.cpu_count() + 4)` number of threads will be used.
+            max_workers: The maximum number of threads that can be used to execute the given calls. If None, there is not limit on the number of threads.
             init_timeout_s: Timeout in seconds for server and model being ready. If non passed default 60 seconds timeout will be used.
             inference_timeout_s: Timeout in seconds for the single model inference request. If non passed default 60 seconds timeout will be used.
         """
@@ -1431,36 +1441,36 @@ class FuturesModelClient:
         _LOGGER.debug("Starting worker thread")
         # Work around for AttributeError: '_Threadlocal' object has no attribute 'hub'
         # gevent/_hub_local.py", line 77, in gevent._gevent_c_hub_local.get_hub_noargs
-        gevent.get_hub()
-        while True:
-            future, request, name = self._queue.get()
-            if future == _CLOSE:
-                _LOGGER.debug("Closing thread")
-                self._queue.task_done()
-                break
-            if future == _INIT:
-                continue
-            try:
-                client = self._create_client(name == _WAIT_FOR_MODEL)
-                with client:
-                    while True:
-                        try:
-                            result = self._client_request_executor(client, request, name)
-                            _LOGGER.debug(f"Finished {name} for {self._model_name}")
-                            future.set_result(result)
-                            self._queue.task_done()
-                        except Exception as e:
-                            _LOGGER.error(f"Error {e} occurred during {name} for {self._model_name}")
-                            future.set_exception(e)
-                            self._queue.task_done()
-                            break
-                        future, request, name = self._queue.get()
-                        if future == _CLOSE:
-                            _LOGGER.debug("Closing thread")
-                            self._queue.task_done()
-                            return
-            except Exception as e:
-                _LOGGER.error(f"Error {e} occurred during {name} for {self._model_name}")
-                future.set_exception(e)
-                self._queue.task_done()
+        with _hub_context():
+            while True:
+                future, request, name = self._queue.get()
+                if future == _CLOSE:
+                    _LOGGER.debug("Closing thread")
+                    self._queue.task_done()
+                    break
+                if future == _INIT:
+                    continue
+                try:
+                    client = self._create_client(name == _WAIT_FOR_MODEL)
+                    with client:
+                        while True:
+                            try:
+                                result = self._client_request_executor(client, request, name)
+                                _LOGGER.debug(f"Finished {name} for {self._model_name}")
+                                future.set_result(result)
+                                self._queue.task_done()
+                            except Exception as e:
+                                _LOGGER.error(f"Error {e} occurred during {name} for {self._model_name}")
+                                future.set_exception(e)
+                                self._queue.task_done()
+                                break
+                            future, request, name = self._queue.get()
+                            if future == _CLOSE:
+                                _LOGGER.debug("Closing thread")
+                                self._queue.task_done()
+                                return
+                except Exception as e:
+                    _LOGGER.error(f"Error {e} occurred during {name} for {self._model_name}")
+                    future.set_exception(e)
+                    self._queue.task_done()
         _LOGGER.debug("Finishing worker thread")

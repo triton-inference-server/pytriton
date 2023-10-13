@@ -19,6 +19,7 @@ limitations under the License.
 ## Unreleased
 
 - Change: `@batch` decorator raises a `ValueError` if any of the outputs have a different batch size than expected.
+- fix: gevent resources leak in ``FuturesModelClient``
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 
