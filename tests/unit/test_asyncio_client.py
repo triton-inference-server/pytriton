@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-# import time
 
 import gc
 import logging
@@ -27,11 +25,10 @@ from tritonclient.grpc.aio import InferenceServerClient as AsyncioGrpcInferenceS
 from tritonclient.http.aio import InferenceServerClient as AsyncioHttpInferenceServerClient
 
 from pytriton.client import AsyncioModelClient
-from pytriton.client.asyncio_utils import ModelState, asyncio_wait_for_model_ready
-from pytriton.client.exceptions import (  # PyTritonClientUrlParseError,
+from pytriton.client.asyncio_utils import asyncio_wait_for_model_ready
+from pytriton.client.exceptions import (
     PyTritonClientInvalidUrlError,
     PyTritonClientModelDoesntSupportBatchingError,
-    PyTritonClientModelUnavailableError,
     PyTritonClientTimeoutError,
     PyTritonClientValueError,
 )
@@ -78,26 +75,6 @@ async def test_utils_asyncio_wait_for_model_ready_http_client_not_ready_server(m
 @pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_utils_asyncio_wait_for_model_ready_http_client_not_live_server(mocker):
     patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient, live_server=False)
-
-    triton_client = AsyncioHttpInferenceServerClient(url=HTTP_LOCALHOST_URL_NO_SCHEME, verbose=False)
-    try:
-        with pytest.raises(PyTritonClientTimeoutError):
-            await asyncio_wait_for_model_ready(
-                asyncio_client=triton_client,
-                model_name=ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
-                model_version=str(ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_version),
-                timeout_s=1,
-            )
-    finally:
-        await triton_client.close()
-
-
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
-async def test_utils_asyncio_wait_for_model_ready_http_client_model_loading(mocker):
-    patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
-    patch_http_client__model_up_and_ready(
-        mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG, AsyncioHttpInferenceServerClient, state=ModelState.LOADING
-    )
 
     triton_client = AsyncioHttpInferenceServerClient(url=HTTP_LOCALHOST_URL_NO_SCHEME, verbose=False)
     try:
@@ -180,66 +157,45 @@ async def test_async_http_client_init_obtain_expected_model_config_when_lazy_ini
 
 
 @pytest.mark.async_timeout(_MAX_TEST_TIME)
-async def test_async_http_client_init_raises_error_when_requested_unavailable_model_and_non_lazy_init_called(mocker):
-    patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
-    mock_get_repo_index = mocker.patch.object(
-        AsyncioHttpInferenceServerClient, AsyncioHttpInferenceServerClient.get_model_repository_index.__name__
-    )
-    mock_get_repo_index.return_value = [{"name": "OtherName", "version": "1", "state": "READY", "reason": ""}]
-
-    with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
-        async with AsyncioModelClient(HTTP_LOCALHOST_URL, "NotExistentModel", lazy_init=False, init_timeout_s=1) as _:
-            pass
-
-    with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
-        async with AsyncioModelClient(
-            HTTP_LOCALHOST_URL, "OtherName", "2", lazy_init=False, init_timeout_s=1
-        ) as _:  # pytype: disable=wrong-arg-types
-            pass
-
-
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_http_client_model_config_raises_error_when_requested_unavailable_model(mocker):
     patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
-    mock_get_repo_index = mocker.patch.object(
-        AsyncioHttpInferenceServerClient, AsyncioHttpInferenceServerClient.get_model_repository_index.__name__
-    )
-    mock_get_repo_index.return_value = [{"name": "OtherName", "version": "1", "state": "READY", "reason": ""}]
 
-    with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
-        async with AsyncioModelClient(HTTP_LOCALHOST_URL, "NonExistentModel") as client:
+    mocker.patch.object(
+        AsyncioHttpInferenceServerClient, AsyncioHttpInferenceServerClient.is_model_ready.__name__
+    ).return_value = False
+
+    with pytest.raises(PyTritonClientTimeoutError, match="Timeout while waiting for model"):
+        async with AsyncioModelClient(HTTP_LOCALHOST_URL, "NonExistentModel", init_timeout_s=1) as client:
             _ = await client.model_config
 
-    with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
-        async with AsyncioModelClient(HTTP_LOCALHOST_URL, "OtherName", "2") as client:
+    with pytest.raises(PyTritonClientTimeoutError, match="Timeout while waiting for model"):
+        async with AsyncioModelClient(HTTP_LOCALHOST_URL, "OtherName", "2", init_timeout_s=1) as client:
             _ = await client.model_config
 
 
 @pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_http_client_infer_raises_error_when_requested_unavailable_model(mocker):
     patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
-    mock_get_repo_index = mocker.patch.object(
-        AsyncioHttpInferenceServerClient, AsyncioHttpInferenceServerClient.get_model_repository_index.__name__
-    )
-    mock_get_repo_index.return_value = [{"name": "OtherName", "version": "1", "state": "READY", "reason": ""}]
-
+    mocker.patch.object(
+        AsyncioHttpInferenceServerClient, AsyncioHttpInferenceServerClient.is_model_ready.__name__
+    ).return_value = False
     a = np.array([1], dtype=np.float32)
     b = np.array([1], dtype=np.float32)
 
-    with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
-        async with AsyncioModelClient(HTTP_LOCALHOST_URL, "NonExistentModel") as client:
+    with pytest.raises(PyTritonClientTimeoutError, match="Timeout while waiting for model"):
+        async with AsyncioModelClient(HTTP_LOCALHOST_URL, "NonExistentModel", init_timeout_s=1) as client:
             _ = await client.infer_sample(a, b)
 
-    with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
-        async with AsyncioModelClient(HTTP_LOCALHOST_URL, "NonExistentModel") as client:
+    with pytest.raises(PyTritonClientTimeoutError, match="Timeout while waiting for model"):
+        async with AsyncioModelClient(HTTP_LOCALHOST_URL, "NonExistentModel", init_timeout_s=1) as client:
             _ = await client.infer_batch(a, b)
 
-    with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
-        async with AsyncioModelClient(HTTP_LOCALHOST_URL, "OtherName", "2") as client:
+    with pytest.raises(PyTritonClientTimeoutError, match="Timeout while waiting for model"):
+        async with AsyncioModelClient(HTTP_LOCALHOST_URL, "OtherName", "2", init_timeout_s=1) as client:
             _ = await client.infer_sample(a, b)
 
-    with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
-        async with AsyncioModelClient(HTTP_LOCALHOST_URL, "OtherName", "2") as client:
+    with pytest.raises(PyTritonClientTimeoutError, match="Timeout while waiting for model"):
+        async with AsyncioModelClient(HTTP_LOCALHOST_URL, "OtherName", "2", init_timeout_s=1) as client:
             _ = await client.infer_batch(a, b)
 
 
@@ -604,40 +560,18 @@ async def test_async_grpc_client_non_lazy_aenter_failure_model_non_ready(mocker)
 
 
 @pytest.mark.async_timeout(_MAX_TEST_TIME)
-async def test_async_grpc_client_non_lazy_aenter_failure_model_state_loading(mocker):
-    model_config = ADD_SUB_WITH_BATCHING_MODEL_CONFIG
-
-    _LOGGER.debug("Entering timeout 0.2")
-    async with async_timeout.timeout(0.2):
-        _LOGGER.debug("Creating client")
-        client = AsyncioModelClient(GRPC_LOCALHOST_URL, model_config.model_name, init_timeout_s=0.1, lazy_init=False)
-        _LOGGER.debug("Before patching")
-        patch_client__server_up_and_ready(mocker, AsyncioGrpcInferenceServerClient)
-        patch_grpc_client__model_up_and_ready(mocker, model_config, AsyncioGrpcInferenceServerClient, state="LOADING")
-        _LOGGER.debug("Entering client")
-        with pytest.raises(PyTritonClientTimeoutError):
-            await client.__aenter__()
-            _LOGGER.debug("Exiting client without error")
-        _LOGGER.debug("Exited client with error")
-
-    _LOGGER.debug("Exited timeout 0.2")
-
-
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_grpc_client_non_lazy_aenter_failure_model_state_unavailable(mocker):
     model_config = ADD_SUB_WITH_BATCHING_MODEL_CONFIG
 
-    _LOGGER.debug("Entering timeout 0.2")
-    async with async_timeout.timeout(0.2):
+    _LOGGER.debug("Entering timeout 2")
+    async with async_timeout.timeout(2):
         _LOGGER.debug("Creating client")
-        client = AsyncioModelClient(GRPC_LOCALHOST_URL, model_config.model_name, init_timeout_s=30, lazy_init=False)
+        client = AsyncioModelClient(GRPC_LOCALHOST_URL, model_config.model_name, init_timeout_s=1, lazy_init=False)
         _LOGGER.debug("Before patching")
         patch_client__server_up_and_ready(mocker, AsyncioGrpcInferenceServerClient)
-        patch_grpc_client__model_up_and_ready(
-            mocker, model_config, AsyncioGrpcInferenceServerClient, state="UNAVAILABLE"
-        )
+        patch_grpc_client__model_up_and_ready(mocker, model_config, AsyncioGrpcInferenceServerClient, ready=False)
         _LOGGER.debug("Entering client")
-        with pytest.raises(PyTritonClientModelUnavailableError):
+        with pytest.raises(PyTritonClientTimeoutError):
             await client.__aenter__()
             _LOGGER.debug("Exiting client without error")
         _LOGGER.debug("Exited client with error")
@@ -649,15 +583,15 @@ async def test_async_grpc_client_non_lazy_aenter_failure_model_state_unavailable
 async def test_async_grpc_client_non_lazy_aenter_failure_model_incorrect_name(mocker):
     model_config = ADD_SUB_WITH_BATCHING_MODEL_CONFIG
 
-    _LOGGER.debug("Entering timeout 0.2")
-    async with async_timeout.timeout(0.2):
+    _LOGGER.debug("Entering timeout 2")
+    async with async_timeout.timeout(2):
         _LOGGER.debug("Creating client")
-        client = AsyncioModelClient(GRPC_LOCALHOST_URL, "DUMMY", init_timeout_s=30, lazy_init=False)
+        client = AsyncioModelClient(GRPC_LOCALHOST_URL, "DUMMY", init_timeout_s=1, lazy_init=False)
         _LOGGER.debug("Before patching")
         patch_client__server_up_and_ready(mocker, AsyncioGrpcInferenceServerClient)
         patch_grpc_client__model_up_and_ready(mocker, model_config, AsyncioGrpcInferenceServerClient)
         _LOGGER.debug("Entering client")
-        with pytest.raises(PyTritonClientModelUnavailableError):
+        with pytest.raises(PyTritonClientTimeoutError):
             await client.__aenter__()
             _LOGGER.debug("Exiting client without error")
         _LOGGER.debug("Exited client with error")
@@ -669,17 +603,17 @@ async def test_async_grpc_client_non_lazy_aenter_failure_model_incorrect_name(mo
 async def test_async_grpc_client_non_lazy_aenter_failure_model_incorrect_version(mocker):
     model_config = ADD_SUB_WITH_BATCHING_MODEL_CONFIG
 
-    _LOGGER.debug("Entering timeout 0.2")
-    async with async_timeout.timeout(0.2):
+    _LOGGER.debug("Entering timeout 2")
+    async with async_timeout.timeout(2):
         _LOGGER.debug("Creating client")
         client = AsyncioModelClient(
-            GRPC_LOCALHOST_URL, model_config.model_name, model_version="2", init_timeout_s=30, lazy_init=False
+            GRPC_LOCALHOST_URL, model_config.model_name, model_version="2", init_timeout_s=1, lazy_init=False
         )
         _LOGGER.debug("Before patching")
         patch_client__server_up_and_ready(mocker, AsyncioGrpcInferenceServerClient)
         patch_grpc_client__model_up_and_ready(mocker, model_config, AsyncioGrpcInferenceServerClient)
         _LOGGER.debug("Entering client")
-        with pytest.raises(PyTritonClientModelUnavailableError):
+        with pytest.raises(PyTritonClientTimeoutError):
             await client.__aenter__()
             _LOGGER.debug("Exiting client without error")
         _LOGGER.debug("Exited client with error")

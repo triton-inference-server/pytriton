@@ -31,16 +31,15 @@ import json
 import logging
 import os
 import pathlib
-import re
 import signal
 import sys
 import threading
 import traceback
 from typing import Callable, Dict, Literal, Optional, Sequence, Union
 
-from pytriton.constants import DEFAULT_GRPC_PORT, DEFAULT_HTTP_PORT, DEFAULT_METRICS_PORT, TRITON_LOCAL_IP
 from pytriton.utils.logging import silence_3rd_party_loggers
 
+from ..utils import endpoint_utils
 from .triton_server_config import TritonServerConfig
 
 LOGGER = logging.getLogger(__name__)
@@ -223,30 +222,7 @@ class TritonServer:
         Returns:
             endpoint url in form of {protocol}://{host}:{port}
         """
-        protocols = {"http": "http", "grpc": "grpc", "metrics": "http"}
-
-        def _obtain_address(key_names):
-            for key_name in key_names:
-                address = self._server_config[key_name]
-                if address and not re.match(r"^0+.0+.0+.0+$", address):
-                    break
-            else:
-                address = TRITON_LOCAL_IP
-
-            return address
-
-        addresses = {
-            "http": _obtain_address(["http-address"]),
-            "grpc": _obtain_address(["grpc-address"]),
-            "metrics": _obtain_address(["metrics-address", "http-address"]),
-        }
-        ports = {
-            "http": self._server_config["http-port"] or DEFAULT_HTTP_PORT,
-            "grpc": self._server_config["grpc-port"] or DEFAULT_GRPC_PORT,
-            "metrics": self._server_config["metrics-port"] or DEFAULT_METRICS_PORT,
-        }
-
-        return f"{protocols[endpoint]}://{addresses[endpoint]}:{ports[endpoint]}"
+        return endpoint_utils.get_endpoint(self._server_config, endpoint)
 
     def _record_logs(self, line: Union[bytes, str]) -> None:
         """Record logs obtained from server process. If verbose logging enabled, print the log into STDOUT.

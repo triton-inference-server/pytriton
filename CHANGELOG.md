@@ -18,6 +18,16 @@ limitations under the License.
 
 ## Unreleased
 
+- New: Remote Mode - PyTriton can be used to connect to a remote Triton Inference Server
+  - Introduced RemoteTriton class which can be used to connect to a remote Triton Inference Server
+    running on the same machine, by passing triton url.
+  - Changed Triton lifecycle - now the Triton Inference Server is started while entering the context.
+    This allows to load models dynamically to the running server while calling the bind method.
+    It is still allowed to create Triton instance without entering the context and bind models before starting
+    the server (in this case the models are lazy loaded when calling run or serve method like it worked before).
+  - In RemoteTriton class, calling __enter__ or connect method connects to triton server, so we can safely load models
+    while binding inference functions (if RemoteTriton is used without context manager, models are lazy loaded
+    when calling connect or serve method).
 - Change: `@batch` decorator raises a `ValueError` if any of the outputs have a different batch size than expected.
 - fix: gevent resources leak in ``FuturesModelClient``
 

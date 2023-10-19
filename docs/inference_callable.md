@@ -65,7 +65,7 @@ To use the inference callable with PyTriton, it must be bound to a Triton server
 
 <!--pytest-codeblocks:cont-->
 
-```python
+```python {"skip": true}
 import numpy as np
 from pytriton.triton import Triton
 from pytriton.model_config import ModelConfig, Tensor

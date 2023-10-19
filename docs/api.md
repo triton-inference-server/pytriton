@@ -22,6 +22,8 @@ limitations under the License.
 
 ::: pytriton.triton.Triton
 
+::: pytriton.triton.RemoteTriton
+
 ::: pytriton.model_config.tensor.Tensor
 
 ::: pytriton.model_config.common

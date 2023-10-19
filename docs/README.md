@@ -91,7 +91,7 @@ the way presented below:
 
 <!--pytest-codeblocks:cont-->
 
-```python
+```python {"skip": true}
 from pytriton.triton import Triton
 from pytriton.model_config import ModelConfig, Tensor
 
@@ -113,9 +113,8 @@ with Triton() as triton:
 At this point, you have defined how the model has to be handled by Triton and where the HTTP/gRPC requests for the model have
 to be directed. The last part for serving the model is to call the `serve` method on the Triton object:
 
-<!--pytest.mark.skip-->
 
-```python
+```python {"skip": true}
 with Triton() as triton:
     # ...
     triton.serve()
@@ -169,9 +168,8 @@ triton.bind(
 
 Finally, to run the model in background mode, use the `run` method:
 
-<!--pytest.mark.skip-->
 
-```python
+```python {"skip": true}
 triton.run()
 ```
 
@@ -180,9 +178,8 @@ When the `.run()` method is called on the `Triton` object, the inference queries
 
 The Triton server can be stopped at any time using the `stop` method:
 
-<!--pytest.mark.skip-->
 
-```python
+```python {"skip": true}
 triton.stop()
 ```
 

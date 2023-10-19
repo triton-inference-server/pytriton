@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -92,14 +92,8 @@ def patch_http_client__model_up_and_ready(
     mocker,
     model_config: TritonModelConfig,
     base_triton_client: _HttpTritonClientType,
-    state: str = "READY",
     ready: bool = True,
 ):
-    mock_get_repo_index = mocker.patch.object(
-        base_triton_client, base_triton_client.get_model_repository_index.__name__
-    )
-    mock_get_repo_index.return_value = [{"name": model_config.model_name, "version": "1", "state": state, "reason": ""}]
-
     mocker.patch.object(base_triton_client, base_triton_client.is_model_ready.__name__).return_value = ready
 
     model_config_dict = ModelConfigGenerator(model_config).get_config()
@@ -112,21 +106,15 @@ def patch_grpc_client__model_up_and_ready(
     model_config: TritonModelConfig,
     base_triton_client: _GrpcTritonClientType,
     ready: bool = True,
-    state: str = "READY",
 ):
+    def new_is_model_ready(model_name, model_version="", headers=None, parameters=None):
+        return (
+            ready
+            and model_name == model_config.model_name
+            and (model_version == "" or model_version == str(model_config.model_version))
+        )
 
-    mock_get_repo_index = mocker.patch.object(
-        base_triton_client, base_triton_client.get_model_repository_index.__name__
-    )
-    mock_get_repo_index.return_value = service_pb2.RepositoryIndexResponse(
-        models=[
-            service_pb2.RepositoryIndexResponse.ModelIndex(
-                name=model_config.model_name, version="1", state=state, reason=""
-            ),
-        ]
-    )
-
-    mocker.patch.object(base_triton_client, base_triton_client.is_model_ready.__name__).return_value = ready
+    mocker.patch.object(base_triton_client, base_triton_client.is_model_ready.__name__, side_effect=new_is_model_ready)
 
     model_config_dict = ModelConfigGenerator(model_config).get_config()
     model_config_protobuf = json_format.ParseDict(model_config_dict, model_config_pb2.ModelConfig())

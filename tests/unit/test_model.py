@@ -23,7 +23,6 @@ from pytriton.models.manager import ModelManager
 from pytriton.models.model import Model, ModelConfig
 from pytriton.proxy.communication import TensorStore
 from pytriton.proxy.types import Request
-from pytriton.server.model_repository import TritonModelRepository
 from pytriton.utils.workspace import Workspace
 
 
@@ -437,6 +436,7 @@ def test_triton_context_injection(tmp_path):
     triton_context = TritonContext()
     workspace = Workspace(tmp_path / "workspace")
     tensor_store = TensorStore(workspace.path / "data_store.sock")
+    tensor_store.start()
     model1 = Model(
         model_name="simple1",
         model_version=1,
@@ -483,14 +483,14 @@ def test_triton_context_injection(tmp_path):
         strict=False,
     )
 
-    tr = TritonModelRepository(path=None, workspace=workspace)
-    manager = ModelManager(tr)
+    manager = ModelManager("")
     try:
-        tensor_store.start()
         manager.add_model(model1)
+        model1.setup()
         manager.add_model(model2)
+        model2.setup()
         manager.add_model(model3)
-        manager.create_models()
+        model3.setup()
 
         input_requests1 = [Request({"variable1": np.array([[7, 5], [8, 6]])}, {})]
         input_requests2 = [Request({"variable2": np.array([[1, 2], [1, 2], [11, 12]])}, {})]

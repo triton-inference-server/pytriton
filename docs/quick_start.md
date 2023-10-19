@@ -69,8 +69,7 @@ def infer_fn(**inputs: np.ndarray):
 
 In the next step, you can create the binding between the inference callable and Triton Inference Server using the `bind` method from PyTriton. This method takes the model name, the inference callable, the inputs and outputs tensors, and an optional model configuration object.
 
-<!--pytest-codeblocks:cont-->
-
+<!--pytest.mark.skip-->
 ```python
 from pytriton.model_config import ModelConfig, Tensor
 from pytriton.triton import Triton

@@ -18,7 +18,7 @@ limitations under the License.
 The Triton class provides methods to bind one or multiple models to the Triton server in order to expose HTTP/gRPC
 endpoints for inference serving:
 
-```python
+```python {"skip": true}
 import numpy as np
 from pytriton.decorators import batch
 from pytriton.model_config import ModelConfig, Tensor
@@ -69,7 +69,7 @@ in [Inference Callable](inference_callable.md) page.**
 
 In the simplest implementation for functionality that passes input data on output, a lambda can be used:
 
-```python
+```python {"skip": true}
 import numpy as np
 from pytriton.model_config import ModelConfig, Tensor
 from pytriton.triton import Triton
@@ -134,7 +134,7 @@ Finally, the list of callable objects is passed to `infer_func` parameter of the
 
 <!--pytest-codeblocks:cont-->
 
-```python
+```python {"skip": true}
 import numpy as np
 from pytriton.triton import Triton
 from pytriton.model_config import ModelConfig, Tensor

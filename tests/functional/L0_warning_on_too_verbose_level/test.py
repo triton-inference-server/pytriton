@@ -27,8 +27,6 @@ METADATA = {
 
 
 def main():
-    import threading
-
     import numpy as np
 
     from pytriton.client import ModelClient
@@ -85,9 +83,7 @@ def main():
         )
         triton.run()
         client = ModelClient(f"http://localhost:{triton_config.http_port}", "Dummy")
-        condition = threading.Condition(threading.RLock())
-        with condition:
-            wait_for_server_ready(client._general_client, timeout_s=args.init_timeout_s, condition=condition)
+        wait_for_server_ready(client._general_client, timeout_s=args.init_timeout_s)
 
     # obtain logs from handler
     logs = handler.stream.getvalue()

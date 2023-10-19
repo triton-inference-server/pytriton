@@ -1,4 +1,5 @@
-# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+#!/usr/bin/env bash
+# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,15 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# noqa: D104
-"""Constants for pytriton."""
-import pathlib
 
-DEFAULT_HTTP_PORT = 8000
-DEFAULT_GRPC_PORT = 8001
-DEFAULT_METRICS_PORT = 8002
-TRITON_LOCAL_IP = "127.0.0.1"
-TRITON_CONTEXT_FIELD_NAME = "triton_context"
-PYTRITON_CACHE_DIR = pathlib.Path.home() / ".cache" / "pytriton"
-TRITON_PYTHON_BACKEND_INTERPRETER_DIRNAME = "python_backend_interpreter"
-DEFAULT_TRITON_STARTUP_TIMEOUT_S = 120
+set -xe
+
+THIS_SCRIPT_DIR="$(realpath --relative-to="${PWD}" "$(dirname "$0")")"
+TEST_MODULE="${THIS_SCRIPT_DIR//\//.}.test"
+
+python -m"${TEST_MODULE}" \
+    --timeout-s 300

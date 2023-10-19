@@ -89,7 +89,7 @@ More about response cache can be found in the [Triton Response Cache](https://gi
 
 Example:
 
-```python
+```python {"skip": true}
 import numpy as np
 
 from pytriton.decorators import batch

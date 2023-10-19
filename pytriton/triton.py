@@ -48,17 +48,18 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 import typing_inspect
 
 from pytriton.client import ModelClient
-from pytriton.client.utils import wait_for_server_ready
+from pytriton.client.utils import TritonUrl, wait_for_server_ready
+from pytriton.constants import DEFAULT_TRITON_STARTUP_TIMEOUT_S
 from pytriton.decorators import TritonContext
 from pytriton.exceptions import PyTritonValidationError
 from pytriton.model_config.tensor import Tensor
 from pytriton.models.manager import ModelManager
 from pytriton.models.model import Model, ModelConfig, ModelEvent
 from pytriton.proxy.communication import TensorStore
-from pytriton.server.model_repository import TritonModelRepository
 from pytriton.server.python_backend_config import PythonBackendConfig
 from pytriton.server.triton_server import TritonServer
 from pytriton.server.triton_server_config import TritonServerConfig
+from pytriton.utils import endpoint_utils
 from pytriton.utils.dataclasses import kwonly_dataclass
 from pytriton.utils.distribution import get_libs_path, get_root_module_path, get_stub_path
 from pytriton.utils.workspace import Workspace
@@ -66,7 +67,7 @@ from pytriton.utils.workspace import Workspace
 LOGGER = logging.getLogger(__name__)
 
 TRITONSERVER_DIST_DIR = get_root_module_path() / "tritonserver"
-MONITORING_PERIOD_SEC = 10.0
+MONITORING_PERIOD_S = 10.0
 WAIT_FORM_MODEL_TIMEOUT_S = 60.0
 INITIAL_BACKEND_SHM_SIZE = 4194304  # 4MB, Python Backend default is 64MB, but is automatically increased
 GROWTH_BACKEND_SHM_SIZE = 1048576  # 1MB, Python Backend default is 64MB
@@ -300,9 +301,7 @@ class _LogLevelChecker:
             PyTritonClientTimeoutError: if timeout is reached
         """
         if self._log_settings is None and not skip_update:
-            condition = threading.Condition(threading.RLock())
-            with condition:
-                wait_for_server_ready(self._client._general_client, timeout_s=120, condition=condition)
+            wait_for_server_ready(self._client._general_client, timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S)
             self._log_settings = self._client._general_client.get_log_settings()
 
         if self._log_settings is not None:
@@ -320,139 +319,30 @@ class _LogLevelChecker:
                 )
 
 
-class Triton:
-    """Triton Inference Server for Python models."""
+class TritonBase:
+    """Base class for Triton Inference Server."""
 
-    def __init__(
-        self, *, config: Optional[TritonConfig] = None, workspace: Union[Workspace, str, pathlib.Path, None] = None
-    ):
-        """Initialize Triton Inference Server context for starting server and loading models.
+    def __init__(self, url: str, workspace: Union[Workspace, str, pathlib.Path, None] = None):
+        """Initialize TritonBase.
 
         Args:
-            config: TritonConfig object with optional customizations for Triton Inference Server.
-                Configuration can be passed also through environment variables.
-                See [TritonConfig.from_env()][pytriton.triton.TritonConfig.from_env] class method for details.
-
-                Order of precedence:
-
-                  - config defined through `config` parameter of init method.
-                  - config defined in environment variables
-                  - default TritonConfig values
-            workspace: workspace or path where the Triton Model Store and files used by pytriton will be created.
-                If workspace is `None` random workspace will be created.
-                Workspace will be deleted in [Triton.stop()][pytriton.triton.Triton.stop].
+            url: Triton Inference Server URL in form of <scheme>://<host>:<port>
+            workspace: Workspace for storing communication sockets and the other temporary files.
         """
-
-        def _without_none_values(_d):
-            return {name: value for name, value in _d.items() if value is not None}
-
-        default_config_dict = _without_none_values(TritonConfig().to_dict())
-        env_config_dict = _without_none_values(TritonConfig.from_env().to_dict())
-        explicit_config_dict = _without_none_values(config.to_dict() if config else {})
-        config_dict = {**default_config_dict, **env_config_dict, **explicit_config_dict}
-        self._config = TritonConfig(**config_dict)
         self._workspace = workspace if isinstance(workspace, Workspace) else Workspace(workspace)
-
-        self._model_repository = TritonModelRepository(path=self._config.model_repository, workspace=self._workspace)
-        self._model_manager = ModelManager(self._model_repository)
-        self._triton_context = TritonContext()
-        self._tensor_store = TensorStore(self._workspace.path / "data_store.sock")
-
-        self._triton_server = None
-        self._triton_server_config = None
-
+        self._url = url
+        self._model_manager = ModelManager(self._url)
         self._cv = th.Condition()
+        self._triton_context = TritonContext()
+        self._log_level_checker = _LogLevelChecker(self._url)
+
         with self._cv:
             self._stopped = True
+            self._connected = False
 
-    def __enter__(self) -> "Triton":
-        """Enter the context.
+        atexit.register(self.stop)
 
-        Returns:
-            A Triton object
-        """
-        return self
-
-    def __exit__(self, *_) -> None:
-        """Exit the context stopping the process and cleaning the workspace.
-
-        Args:
-            *_: unused arguments
-        """
-        self.stop()
-
-    def run(self) -> None:
-        """Run Triton Inference Server."""
-        if not self._triton_server:
-            self._initialize_server()
-
-        self._tensor_store.start()
-        if not self._triton_server.is_alive():
-            self._model_manager.create_models()
-            with self._cv:
-                self._stopped = False
-            LOGGER.debug("Starting Triton Inference")
-            self._triton_server.register_on_exit(self._on_tritonserver_exit)
-            atexit.register(self.stop)
-            self._triton_server.start()
-        self._wait_for_models()
-
-    def stop(self) -> None:
-        """Stop Triton Inference Server."""
-        LOGGER.debug("Stopping Triton Inference server and proxy backends")
-
-        with self._cv:
-            if self._stopped:
-                LOGGER.debug("Triton Inference already stopped.")
-                return
-            self._stopped = True
-
-        if self._triton_server:
-            self._triton_server.unregister_on_exit(self._on_tritonserver_exit)
-            atexit.unregister(self.stop)
-            self._triton_server.stop()
-
-        self._model_manager.clean()
-        self._tensor_store.close()
-        self._workspace.clean()
-        with self._cv:
-            self._cv.notify_all()
-        LOGGER.debug("Stopped Triton Inference server and proxy backends")
-        self._log_level_checker.check(skip_update=True)
-
-    def serve(self, monitoring_period_sec: float = MONITORING_PERIOD_SEC) -> None:
-        """Run Triton Inference Server and lock thread for serving requests/response.
-
-        Args:
-            monitoring_period_sec: the timeout of monitoring if Triton and models are available.
-                Every monitoring_period_sec seconds main thread wakes up and check if triton server and proxy backend
-                are still alive and sleep again. If triton or proxy is not alive - method returns.
-        """
-        self.run()
-        with self._cv:
-            try:
-                while self.is_alive():
-                    self._cv.wait(timeout=monitoring_period_sec)
-            except KeyboardInterrupt:
-                LOGGER.info("SIGINT received, exiting.")
-        self.stop()
-
-    def is_alive(self) -> bool:
-        """Verify is deployed models and server are alive.
-
-        Returns:
-            True if server and loaded models are alive, False otherwise.
-        """
-        if not self._triton_server:
-            return False
-
-        if not self._triton_server.is_alive():
-            return False
-
-        for model in self._model_manager.models:
-            if not model.is_alive():
-                return False
-        return True
+        self._tensor_store = None
 
     def bind(
         self,
@@ -494,41 +384,135 @@ class Triton:
         )
         model.on_model_event(self._on_model_event)
 
-        self._model_manager.add_model(model)
+        self._model_manager.add_model(model, self.is_connected())
 
-    def _on_model_event(self, model: Model, event: ModelEvent, context: typing.Optional[typing.Any] = None):
-        LOGGER.info(f"Received {event} from {model}; context={context}")
+    def connect(self) -> None:
+        """Connect to Triton Inference Server.
 
-        if event in [ModelEvent.RUNTIME_TERMINATING, ModelEvent.RUNTIME_TERMINATED]:
-            threading.Thread(target=self.stop).start()
+        Raises:
+            TimeoutError: if Triton Inference Server is not ready after timeout
+        """
+        with self._cv:
+            if self._connected:
+                LOGGER.debug("Triton Inference already connected.")
+                return
 
-    def _on_tritonserver_exit(self, *_) -> None:
-        """Handle the Triton Inference Server process exit.
+            self._wait_for_server()
+            if self._tensor_store is None:
+                self._tensor_store = TensorStore(self._workspace.path / "data_store.sock")
+                self._tensor_store.start()
+
+            self._model_manager.load_models()
+            self._wait_for_models()
+            self._connected = True
+
+    def serve(self, monitoring_period_s: float = MONITORING_PERIOD_S) -> None:
+        """Run Triton Inference Server and lock thread for serving requests/response.
 
         Args:
-            _: unused arguments
+            monitoring_period_s: the timeout of monitoring if Triton and models are available.
+                Every monitoring_period_s seconds main thread wakes up and check if triton server and proxy backend
+                are still alive and sleep again. If triton or proxy is not alive - method returns.
         """
-        LOGGER.debug("Got callback that tritonserver process finished")
+        self.connect()
+        with self._cv:
+            while self.is_alive():
+                self._cv.wait(timeout=monitoring_period_s)
+            self.stop()
+
+    def stop(self) -> bool:
+        """Stop Triton Inference Server and clean workspace."""
+        with self._cv:
+            if self._stopped:
+                LOGGER.debug("Triton Inference already stopped.")
+                return False
+            self._stopped = True
+            self._connected = False
+            atexit.unregister(self.stop)
+        self._pre_stop_impl()
+        LOGGER.debug("Cleaning model manager, tensor store and workspace.")
+        self._model_manager.clean()
+        if self._tensor_store is not None:
+            self._tensor_store.close()
+            self._tensor_store = None
+        self._workspace.clean()
+
+        with self._cv:
+            self._cv.notify_all()
+        LOGGER.debug("Stopped Triton Inference server and proxy backends")
+        self._log_level_checker.check(skip_update=True)
+
+        return True
+
+    def is_alive(self) -> bool:
+        """Check if Triton Inference Server is alive."""
+        if not self._is_alive_impl():
+            return False
+
+        for model in self._model_manager.models:
+            if not model.is_alive():
+                return False
+        return True
+
+    def is_connected(self) -> bool:
+        """Check if Triton Inference Server is connected."""
+        with self._cv:
+            return self._connected
+
+    def __enter__(self):
+        """Connects to Triton server on __enter__.
+
+        Returns:
+            A Triton object
+        """
+        self.connect()
+        return self
+
+    def __exit__(self, *_) -> None:
+        """Exit the context stopping the process and cleaning the workspace.
+
+        Args:
+            *_: unused arguments
+        """
         self.stop()
+
+    def _is_alive_impl(self) -> bool:
+        return True
+
+    def _pre_stop_impl(self):
+        pass
+
+    def _post_stop_impl(self):
+        pass
+
+    def _wait_for_server(self) -> None:
+        """Wait for Triton Inference Server to be ready."""
+        self._log_level_checker.check()
+        try:
+            with ModelClient(url=self._url, model_name="Dummy") as client:
+                client.wait_for_server(timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S)
+        except TimeoutError as e:
+            LOGGER.warning(
+                f"Could not verify locally if Triton Inference Server is ready using {self._url}. "
+                "Please, check the server logs for details."
+            )
+            raise TimeoutError("Triton Inference Server is not ready after timeout.") from e
 
     def _wait_for_models(self) -> None:
         """Log loaded models in console to show the available endpoints."""
-        endpoint = "http" if self._config.allow_http in [True, None] else "grpc"
-        server_url = self._triton_server.get_endpoint(endpoint)
-
         self._log_level_checker.check()
 
         try:
             for model in self._model_manager.models:
                 with ModelClient(
-                    url=server_url, model_name=model.model_name, model_version=str(model.model_version)
+                    url=self._url, model_name=model.model_name, model_version=str(model.model_version)
                 ) as client:
                     # This waits for only tritonserver and lightweight proxy backend to be ready
                     # timeout should be short as model is loaded before execution of Triton.start() method
                     client.wait_for_model(timeout_s=WAIT_FORM_MODEL_TIMEOUT_S)
         except TimeoutError:
             LOGGER.warning(
-                f"Could not verify locally if models are ready using {server_url}. "
+                f"Could not verify locally if models are ready using {self._url}. "
                 "Please, check the server logs for details."
             )
 
@@ -543,6 +527,12 @@ class Triton:
             """documentation: https://triton-inference-server.github.io/pytriton."""
         )
         LOGGER.info(f"(Press CTRL+C or use the command `kill -SIGINT {os.getpid()}` to send a SIGINT signal and quit)")
+
+    def _on_model_event(self, model: Model, event: ModelEvent, context: typing.Optional[typing.Any] = None):
+        LOGGER.info(f"Received {event} from {model}; context={context}")
+
+        if event in [ModelEvent.RUNTIME_TERMINATING, ModelEvent.RUNTIME_TERMINATED]:
+            threading.Thread(target=self.stop).start()
 
     @classmethod
     def _validate_model_name(cls, model_name: str) -> None:
@@ -559,40 +549,78 @@ class Triton:
                 "Model name can only contain alphanumeric characters, dots, underscores and dashes"
             )
 
-    def _initialize_server(self):
+
+class Triton(TritonBase):
+    """Triton Inference Server for Python models."""
+
+    def __init__(
+        self, *, config: Optional[TritonConfig] = None, workspace: Union[Workspace, str, pathlib.Path, None] = None
+    ):
+        """Initialize Triton Inference Server context for starting server and loading models.
+
+        Args:
+            config: TritonConfig object with optional customizations for Triton Inference Server.
+                Configuration can be passed also through environment variables.
+                See [TritonConfig.from_env()][pytriton.triton.TritonConfig.from_env] class method for details.
+
+                Order of precedence:
+
+                  - config defined through `config` parameter of init method.
+                  - config defined in environment variables
+                  - default TritonConfig values
+            workspace: workspace or path where the Triton Model Store and files used by pytriton will be created.
+                If workspace is `None` random workspace will be created.
+                Workspace will be deleted in [Triton.stop()][pytriton.triton.Triton.stop].
+        """
+
+        def _without_none_values(_d):
+            return {name: value for name, value in _d.items() if value is not None}
+
+        default_config_dict = _without_none_values(TritonConfig().to_dict())
+        env_config_dict = _without_none_values(TritonConfig.from_env().to_dict())
+        explicit_config_dict = _without_none_values(config.to_dict() if config else {})
+        config_dict = {**default_config_dict, **env_config_dict, **explicit_config_dict}
+        self._config = TritonConfig(**config_dict)
+        workspace_instance = workspace if isinstance(workspace, Workspace) else Workspace(workspace)
+        self._prepare_triton_config(workspace_instance)
+        endpoint_protocol = "http" if self._config.allow_http in [True, None] else "grpc"
+        super().__init__(
+            url=endpoint_utils.get_endpoint(self._triton_server_config, endpoint_protocol),
+            workspace=workspace_instance,
+        )
+        self._triton_server = None
+
+    def __enter__(self) -> "Triton":
+        """Entering the context launches the triton server.
+
+        Returns:
+            A Triton object
+        """
+        self._run_server()
+        super().__enter__()
+        return self
+
+    def run(self) -> None:
+        """Run Triton Inference Server."""
+        self._run_server()
+        self.connect()
+
+    def serve(self, monitoring_period_s: float = MONITORING_PERIOD_S) -> None:
+        """Run Triton Inference Server and lock thread for serving requests/response.
+
+        Args:
+            monitoring_period_s: the timeout of monitoring if Triton and models are available.
+                Every monitoring_period_s seconds main thread wakes up and check if triton server and proxy backend
+                are still alive and sleep again. If triton or proxy is not alive - method returns.
+        """
+        self._run_server()
+        super().serve(monitoring_period_s=monitoring_period_s)
+
+    def _initialize_server(self) -> None:
         """Initialize Triton Inference Server before binary execution."""
-        self._triton_server_config = TritonServerConfig()
-        config_data = self._config.to_dict()
-
-        self._python_backend_config = PythonBackendConfig()
-        python_backend_config_data = {
-            "shm-region-prefix-name": self._shm_prefix(),
-            "shm-default-byte-size": INITIAL_BACKEND_SHM_SIZE,
-            "shm-growth-byte-size": GROWTH_BACKEND_SHM_SIZE,
-        }
-        for name, value in python_backend_config_data.items():
-            if name not in PythonBackendConfig.allowed_keys() or value is None:
-                continue
-
-            self._python_backend_config[name] = value
-
-        for name, value in config_data.items():
-            if name not in TritonServerConfig.allowed_keys() or value is None:
-                continue
-
-            self._triton_server_config[name] = value
-
-        triton_inference_server_path = self._prepare_triton_inference_server(workspace=self._workspace)
-
-        self._triton_server_config["backend_config"] = self._python_backend_config.to_list_args()
-
-        self._triton_server_config["model_repository"] = self._model_repository.path.as_posix()
-        self._triton_server_config["backend_directory"] = (triton_inference_server_path / "backends").as_posix()
-        if "cache_directory" not in self._triton_server_config:
-            self._triton_server_config["cache_directory"] = (triton_inference_server_path / "caches").as_posix()
-
+        self._triton_inference_server_path = self._prepare_triton_inference_server()
         self._triton_server = TritonServer(
-            path=(triton_inference_server_path / "bin" / "tritonserver").as_posix(),
+            path=(self._triton_inference_server_path / "bin" / "tritonserver").as_posix(),
             libs_path=get_libs_path(),
             config=self._triton_server_config,
         )
@@ -604,16 +632,42 @@ class Triton:
         )
         self._log_level_checker = _LogLevelChecker(url)
 
-    def _prepare_triton_inference_server(self, workspace: Workspace) -> pathlib.Path:
-        """Prepare binaries and libraries of Triton Inference Server for execution.
+    def _prepare_triton_config(self, workspace: Workspace) -> None:
+        self._triton_server_config = TritonServerConfig()
+        config_data = self._config.to_dict()
+        self._python_backend_config = PythonBackendConfig()
+        python_backend_config_data = {
+            "shm-region-prefix-name": self._shm_prefix(),
+            "shm-default-byte-size": INITIAL_BACKEND_SHM_SIZE,
+            "shm-growth-byte-size": GROWTH_BACKEND_SHM_SIZE,
+        }
+        for name, value in python_backend_config_data.items():
+            if name not in PythonBackendConfig.allowed_keys() or value is None:
+                continue
 
-        Args:
-            workspace: Workspace initialized for PyTriton
+            if isinstance(value, pathlib.Path):
+                value = value.as_posix()
+            self._python_backend_config[name] = value
+        for name, value in config_data.items():
+            if name not in TritonServerConfig.allowed_keys() or value is None:
+                continue
+
+            if isinstance(value, pathlib.Path):
+                value = value.as_posix()
+            self._triton_server_config[name] = value
+
+        self._triton_server_config["model_control_mode"] = "explicit"
+        self._triton_server_config["backend_config"] = self._python_backend_config.to_list_args()
+        if "model_repository" not in self._triton_server_config:
+            self._triton_server_config["model_repository"] = workspace.path.as_posix()
+
+    def _prepare_triton_inference_server(self) -> pathlib.Path:
+        """Prepare binaries and libraries of Triton Inference Server for execution.
 
         Return:
             Path where Triton binaries are ready for execution
         """
-        triton_inference_server_path = workspace.path / "tritonserver"
+        triton_inference_server_path = self._workspace.path / "tritonserver"
 
         LOGGER.debug("Preparing Triton Inference Server binaries and libs for execution.")
         shutil.copytree(
@@ -634,6 +688,10 @@ class Triton:
         shutil.copy(src_stub_path, dst_stub_path)
 
         LOGGER.debug(f"Triton Inference Server binaries ready in {triton_inference_server_path}")
+
+        self._triton_server_config["backend_directory"] = (triton_inference_server_path / "backends").as_posix()
+        if "cache_directory" not in self._triton_server_config:
+            self._triton_server_config["cache_directory"] = (triton_inference_server_path / "caches").as_posix()
         return triton_inference_server_path
 
     def _shm_prefix(self) -> str:
@@ -645,3 +703,72 @@ class Triton:
         hash = codecs.encode(os.urandom(4), "hex").decode()
         pid = os.getpid()
         return f"pytrtion{pid}-{hash}"
+
+    def _run_server(self):
+        """Run Triton Inference Server."""
+        if self._triton_server is None:
+            self._initialize_server()
+        if not self._triton_server.is_alive():
+            with self._cv:
+                self._stopped = False
+            LOGGER.debug("Starting Triton Inference")
+            self._triton_server.register_on_exit(self._on_tritonserver_exit)
+            self._triton_server.start()
+
+    def _is_alive_impl(self) -> bool:
+        """Verify is deployed models and server are alive.
+
+        Returns:
+            True if server and loaded models are alive, False otherwise.
+        """
+        if not self._triton_server:
+            return False
+
+        return self._triton_server.is_alive()
+
+    def _pre_stop_impl(self):
+        self._triton_server.unregister_on_exit(self._on_tritonserver_exit)
+        if self._triton_server is not None:
+            self._triton_server.stop()
+
+    def _on_tritonserver_exit(self, *_) -> None:
+        """Handle the Triton Inference Server process exit.
+
+        Args:
+            _: unused arguments
+        """
+        LOGGER.debug("Got callback that tritonserver process finished")
+        self.stop()
+
+
+class RemoteTriton(TritonBase):
+    """RemoteTriton connects to Triton Inference Server running on remote host."""
+
+    def __init__(self, url: str, workspace: Union[Workspace, str, pathlib.Path, None] = None):
+        """Initialize RemoteTriton.
+
+        Args:
+            url: Triton Inference Server URL in form of <scheme>://<host>:<port>
+                If scheme is not provided, http is used as default.
+                If port is not provided, 8000 is used as default for http and 8001 for grpc.
+            workspace: path to be created where the files used by pytriton will be stored
+                (e.g. socket files for communication).
+                If workspace is `None` temporary workspace will be created.
+                Workspace should be created in shared filesystem space between RemoteTriton
+                and Triton Inference Server to allow access to socket files
+                (if you use containers, folder must be shared between containers).
+
+        """
+        super().__init__(url=TritonUrl.from_url(url).with_scheme, workspace=workspace)
+
+        with self._cv:
+            self._stopped = False
+
+    def __enter__(self) -> "RemoteTriton":
+        """Entering the context connects to remote Triton server.
+
+        Returns:
+            A RemoteTriton object
+        """
+        super().__enter__()
+        return self

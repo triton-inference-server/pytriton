@@ -68,6 +68,8 @@ def _inject_triton_context(triton_context: TritonContext, model_callable: Callab
 class Model:
     """Model definition."""
 
+    SCRIPT_FILES_TO_COPY = ["model.py", "communication.py", "types.py"]
+
     def __init__(
         self,
         model_name: str,
@@ -122,6 +124,34 @@ class Model:
         self._triton_model_config: Optional[TritonModelConfig] = None
         self._model_events_observers: typing.List[ModelEventsHandler] = []
 
+    def get_model_config(self) -> dict:
+        """Get model config.
+
+        Returns:
+            Dictionary with model config
+        """
+        triton_model_config = self._get_triton_model_config()
+        generator = ModelConfigGenerator(config=triton_model_config)
+        return generator.get_config()
+
+    def get_proxy_model_files(self) -> typing.Dict[str, bytes]:
+        """Get proxy model files.
+
+        Returns:
+            Dictionary with model files to be copied to Triton model store on server side:
+                key: file path in following format - 'file:{model_version}/{file_name}'
+                value: file content as bytes
+        """
+        proxy_model_files_dict = {}
+        proxy_path = pathlib.Path(__file__).parent.parent / "proxy"
+        for file_to_copy in self.SCRIPT_FILES_TO_COPY:
+            src_file_path = proxy_path / file_to_copy
+            with open(src_file_path, "rb") as f:
+                src_file = f.read()
+                proxy_model_files_dict[f"file:{self.model_version}/{file_to_copy}"] = src_file
+
+        return proxy_model_files_dict
+
     def generate_model(self, model_repository: pathlib.Path) -> None:
         """Generate model and its config in the model repository.
 
@@ -150,10 +180,9 @@ class Model:
 
         proxy_path = pathlib.Path(__file__).parent.parent / "proxy"
 
-        files_to_copy = ["model.py", "communication.py", "types.py"]
-        for file in files_to_copy:
-            src_file_path = proxy_path / file
-            dst_file_path = model_version_catalog / file
+        for script_file in self.SCRIPT_FILES_TO_COPY:
+            src_file_path = proxy_path / script_file
+            dst_file_path = model_version_catalog / script_file
             shutil.copy(src_file_path, dst_file_path)
 
     def setup(self) -> None:

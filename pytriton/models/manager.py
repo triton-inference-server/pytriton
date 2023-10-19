@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,12 +21,14 @@ The ModelManager is responsible for maintaining the models that has to be server
 
         manager.create_models()
 """
+import json
 import logging
 from typing import Dict, Iterable, Tuple
 
+from pytriton.client import ModelClient
+from pytriton.constants import DEFAULT_TRITON_STARTUP_TIMEOUT_S
 from pytriton.exceptions import PyTritonInvalidOperationError
 from pytriton.models.model import Model
-from pytriton.server.model_repository import TritonModelRepository
 
 LOGGER = logging.getLogger(__name__)
 
@@ -34,13 +36,16 @@ LOGGER = logging.getLogger(__name__)
 class ModelManager:
     """ModelManager class for maintaining Triton models."""
 
-    def __init__(self, model_repository: TritonModelRepository):
+    def __init__(
+        self,
+        triton_url: str,
+    ):
         """Create ModelManager object.
 
         Args:
-            model_repository: Triton model repository object
+            triton_url: Triton server URL
         """
-        self._model_repository = model_repository
+        self._triton_url = triton_url
         self._models: Dict[Tuple[str, int], Model] = {}
 
     @property
@@ -52,11 +57,12 @@ class ModelManager:
         """
         return self._models.values()
 
-    def add_model(self, model: Model) -> None:
+    def add_model(self, model: Model, load_model: bool = False) -> None:
         """Add model to manage.
 
         Args:
             model: Model instance
+            load_model: If True, model will be loaded to Triton server.
         """
         key = self._format_key(model)
         if key in self._models:
@@ -65,13 +71,14 @@ class ModelManager:
         LOGGER.debug(f"Adding {model.model_name} ({model.model_version}) to registry under {key}.")
         self._models[key] = model
 
-    def create_models(self) -> None:
-        """Create models in model repository and setup necessary dependencies."""
+        if load_model:
+            self._load_model(model)
+
+    def load_models(self) -> None:
+        """Load bound models to Triton server."""
         for model in self._models.values():
-            LOGGER.debug(f"Crating model {model.model_name} with version {model.model_version}.")
-            model.generate_model(self._model_repository.path)
-            model.setup()
-            LOGGER.debug("Done.")
+            if not model.is_alive():
+                self._load_model(model)
 
     def clean(self) -> None:
         """Clean the model and internal registry."""
@@ -84,3 +91,16 @@ class ModelManager:
     def _format_key(self, model: Model) -> Tuple[str, int]:
         key = (model.model_name.lower(), model.model_version)
         return key
+
+    def _load_model(self, model: Model):
+        """Prepare model config and required files dict and load model to Triton server."""
+        LOGGER.debug(f"Crating model {model.model_name} with version {model.model_version}.")
+        model.setup()
+        config = json.dumps(model.get_model_config())
+        files = model.get_proxy_model_files()
+        with ModelClient(
+            url=self._triton_url, model_name=model.model_name, model_version=str(model.model_version)
+        ) as client:
+            client.wait_for_server(timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S)
+            client.load_model(config=config, files=files)
+        LOGGER.debug("Done.")

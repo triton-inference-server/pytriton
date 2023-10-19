@@ -202,7 +202,7 @@ import numpy as np
 from pytriton.decorators import batch, fill_optionals, group_by_values
 
 
-@fill_optionals(temperature=np.array([10.0]))
+@fill_optionals(temperature=np.array([0.7]))
 @batch
 @group_by_values('temperature')
 def infer_fn(mandatory_input, temperature):
@@ -239,7 +239,7 @@ You can use `@group_by_values` before to have batches with the same values in ea
 import numpy as np
 from pytriton.decorators import batch, fill_optionals, first_value, group_by_values
 
-@fill_optionals(temperature=np.array([10.0]))
+@fill_optionals(temperature=np.array([0.7]))
 @batch
 @group_by_values('temperature')
 @first_value('temperature')
@@ -275,7 +275,7 @@ import numpy as np
 from pytriton.decorators import batch, fill_optionals, first_value, group_by_keys, group_by_values, triton_context
 
 
-@fill_optionals(temperature=np.array([10.0]))
+@fill_optionals(temperature=np.array([0.7]))
 @group_by_keys
 @batch
 @group_by_values('temperature')

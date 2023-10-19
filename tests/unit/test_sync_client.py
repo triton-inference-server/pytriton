@@ -26,7 +26,6 @@ from pytriton.client.exceptions import (
     PyTritonClientClosedError,
     PyTritonClientInvalidUrlError,
     PyTritonClientModelDoesntSupportBatchingError,
-    PyTritonClientModelUnavailableError,
     PyTritonClientTimeoutError,
     PyTritonClientValueError,
 )
@@ -137,12 +136,13 @@ def test_sync_grpc_client_init_raises_error_when_requested_unavailable_model_and
             service_pb2.RepositoryIndexResponse.ModelIndex(name="OtherName", version="1", state="READY", reason=""),
         ]
     )
+    mocker.patch.object(tritonclient.grpc.InferenceServerClient, "is_model_ready").return_value = False
 
-    with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
-        ModelClient(_GRPC_LOCALHOST_URL, "NotExistentModel", lazy_init=False, init_timeout_s=10)
+    with pytest.raises(PyTritonClientTimeoutError, match="Waiting for model (.*) to be ready timed out."):
+        ModelClient(_GRPC_LOCALHOST_URL, "NotExistentModel", lazy_init=False, init_timeout_s=1.5)
 
-    with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
-        ModelClient(_GRPC_LOCALHOST_URL, "OtherName", "2", lazy_init=False, init_timeout_s=10)
+    with pytest.raises(PyTritonClientTimeoutError, match="Waiting for model (.*) to be ready timed out."):
+        ModelClient(_GRPC_LOCALHOST_URL, "OtherName", "2", lazy_init=False, init_timeout_s=1.5)
 
 
 def test_sync_grpc_client_init_obtain_expected_model_config_when_lazy_init_is_disabled(mocker):
@@ -200,12 +200,14 @@ def test_sync_grpc_client_model_config_raises_error_when_requested_unavailable_m
             service_pb2.RepositoryIndexResponse.ModelIndex(name="OtherName", version="1", state="READY", reason=""),
         ]
     )
-    with ModelClient(_GRPC_LOCALHOST_URL, "NonExistentModel") as client:
-        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+    mocker.patch.object(tritonclient.grpc.InferenceServerClient, "is_model_ready").return_value = False
+
+    with ModelClient(_GRPC_LOCALHOST_URL, "NonExistentModel", init_timeout_s=1.5) as client:
+        with pytest.raises(PyTritonClientTimeoutError, match="Waiting for model (.*) to be ready timed out."):
             _ = client.model_config
 
-    with ModelClient(_GRPC_LOCALHOST_URL, "OtherName", "2") as client:
-        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+    with ModelClient(_GRPC_LOCALHOST_URL, "OtherName", "2", init_timeout_s=1.5) as client:
+        with pytest.raises(PyTritonClientTimeoutError, match="Waiting for model (.*) to be ready timed out."):
             _ = client.model_config
 
 
@@ -219,24 +221,25 @@ def test_sync_grpc_client_infer_raises_error_when_requested_unavailable_model(mo
             service_pb2.RepositoryIndexResponse.ModelIndex(name="OtherName", version="1", state="READY", reason=""),
         ]
     )
+    mocker.patch.object(tritonclient.grpc.InferenceServerClient, "is_model_ready").return_value = False
 
     a = np.array([1], dtype=np.float32)
     b = np.array([1], dtype=np.float32)
 
-    with ModelClient(_GRPC_LOCALHOST_URL, "NonExistentModel") as client:
-        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+    with ModelClient(_GRPC_LOCALHOST_URL, "NonExistentModel", init_timeout_s=1.5) as client:
+        with pytest.raises(PyTritonClientTimeoutError, match="Waiting for model (.*) to be ready timed out."):
             _ = client.infer_sample(a, b)
 
-    with ModelClient(_GRPC_LOCALHOST_URL, "NonExistentModel") as client:
-        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+    with ModelClient(_GRPC_LOCALHOST_URL, "NonExistentModel", init_timeout_s=1.5) as client:
+        with pytest.raises(PyTritonClientTimeoutError, match="Waiting for model (.*) to be ready timed out."):
             _ = client.infer_batch(a, b)
 
-    with ModelClient(_GRPC_LOCALHOST_URL, "OtherName", "2") as client:
-        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+    with ModelClient(_GRPC_LOCALHOST_URL, "OtherName", "2", init_timeout_s=1.5) as client:
+        with pytest.raises(PyTritonClientTimeoutError, match="Waiting for model (.*) to be ready timed out."):
             _ = client.infer_sample(a, b)
 
-    with ModelClient(_GRPC_LOCALHOST_URL, "OtherName", "2") as client:
-        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+    with ModelClient(_GRPC_LOCALHOST_URL, "OtherName", "2", init_timeout_s=1.5) as client:
+        with pytest.raises(PyTritonClientTimeoutError, match="Waiting for model (.*) to be ready timed out."):
             _ = client.infer_batch(a, b)
 
 
@@ -518,25 +521,27 @@ def test_sync_http_client_init_raises_error_when_requested_unavailable_model_and
     patch_http_client__server_up_and_ready(mocker)
     mock_get_repo_index = mocker.patch.object(tritonclient.http.InferenceServerClient, "get_model_repository_index")
     mock_get_repo_index.return_value = [{"name": "OtherName", "version": "1", "state": "READY", "reason": ""}]
+    mocker.patch.object(tritonclient.http.InferenceServerClient, "is_model_ready").return_value = False
 
-    with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
-        ModelClient(_HTTP_LOCALHOST_URL, "NotExistentModel", lazy_init=False, init_timeout_s=10)
+    with pytest.raises(PyTritonClientTimeoutError, match="Waiting for model (.*) to be ready timed out."):
+        ModelClient(_HTTP_LOCALHOST_URL, "NotExistentModel", lazy_init=False, init_timeout_s=1.5)
 
-    with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
-        ModelClient(_HTTP_LOCALHOST_URL, "OtherName", "2", lazy_init=False, init_timeout_s=10)
+    with pytest.raises(PyTritonClientTimeoutError, match="Waiting for model (.*) to be ready timed out."):
+        ModelClient(_HTTP_LOCALHOST_URL, "OtherName", "2", lazy_init=False, init_timeout_s=1.5)
 
 
 def test_sync_http_client_model_config_raises_error_when_requested_unavailable_model(mocker):
     patch_http_client__server_up_and_ready(mocker)
     mock_get_repo_index = mocker.patch.object(tritonclient.http.InferenceServerClient, "get_model_repository_index")
     mock_get_repo_index.return_value = [{"name": "OtherName", "version": "1", "state": "READY", "reason": ""}]
+    mocker.patch.object(tritonclient.http.InferenceServerClient, "is_model_ready").return_value = False
 
-    with ModelClient(_HTTP_LOCALHOST_URL, "NonExistentModel") as client:
-        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+    with ModelClient(_HTTP_LOCALHOST_URL, "NonExistentModel", init_timeout_s=1.5) as client:
+        with pytest.raises(PyTritonClientTimeoutError, match="Waiting for model (.*) to be ready timed out."):
             _ = client.model_config
 
-    with ModelClient(_HTTP_LOCALHOST_URL, "OtherName", "2") as client:
-        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+    with ModelClient(_HTTP_LOCALHOST_URL, "OtherName", "2", init_timeout_s=1.5) as client:
+        with pytest.raises(PyTritonClientTimeoutError, match="Waiting for model (.*) to be ready timed out."):
             _ = client.model_config
 
 
@@ -544,24 +549,25 @@ def test_sync_http_client_infer_raises_error_when_requested_unavailable_model(mo
     patch_http_client__server_up_and_ready(mocker)
     mock_get_repo_index = mocker.patch.object(tritonclient.http.InferenceServerClient, "get_model_repository_index")
     mock_get_repo_index.return_value = [{"name": "OtherName", "version": "1", "state": "READY", "reason": ""}]
+    mocker.patch.object(tritonclient.http.InferenceServerClient, "is_model_ready").return_value = False
 
     a = np.array([1], dtype=np.float32)
     b = np.array([1], dtype=np.float32)
 
-    with ModelClient(_HTTP_LOCALHOST_URL, "NonExistentModel") as client:
-        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+    with ModelClient(_HTTP_LOCALHOST_URL, "NonExistentModel", init_timeout_s=1.5) as client:
+        with pytest.raises(PyTritonClientTimeoutError, match="Waiting for model (.*) to be ready timed out."):
             _ = client.infer_sample(a, b)
 
-    with ModelClient(_HTTP_LOCALHOST_URL, "NonExistentModel") as client:
-        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+    with ModelClient(_HTTP_LOCALHOST_URL, "NonExistentModel", init_timeout_s=1.5) as client:
+        with pytest.raises(PyTritonClientTimeoutError, match="Waiting for model (.*) to be ready timed out."):
             _ = client.infer_batch(a, b)
 
-    with ModelClient(_HTTP_LOCALHOST_URL, "OtherName", "2") as client:
-        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+    with ModelClient(_HTTP_LOCALHOST_URL, "OtherName", "2", init_timeout_s=1.5) as client:
+        with pytest.raises(PyTritonClientTimeoutError, match="Waiting for model (.*) to be ready timed out."):
             _ = client.infer_sample(a, b)
 
-    with ModelClient(_HTTP_LOCALHOST_URL, "OtherName", "2") as client:
-        with pytest.raises(PyTritonClientModelUnavailableError, match="Model (.*) is unavailable."):
+    with ModelClient(_HTTP_LOCALHOST_URL, "OtherName", "2", init_timeout_s=1.5) as client:
+        with pytest.raises(PyTritonClientTimeoutError, match="Waiting for model (.*) to be ready timed out."):
             _ = client.infer_batch(a, b)
 
 

@@ -32,9 +32,7 @@ import contextlib
 import itertools
 import logging
 import socket
-import sys
 import time
-import urllib
 from concurrent.futures import Future
 from queue import Queue
 from threading import Thread
@@ -53,7 +51,6 @@ from pytriton.client.asyncio_utils import asyncio_get_model_config, asyncio_wait
 from pytriton.client.exceptions import (
     PyTritonClientClosedError,
     PyTritonClientInferenceServerError,
-    PyTritonClientInvalidUrlError,
     PyTritonClientModelDoesntSupportBatchingError,
     PyTritonClientTimeoutError,
     PyTritonClientValueError,
@@ -61,10 +58,11 @@ from pytriton.client.exceptions import (
 from pytriton.client.utils import (
     _DEFAULT_NETWORK_TIMEOUT_S,
     _DEFAULT_WAIT_FOR_MODEL_TIMEOUT_S,
+    TritonUrl,
     get_model_config,
     wait_for_model_ready,
+    wait_for_server_ready,
 )
-from pytriton.constants import DEFAULT_GRPC_PORT, DEFAULT_HTTP_PORT
 from pytriton.model_config.triton_model_config import TritonModelConfig
 
 _LOGGER = logging.getLogger(__name__)
@@ -175,34 +173,12 @@ class BaseModelClient:
         Raises:
             PyTritonClientInvalidUrlError: If provided Triton Inference Server url is invalid.
         """
-        if not isinstance(url, str):
-            raise PyTritonClientInvalidUrlError(f"Invalid url {url}. Url must be a string.")
-
-        try:
-            parsed_url = urllib.parse.urlparse(url)
-            # change in py3.9+
-            # https://github.com/python/cpython/commit/5a88d50ff013a64fbdb25b877c87644a9034c969
-            if sys.version_info < (3, 9) and not parsed_url.scheme and "://" in parsed_url.path:
-                raise ValueError(f"Invalid url {url}. Only grpc and http are supported.")
-            if (not parsed_url.scheme and "://" not in parsed_url.path) or (
-                sys.version_info >= (3, 9) and parsed_url.scheme and not parsed_url.netloc
-            ):
-                _LOGGER.debug(f"Adding http scheme to {url}")
-                parsed_url = urllib.parse.urlparse(f"http://{url}")
-
-            self._scheme = parsed_url.scheme.lower()
-            if self._scheme not in ["grpc", "http"]:
-                raise ValueError(f"Invalid scheme {self._scheme}. Only grpc and http are supported.")
-            port = parsed_url.port or {"grpc": DEFAULT_GRPC_PORT, "http": DEFAULT_HTTP_PORT}[self._scheme]
-        except ValueError as e:
-            raise PyTritonClientInvalidUrlError(f"Invalid url {url}") from e
-
+        self._triton_url = TritonUrl.from_url(url)
+        self._url = self._triton_url.without_scheme
         self._triton_client_lib = self.get_lib()
-
-        self._url = f"{parsed_url.hostname}:{port}"
         self._monkey_patch_client()
 
-        if self._scheme == "grpc":
+        if self._triton_url.scheme == "grpc":
             # by default grpc client has very large number of timeout, thus we want to make it equal to http client timeout
             network_timeout_s = _DEFAULT_NETWORK_TIMEOUT_S if network_timeout_s is None else network_timeout_s
             _LOGGER.warning(
@@ -212,7 +188,7 @@ class BaseModelClient:
         triton_client_init_kwargs = self._get_init_extra_args()
 
         _LOGGER.debug(
-            f"Creating InferenceServerClient for {parsed_url.scheme}://{self._url} with {triton_client_init_kwargs}"
+            f"Creating InferenceServerClient for {self._triton_url.with_scheme} with {triton_client_init_kwargs}"
         )
         return self._triton_client_lib.InferenceServerClient(self._url, **triton_client_init_kwargs)
 
@@ -239,7 +215,7 @@ class BaseModelClient:
         #  if the network request or the inference process takes longer than the timeout.
         #  This is a design choice of the underlying tritonclient library.
 
-        if self._scheme != "http":
+        if self._triton_url.scheme != "http":
             return {}
 
         kwargs = {
@@ -323,7 +299,7 @@ class ModelClient(BaseModelClient):
 
     def get_lib(self):
         """Returns tritonclient library for given scheme."""
-        return {"grpc": tritonclient.grpc, "http": tritonclient.http}[self._scheme.lower()]
+        return {"grpc": tritonclient.grpc, "http": tritonclient.http}[self._triton_url.scheme.lower()]
 
     def __enter__(self):
         """Create context for using ModelClient as a context manager."""
@@ -332,6 +308,25 @@ class ModelClient(BaseModelClient):
     def __exit__(self, *_):
         """Close resources used by ModelClient instance when exiting from the context."""
         self.close()
+
+    def load_model(self, config: Optional[str] = None, files: Optional[dict] = None):
+        """Load model on the Triton Inference Server.
+
+        Args:
+            config: str - Optional JSON representation of a model config provided for
+                the load request, if provided, this config will be used for
+                loading the model.
+            files: dict - Optional dictionary specifying file path (with "file:" prefix) in
+                the override model directory to the file content as bytes.
+                The files will form the model directory that the model will be
+                loaded from. If specified, 'config' must be provided to be
+                the model configuration of the override model directory.
+        """
+        self._general_client.load_model(self._model_name, config=config, files=files)
+
+    def unload_model(self):
+        """Unload model from the Triton Inference Server."""
+        self._general_client.unload_model(self._model_name)
 
     def close(self):
         """Close resources used by ModelClient.
@@ -375,6 +370,18 @@ class ModelClient(BaseModelClient):
         Also waits for server to get into readiness state.
         """
         return self.model_config.max_batch_size > 0
+
+    def wait_for_server(self, timeout_s: float):
+        """Wait for Triton Inference Server readiness.
+
+        Args:
+            timeout_s: timeout to server get into readiness state.
+
+        Raises:
+            PyTritonClientTimeoutError: If server is not in readiness state before given timeout.
+            KeyboardInterrupt: If hosting process receives SIGINT
+        """
+        wait_for_server_ready(self._general_client, timeout_s=timeout_s)
 
     @property
     def model_config(self) -> TritonModelConfig:
@@ -618,7 +625,7 @@ class ModelClient(BaseModelClient):
             self._wait_and_init_model_config(self._init_timeout_s)
 
     def _get_infer_extra_args(self):
-        if self._scheme == "http":
+        if self._triton_url.scheme == "http":
             return {}
         # For the GRPC protocol, the timeout is passed to the infer method as client_timeout
         # This timeout applies to the whole inference process and each network request
@@ -652,7 +659,7 @@ class DecoupledModelClient(ModelClient):
             init_timeout_s=init_timeout_s,
             inference_timeout_s=inference_timeout_s,
         )
-        if self._scheme == "http":
+        if self._triton_url.scheme == "http":
             raise PyTritonClientValueError("DecoupledModelClient is only supported for grpc protocol")
         self.queue = Queue()
 
@@ -806,7 +813,7 @@ class AsyncioModelClient(BaseModelClient):
 
     def get_lib(self):
         """Get Triton Inference Server Python client library."""
-        return {"grpc": tritonclient.grpc.aio, "http": tritonclient.http.aio}[self._scheme.lower()]
+        return {"grpc": tritonclient.grpc.aio, "http": tritonclient.http.aio}[self._triton_url.scheme.lower()]
 
     async def __aenter__(self):
         """Create context for use AsyncioModelClient as a context manager."""
@@ -1130,7 +1137,7 @@ class AsyncioModelClient(BaseModelClient):
         #  if the network request or the inference process takes longer than the timeout.
         #  This is a design choice of the underlying tritonclient library.
 
-        if self._scheme != "http":
+        if self._triton_url.scheme != "http":
             return {}
 
         kwargs = {
@@ -1140,7 +1147,7 @@ class AsyncioModelClient(BaseModelClient):
         return kwargs
 
     def _get_infer_extra_args(self):
-        if self._scheme == "http":
+        if self._triton_url.scheme == "http":
             return {}
         # For the GRPC protocol, the timeout is passed to the infer method as client_timeout
         # This timeout applies to the whole inference process and each network request

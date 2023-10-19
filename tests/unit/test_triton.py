@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -41,10 +41,8 @@ def test_triton_is_alive_return_false_when_not_initialized():
 
 
 def test_triton_server_initialize_server_with_default_arguments(mocker):
-    mocker.patch.object(Triton, "_prepare_triton_inference_server").return_value = TRITONSERVER_DIST_DIR
-
     triton = Triton()
-    triton._initialize_server()
+    triton._prepare_triton_inference_server()
 
     assert triton._triton_server_config["model_repository"] is not None
     assert triton._triton_server_config["backend_directory"] is not None
@@ -54,11 +52,9 @@ def test_triton_server_initialize_server_with_default_arguments(mocker):
 
 
 def test_triton_server_initialize_server_with_custom_arguments(mocker):
-    mocker.patch.object(Triton, "_prepare_triton_inference_server").return_value = TRITONSERVER_DIST_DIR
-
     config = TritonConfig(id="CustomId", model_repository=pathlib.Path("/tmp"), allow_metrics=False)
     triton = Triton(config=config)
-    triton._initialize_server()
+    triton._prepare_triton_inference_server()
 
     assert triton._triton_server_config["id"] == "CustomId"
     assert triton._triton_server_config["model_repository"] == "/tmp"
@@ -77,11 +73,10 @@ def test_triton_server_initialize_server_with_custom_arguments_and_env_variables
         "PYTRITON_TRITON_CONFIG_MODEL_REPOSITORY": "/opt",
     }
     mocker.patch("os.environ", new_callable=PropertyMock(return_value=updated_environ))
-    mocker.patch.object(Triton, "_prepare_triton_inference_server").return_value = TRITONSERVER_DIST_DIR
 
     config = TritonConfig(id="CustomId", model_repository=pathlib.Path("/tmp"), allow_metrics=False)
     triton = Triton(config=config)
-    triton._initialize_server()
+    triton._prepare_triton_inference_server()
 
     assert triton._triton_server_config["id"] == "CustomId"
     assert triton._triton_server_config["model_repository"] == "/tmp"

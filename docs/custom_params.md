@@ -62,8 +62,7 @@ def _infer_with_params_and_headers(requests):
 
 2. Bind inference callable to Triton ("header" is the prefix for custom headers):
 
-<!--pytest-codeblocks:cont-->
-
+<!--pytest.mark.skip-->
 ```python
 with Triton(config=TritonConfig(http_header_forward_pattern="header.*")) as triton:
     triton.bind(
@@ -79,9 +78,7 @@ with Triton(config=TritonConfig(http_header_forward_pattern="header.*")) as trit
         ],
         config=ModelConfig(max_batch_size=128),
     )
-```
-<!--pytest.mark.skip-->
-```python
+
     triton.serve()
 ```
 

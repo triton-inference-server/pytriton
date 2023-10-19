@@ -23,7 +23,7 @@ import tritonclient.grpc
 import tritonclient.http
 
 from pytriton.client.exceptions import PyTritonClientModelUnavailableError, PyTritonClientTimeoutError
-from pytriton.client.utils import ModelState, parse_grpc_response, parse_http_response
+from pytriton.client.utils import LATEST_MODEL_VERSION, ModelState, parse_grpc_response, parse_http_response
 from pytriton.model_config.parser import ModelConfigParser
 
 aio_clients = Union[tritonclient.grpc.aio.InferenceServerClient, tritonclient.http.aio.InferenceServerClient]
@@ -244,20 +244,15 @@ async def asyncio_wait_for_model_status_loaded(
     Raises:
         PyTritonClientTimeoutError: If obtain of model configuration didn't finish before given timeout.
     """
-    model_version_msg = model_version if model_version is not None else "<latest>"
+    model_version = model_version or ""
+    model_version_msg = model_version or LATEST_MODEL_VERSION
     _LOGGER.debug(f"Waiting for model {model_name}, {model_version_msg} to be ready")
     try:
         while True:
-            _LOGGER.debug(f"Getting model {model_name} state")
-            model_state = await asyncio_get_model_state(asyncio_client, model_name, model_version)
-            if model_state == ModelState.READY:
-                _LOGGER.debug(f"Checking if model {model_name} is ready")
-                is_model_ready = await asyncio_client.is_model_ready(model_name)
-                if is_model_ready:
-                    break
-            elif model_state == ModelState.UNAVAILABLE:
-                _LOGGER.error(f"Model {model_name}, {model_version} is unavailable.")
-                raise PyTritonClientModelUnavailableError(f"Model {model_name}, {model_version} is unavailable.")
+            _LOGGER.debug(f"Checking if model {model_name} is ready")
+            is_model_ready = await asyncio_client.is_model_ready(model_name, model_version)
+            if is_model_ready:
+                break
             _LOGGER.debug(f"Sleeping for {sleep_time_s} seconds")
             await asyncio.sleep(sleep_time_s)
     except asyncio.TimeoutError as e:
