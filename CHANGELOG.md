@@ -18,6 +18,12 @@ limitations under the License.
 
 ## Unreleased
 
+[//]: <> (put here on external component update with short summary what change or link to changelog)
+
+- Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.36.0](https://github.com/triton-inference-server/server/releases/tag/v2.36.0)
+
+## 0.4.0 (2023-10-20)
+
 - New: Remote Mode - PyTriton can be used to connect to a remote Triton Inference Server
   - Introduced RemoteTriton class which can be used to connect to a remote Triton Inference Server
     running on the same machine, by passing triton url.
