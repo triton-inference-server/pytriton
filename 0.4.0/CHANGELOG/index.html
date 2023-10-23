@@ -1,0 +1,1341 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../api/">
+      
+      
+        <link rel="next" href="../known_issues/">
+      
+      
+      <link rel="icon" href="../assets/favicon.png">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.6">
+    
+    
+      
+        <title>Changelog - PyTriton</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.35e1ed30.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.356b1318.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../assets/styles.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo">
+  
+    
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#changelog" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="PyTriton" class="md-header__button md-logo" aria-label="PyTriton" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            PyTriton
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Changelog
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/triton-inference-server/pytriton" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Git Repository
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="PyTriton" class="md-nav__button md-logo" aria-label="PyTriton" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    PyTriton
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/triton-inference-server/pytriton" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Git Repository
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Installation and Packaging
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Installation and Packaging
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Installation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../building/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Building binary package
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quick_start/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick Start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Deploying Models
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Deploying Models
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../initialization/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Triton Initialization
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../binding_models/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Binding Model to Triton
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../binding_configuration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Binding Configuration
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deploying_in_clusters/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Deploying in Clusters
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../remote_triton/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Triton Remote Mode
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Inference Handling
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Inference Handling
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../inference_callable/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Inference Callable
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../decorators/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Decorators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../custom_params/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom parameters/headers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../downloaded_input_data/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Example with downloaded input data
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../clients/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Clients
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Examples
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    API Reference
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Changelog
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Changelog
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    Unreleased
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#040-2023-10-20" class="md-nav__link">
+    0.4.0 (2023-10-20)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#031-2023-09-26" class="md-nav__link">
+    0.3.1 (2023-09-26)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#030-2023-09-05" class="md-nav__link">
+    0.3.0 (2023-09-05)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#025-2023-08-24" class="md-nav__link">
+    0.2.5 (2023-08-24)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#024-2023-08-10" class="md-nav__link">
+    0.2.4 (2023-08-10)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#023-2023-07-21" class="md-nav__link">
+    0.2.3 (2023-07-21)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#022-2023-07-19" class="md-nav__link">
+    0.2.2 (2023-07-19)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#021-2023-06-28" class="md-nav__link">
+    0.2.1 (2023-06-28)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#020-2023-05-30" class="md-nav__link">
+    0.2.0 (2023-05-30)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#015-2023-05-12" class="md-nav__link">
+    0.1.5 (2023-05-12)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#014-2023-03-16" class="md-nav__link">
+    0.1.4 (2023-03-16)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#013-2023-02-20" class="md-nav__link">
+    0.1.3 (2023-02-20)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#012-2023-02-14" class="md-nav__link">
+    0.1.2 (2023-02-14)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#011-2023-01-31" class="md-nav__link">
+    0.1.1 (2023-01-31)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#010-2023-01-12" class="md-nav__link">
+    0.1.0 (2023-01-12)
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../known_issues/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Known Issues
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../LICENSE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    License
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    Unreleased
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#040-2023-10-20" class="md-nav__link">
+    0.4.0 (2023-10-20)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#031-2023-09-26" class="md-nav__link">
+    0.3.1 (2023-09-26)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#030-2023-09-05" class="md-nav__link">
+    0.3.0 (2023-09-05)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#025-2023-08-24" class="md-nav__link">
+    0.2.5 (2023-08-24)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#024-2023-08-10" class="md-nav__link">
+    0.2.4 (2023-08-10)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#023-2023-07-21" class="md-nav__link">
+    0.2.3 (2023-07-21)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#022-2023-07-19" class="md-nav__link">
+    0.2.2 (2023-07-19)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#021-2023-06-28" class="md-nav__link">
+    0.2.1 (2023-06-28)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#020-2023-05-30" class="md-nav__link">
+    0.2.0 (2023-05-30)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#015-2023-05-12" class="md-nav__link">
+    0.1.5 (2023-05-12)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#014-2023-03-16" class="md-nav__link">
+    0.1.4 (2023-03-16)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#013-2023-02-20" class="md-nav__link">
+    0.1.3 (2023-02-20)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#012-2023-02-14" class="md-nav__link">
+    0.1.2 (2023-02-14)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#011-2023-01-31" class="md-nav__link">
+    0.1.1 (2023-01-31)
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#010-2023-01-12" class="md-nav__link">
+    0.1.0 (2023-01-12)
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<!--
+Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<h1 id="changelog">Changelog</h1>
+<h2 id="unreleased">Unreleased</h2>
+<ul>
+<li>Version of <a href="https://github.com/triton-inference-server/">Triton Inference Server</a> embedded in wheel: <a href="https://github.com/triton-inference-server/server/releases/tag/v2.36.0">2.36.0</a></li>
+</ul>
+<h2 id="040-2023-10-20">0.4.0 (2023-10-20)</h2>
+<ul>
+<li>New: Remote Mode - PyTriton can be used to connect to a remote Triton Inference Server</li>
+<li>Introduced RemoteTriton class which can be used to connect to a remote Triton Inference Server
+    running on the same machine, by passing triton url.</li>
+<li>Changed Triton lifecycle - now the Triton Inference Server is started while entering the context.
+    This allows to load models dynamically to the running server while calling the bind method.
+    It is still allowed to create Triton instance without entering the context and bind models before starting
+    the server (in this case the models are lazy loaded when calling run or serve method like it worked before).</li>
+<li>In RemoteTriton class, calling <strong>enter</strong> or connect method connects to triton server, so we can safely load models
+    while binding inference functions (if RemoteTriton is used without context manager, models are lazy loaded
+    when calling connect or serve method).</li>
+<li>Change: <code>@batch</code> decorator raises a <code>ValueError</code> if any of the outputs have a different batch size than expected.</li>
+<li>
+<p>fix: gevent resources leak in <code>FuturesModelClient</code></p>
+</li>
+<li>
+<p>Version of <a href="https://github.com/triton-inference-server/">Triton Inference Server</a> embedded in wheel: <a href="https://github.com/triton-inference-server/server/releases/tag/v2.36.0">2.36.0</a></p>
+</li>
+</ul>
+<h2 id="031-2023-09-26">0.3.1 (2023-09-26)</h2>
+<ul>
+<li>Change: <code>KeyboardInterrupt</code> is now handled in <code>triton.serve()</code>. PyTriton hosting scripts return an exit code of 0 instead of 130 when they receive a SIGINT signal.</li>
+<li>
+<p>Fix: Addressed potential instability in shared memory management.</p>
+</li>
+<li>
+<p>Version of <a href="https://github.com/triton-inference-server/">Triton Inference Server</a> embedded in wheel: <a href="https://github.com/triton-inference-server/server/releases/tag/v2.36.0">2.36.0</a></p>
+</li>
+</ul>
+<h2 id="030-2023-09-05">0.3.0 (2023-09-05)</h2>
+<ul>
+<li>new: Support for multiple Python versions starting from 3.8+</li>
+<li>new: Added support for <a href="https://github.com/triton-inference-server/server/blob/main/docs/user_guide/decoupled_models.md">decoupled models</a> enabling to support streaming models (alpha state)</li>
+<li>
+<p>change: Upgraded Triton Inference Server binaries to version 2.36.0. Note that this Triton Inference Server requires glibc 2.35+ or a more recent version.</p>
+</li>
+<li>
+<p>Version of <a href="https://github.com/triton-inference-server/">Triton Inference Server</a> embedded in wheel: <a href="https://github.com/triton-inference-server/server/releases/tag/v2.36.0">2.36.0</a></p>
+</li>
+</ul>
+<h2 id="025-2023-08-24">0.2.5 (2023-08-24)</h2>
+<ul>
+<li>new: Allow to execute multiple PyTriton instances in the same process and/or host</li>
+<li>
+<p>fix: Invalid flags for Proxy Backend configuration passed to Triton</p>
+</li>
+<li>
+<p>Version of <a href="https://github.com/triton-inference-server/">Triton Inference Server</a> embedded in wheel: <a href="https://github.com/triton-inference-server/server/releases/tag/v2.33.0">2.33.0</a></p>
+</li>
+</ul>
+<h2 id="024-2023-08-10">0.2.4 (2023-08-10)</h2>
+<ul>
+<li>new: Introduced <code>strict</code> flag in <code>Triton.bind</code> which enables data types and shapes validation of inference callable outputs
+  against model config</li>
+<li>new: <code>AsyncioModelClient</code> which works in FastAPI and other async frameworks</li>
+<li>fix: <code>FuturesModelClient</code> do not raise <code>gevent.exceptions.InvalidThreadUseError</code></li>
+<li>
+<p>fix: Do not throw TimeoutError if could not connect to server during model verification</p>
+</li>
+<li>
+<p>Version of <a href="https://github.com/triton-inference-server/">Triton Inference Server</a> embedded in wheel: <a href="https://github.com/triton-inference-server/server/releases/tag/v2.33.0">2.33.0</a></p>
+</li>
+</ul>
+<h2 id="023-2023-07-21">0.2.3 (2023-07-21)</h2>
+<ul>
+<li>Improved verification of Proxy Backend environment when running under same Python interpreter</li>
+<li>
+<p>Fixed pytriton.<strong>version</strong> to represent currently installed version</p>
+</li>
+<li>
+<p>Version of <a href="https://github.com/triton-inference-server/">Triton Inference Server</a> embedded in wheel: <a href="https://github.com/triton-inference-server/server/releases/tag/v2.33.0">2.33.0</a></p>
+</li>
+</ul>
+<h2 id="022-2023-07-19">0.2.2 (2023-07-19)</h2>
+<ul>
+<li>Added <code>inference_timeout_s</code> parameters to client classes</li>
+<li>Renamed <code>PyTritonClientUrlParseError</code> to <code>PyTritonClientInvalidUrlError</code></li>
+<li><code>ModelClient</code> and <code>FuturesModelClient</code> methods raise <code>PyTritonClientClosedError</code> when used after client is closed</li>
+<li>Pinned tritonclient dependency due to issues with tritonclient &gt;= 2.34 on systems with glibc version lower than 2.34</li>
+<li>
+<p>Added warning after Triton Server setup and teardown while using too verbose logging level as it may cause a significant performance drop in model inference</p>
+</li>
+<li>
+<p>Version of <a href="https://github.com/triton-inference-server/">Triton Inference Server</a> embedded in wheel: <a href="https://github.com/triton-inference-server/server/releases/tag/v2.33.0">2.33.0</a></p>
+</li>
+</ul>
+<h2 id="021-2023-06-28">0.2.1 (2023-06-28)</h2>
+<ul>
+<li>Fixed handling <code>TritonConfig.cache_directory</code> option - the directory was always overwritten with the default value.</li>
+<li>Fixed tritonclient dependency - PyTriton need tritonclient supporting http headers and parameters</li>
+<li>
+<p>Improved shared memory usage to match 64MB limit (default value for Docker, Kubernetes) reducing the initial size for PyTriton Proxy Backend.</p>
+</li>
+<li>
+<p>Version of <a href="https://github.com/triton-inference-server/">Triton Inference Server</a> embedded in wheel: <a href="https://github.com/triton-inference-server/server/releases/tag/v2.33.0">2.33.0</a></p>
+</li>
+</ul>
+<h2 id="020-2023-05-30">0.2.0 (2023-05-30)</h2>
+<ul>
+<li>Added support for using custom HTTP/gRPC request headers and parameters.</li>
+</ul>
+<p>This change breaks backward compatibility of the inference function signature.
+  The undecorated inference function now accepts a list of <code>Request</code> instances instead
+  of a list of dictionaries. The <code>Request</code> class contains data for inputs and parameters
+  for combined parameters and headers.</p>
+<p>See <a href="docs/custom_params.md">docs/custom_params.md</a> for further information</p>
+<ul>
+<li>Added <code>FuturesModelClient</code> which enables sending inference requests in a parallel manner.</li>
+<li>
+<p>Added displaying documentation link after models are loaded.</p>
+</li>
+<li>
+<p>Version of <a href="https://github.com/triton-inference-server/">Triton Inference Server</a> embedded in wheel: <a href="https://github.com/triton-inference-server/server/releases/tag/v2.33.0">2.33.0</a></p>
+</li>
+</ul>
+<h2 id="015-2023-05-12">0.1.5 (2023-05-12)</h2>
+<ul>
+<li>Improved <code>pytriton.decorators.group_by_values</code> function</li>
+<li>Modified the function to avoid calling the inference callable on each individual sample when grouping by string/bytes input</li>
+<li>Added <code>pad_fn</code> argument for easy padding and combining of the inference results</li>
+<li>Fixed Triton binaries search</li>
+<li>
+<p>Improved Workspace management (remove workspace on shutdown)</p>
+</li>
+<li>
+<p>Version of external components used during testing:</p>
+</li>
+<li><a href="https://github.com/triton-inference-server/">Triton Inference Server</a>: 2.29.0</li>
+<li>Other component versions depend on the used framework and Triton Inference Server containers versions.
+    Refer to its <a href="https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html">support matrix</a>
+    for a detailed summary.</li>
+</ul>
+<h2 id="014-2023-03-16">0.1.4 (2023-03-16)</h2>
+<ul>
+<li>Add validation of the model name passed to Triton bind method.</li>
+<li>
+<p>Add monkey patching of <code>InferenceServerClient.__del__</code> method to prevent unhandled exceptions.</p>
+</li>
+<li>
+<p>Version of external components used during testing:</p>
+</li>
+<li><a href="https://github.com/triton-inference-server/">Triton Inference Server</a>: 2.29.0</li>
+<li>Other component versions depend on the used framework and Triton Inference Server containers versions.
+    Refer to its <a href="https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html">support matrix</a>
+    for a detailed summary.</li>
+</ul>
+<h2 id="013-2023-02-20">0.1.3 (2023-02-20)</h2>
+<ul>
+<li>
+<p>Fixed getting model config in <code>fill_optionals</code> decorator.</p>
+</li>
+<li>
+<p>Version of external components used during testing:</p>
+</li>
+<li><a href="https://github.com/triton-inference-server/">Triton Inference Server</a>: 2.29.0</li>
+<li>Other component versions depend on the used framework and Triton Inference Server containers versions.
+    Refer to its <a href="https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html">support matrix</a>
+    for a detailed summary.</li>
+</ul>
+<h2 id="012-2023-02-14">0.1.2 (2023-02-14)</h2>
+<ul>
+<li>Fixed wheel build to support installations on operating systems with glibc version 2.31 or higher.</li>
+<li>Updated the documentation on custom builds of the package.</li>
+<li>Change: TritonContext instance is shared across bound models and contains model_configs dictionary.</li>
+<li>
+<p>Fixed support of binding multiple models that uses methods of the same class.</p>
+</li>
+<li>
+<p>Version of external components used during testing:</p>
+</li>
+<li><a href="https://github.com/triton-inference-server/">Triton Inference Server</a>: 2.29.0</li>
+<li>Other component versions depend on the used framework and Triton Inference Server containers versions.
+    Refer to its <a href="https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html">support matrix</a>
+    for a detailed summary.</li>
+</ul>
+<h2 id="011-2023-01-31">0.1.1 (2023-01-31)</h2>
+<ul>
+<li>Change: The <code>@first_value</code> decorator has been updated with new features:</li>
+<li>Renamed from <code>@first_values</code> to <code>@first_value</code></li>
+<li>Added a <code>strict</code> flag to toggle the checking of equality of values on a single selected input of the request. Default is True</li>
+<li>Added a <code>squeeze_single_values</code> flag to toggle the squeezing of single value ND arrays to scalars. Default is True</li>
+<li>Fix: <code>@fill_optionals</code> now supports non-batching models</li>
+<li>Fix: <code>@first_value</code> fixed to work with optional inputs</li>
+<li>Fix: <code>@group_by_values</code> fixed to work with string inputs</li>
+<li>
+<p>Fix: <code>@group_by_values</code> fixed to work per sample-wise</p>
+</li>
+<li>
+<p>Version of external components used during testing:</p>
+</li>
+<li><a href="https://github.com/triton-inference-server/">Triton Inference Server</a>: 2.29.0</li>
+<li>Other component versions depend on the used framework and Triton Inference Server containers versions.
+    Refer to its <a href="https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html">support matrix</a>
+    for a detailed summary.</li>
+</ul>
+<h2 id="010-2023-01-12">0.1.0 (2023-01-12)</h2>
+<ul>
+<li>
+<p>Initial release of PyTriton</p>
+</li>
+<li>
+<p>Version of external components used during testing:</p>
+</li>
+<li><a href="https://github.com/triton-inference-server/">Triton Inference Server</a>: 2.29.0</li>
+<li>Other component versions depend on the used framework and Triton Inference Server containers versions.
+    Refer to its <a href="https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html">support matrix</a>
+    for a detailed summary.</li>
+</ul>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12Z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <!--
+Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+Copyright © 2022 NVIDIA Corporation
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.top"], "search": "../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.aecac24b.min.js"></script>
+      
+    
+  </body>
+</html>
