@@ -300,7 +300,7 @@ class Model:
             LOGGER.error("Internal proxy backend error. It will be closed.")
             LOGGER.exception(exception)
         finally:
-            LOGGER.info("Closing socket")
+            LOGGER.debug("Closing handshake socket")
             socket_close_timeout_s = 0
             socket.close(linger=socket_close_timeout_s)
 

@@ -76,6 +76,7 @@ nav:
       - Binding Model to Triton: binding_models.md
       - Binding Configuration: binding_configuration.md
       - Deploying in Clusters: deploying_in_clusters.md
+      - Triton Remote Mode: remote_triton.md
   - Inference Handling:
       - Inference Callable: inference_callable.md
       - Decorators: decorators.md
