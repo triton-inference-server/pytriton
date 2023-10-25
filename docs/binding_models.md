@@ -18,7 +18,8 @@ limitations under the License.
 The Triton class provides methods to bind one or multiple models to the Triton server in order to expose HTTP/gRPC
 endpoints for inference serving:
 
-```python {"skip": true}
+<!--pytest.mark.skip-->
+```python
 import numpy as np
 from pytriton.decorators import batch
 from pytriton.model_config import ModelConfig, Tensor
@@ -69,7 +70,7 @@ in [Inference Callable](inference_callable.md) page.**
 
 In the simplest implementation for functionality that passes input data on output, a lambda can be used:
 
-```python {"skip": true}
+```python
 import numpy as np
 from pytriton.model_config import ModelConfig, Tensor
 from pytriton.triton import Triton
@@ -97,6 +98,7 @@ The example presents multiple instances of the Linear PyTorch model loaded on se
 First, define the wrapper class for the inference handler. The class initialization receives a model and device as
 arguments. The inference handling is done by method `__call__` where the `model` instance is called:
 
+<!--pytest-codeblocks:cont-->
 ```python
 import torch
 from pytriton.decorators import batch
@@ -132,9 +134,9 @@ def _infer_function_factory(devices):
 
 Finally, the list of callable objects is passed to `infer_func` parameter of the `Triton.bind` function:
 
-<!--pytest-codeblocks:cont-->
+<!--pytest.mark.skip-->
 
-```python {"skip": true}
+```python
 import numpy as np
 from pytriton.triton import Triton
 from pytriton.model_config import ModelConfig, Tensor
@@ -165,6 +167,7 @@ correctly map the input and output data passed through the Triton Inference Serv
 
 The simplest definition of model inputs and outputs expects providing the type of data and the shape per input:
 
+<!--pytest-codeblocks:cont-->
 ```python
 import numpy as np
 from pytriton.model_config import Tensor

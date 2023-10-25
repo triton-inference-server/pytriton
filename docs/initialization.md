@@ -25,7 +25,8 @@ block and non-blocking mode for tests and deployment.
 Connecting Python models with Triton Inference Server working in the current environment requires creating
 a [Triton][pytriton.triton.Triton] object. This can be done by creating a context:
 
-```python {"skip": true}
+<!--pytest.mark.skip-->
+```python
 from pytriton.triton import Triton
 
 with Triton() as triton:
@@ -34,6 +35,7 @@ with Triton() as triton:
 
 or simply creating an object:
 
+<!--pytest-codeblocks:cont-->
 ```python
 from pytriton.triton import Triton
 
@@ -42,7 +44,8 @@ triton = Triton()
 
 The Triton Inference Server behavior can be configured by passing [config][pytriton.triton.TritonConfig] parameter:
 
-```python {"skip": true}
+<!--pytest.mark.skip-->
+```python
 import pathlib
 from pytriton.triton import Triton, TritonConfig
 
@@ -70,7 +73,8 @@ The order of precedence of configuration methods is:
 The blocking mode will stop the execution of the current thread and wait for incoming HTTP/gRPC requests for inference
 execution. This mode makes your application behave as a pure server. The example of using blocking mode:
 
-```python {"skip": true}
+<!--pytest.mark.skip-->
+```python
 from pytriton.triton import Triton
 
 with Triton() as triton:
@@ -83,7 +87,7 @@ with Triton() as triton:
 The background mode runs Triton as a subprocess and does not block the execution of the current thread. In this mode, you can run
 Triton Inference Server and interact with it from the current context. The example of using background mode:
 
-```python {"skip": true}
+```python
 from pytriton.triton import Triton
 
 triton = Triton()

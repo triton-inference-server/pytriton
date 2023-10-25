@@ -63,9 +63,9 @@ control over the order of initialized objects or models.
 
 To use the inference callable with PyTriton, it must be bound to a Triton server instance using the `bind` method:
 
-<!--pytest-codeblocks:cont-->
+<!--pytest.mark.skip-->
 
-```python {"skip": true}
+```python
 import numpy as np
 from pytriton.triton import Triton
 from pytriton.model_config import ModelConfig, Tensor

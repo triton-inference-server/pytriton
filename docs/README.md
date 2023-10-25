@@ -89,9 +89,8 @@ Server and the defined `infer_fn`.
 In the blocking mode, we suggest using the `Triton` object as a context manager where multiple models can be loaded in
 the way presented below:
 
-<!--pytest-codeblocks:cont-->
-
-```python {"skip": true}
+<!--pytest.mark.skip-->
+```python
 from pytriton.triton import Triton
 from pytriton.model_config import ModelConfig, Tensor
 
@@ -114,7 +113,8 @@ At this point, you have defined how the model has to be handled by Triton and wh
 to be directed. The last part for serving the model is to call the `serve` method on the Triton object:
 
 
-```python {"skip": true}
+<!--pytest.mark.skip-->
+```python
 with Triton() as triton:
     # ...
     triton.serve()
@@ -133,6 +133,7 @@ want to perform after loading and starting serving the model.
 Having the `infer_fn` defined in the same way as described in the [serving the models](#serving-the-models) section, you
 can use the `Triton` object without a context:
 
+<!--pytest-codeblocks:cont-->
 ```python
 from pytriton.triton import Triton
 triton = Triton()
@@ -168,8 +169,8 @@ triton.bind(
 
 Finally, to run the model in background mode, use the `run` method:
 
-
-```python {"skip": true}
+<!--pytest.mark.skip-->
+```python
 triton.run()
 ```
 
@@ -179,7 +180,8 @@ When the `.run()` method is called on the `Triton` object, the inference queries
 The Triton server can be stopped at any time using the `stop` method:
 
 
-```python {"skip": true}
+<!--pytest.mark.skip-->
+```python
 triton.stop()
 ```
 

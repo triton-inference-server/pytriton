@@ -28,7 +28,8 @@ in separate python script).
 
 RemoteTriton binds remote model to existing Triton Inference Server.
 
-```python {"skip": true}
+<!--pytest.mark.skip-->
+```python
 import numpy as np
 
 from pytriton.decorators import batch
