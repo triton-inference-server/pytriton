@@ -416,8 +416,11 @@ class TritonBase:
         """
         self.connect()
         with self._cv:
-            while self.is_alive():
-                self._cv.wait(timeout=monitoring_period_s)
+            try:
+                while self.is_alive():
+                    self._cv.wait(timeout=monitoring_period_s)
+            except KeyboardInterrupt:
+                LOGGER.info("SIGINT received, exiting.")
             self.stop()
 
     def stop(self) -> bool:
