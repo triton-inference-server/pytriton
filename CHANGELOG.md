@@ -18,11 +18,13 @@ limitations under the License.
 
 ## Unreleased
 
-- fix: recover handling `KeyboardInterrupt` in `triton.serve()`
+- Fix: recover handling `KeyboardInterrupt` in `triton.serve()`
+- Build scripts update
+  - Added support for arm64 platform builds
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 
-- Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.36.0](https://github.com/triton-inference-server/server/releases/tag/v2.36.0)
+- Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.37.0](https://github.com/triton-inference-server/server/releases/tag/v2.37.0)
 
 ## 0.4.0 (2023-10-20)
 

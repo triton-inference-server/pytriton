@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,14 +36,14 @@ export PRINT_HELP_PYSCRIPT
 
 BROWSER := python -c "$$BROWSER_PYSCRIPT"
 PIP_INSTALL := pip install --extra-index-url https://pypi.ngc.nvidia.com
-TRITONSERVER_IMAGE_VERSION = 23.07
+TRITONSERVER_IMAGE_VERSION = 23.08
 TRITONSERVER_IMAGE_NAME = nvcr.io/nvidia/tritonserver:$(TRITONSERVER_IMAGE_VERSION)-pyt-python-py3
 TRITONSERVER_OUTPUT_DIR = ${PWD}/pytriton/tritonserver
 TRITONSERVER_BASENAME = pytriton
 PYTRITON_IMAGE_NAME = $(TRITONSERVER_BASENAME):$(TRITONSERVER_IMAGE_VERSION)
-# to set PLATFORM from outside, use: make PLATFORM=linux/aarch64;
-# correct values are: linux/x86_64 (default), linux/aarch64
-PLATFORM=linux/x86_64
+# to set PLATFORM from outside, use: make PLATFORM=linux/arm64;
+# correct values are: linux/amd64 (default), linux/arm64
+PLATFORM=linux/amd64
 
 help:
 	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
@@ -99,8 +99,9 @@ coverage: ## check code coverage quickly with the default Python
 	$(BROWSER) htmlcov/index.html
 
 dist: clean build-triton extract-triton ## builds source and wheel package
-	python3 -m build .
-	find ./dist -iname *-linux*.whl -type f -exec bash ./scripts/add_libs_to_wheel.sh $(PYTRITON_IMAGE_NAME) $(TRITONSERVER_OUTPUT_DIR) {} ${PLATFORM} \;
+	bash ./scripts/build_wheel.sh $(PLATFORM)
+	ls -lh dist
+	find ./dist -iname *-linux*.whl -type f -exec bash ./scripts/add_libs_to_wheel.sh $(PYTRITON_IMAGE_NAME) $(TRITONSERVER_OUTPUT_DIR) {} $(PLATFORM) \;
 	find ./dist -iname *-linux*.whl -type f -delete
 	ls -lh dist
 	twine check dist/*

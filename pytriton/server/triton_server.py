@@ -164,7 +164,7 @@ class TritonServer:
             )
             self._tritonserver_running_cmd.process.signal(signal.SIGINT)
             try:
-                LOGGER.debug("Waiting for process to stop")
+                LOGGER.debug("Waiting for process to stop.")
                 self._tritonserver_running_cmd.wait(timeout=SERVER_OUTPUT_TIMEOUT_SECS)
             except Exception:
                 message = traceback.format_exc()

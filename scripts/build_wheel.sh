@@ -1,4 +1,5 @@
-# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+#!/usr/bin/env bash
+# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,15 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-ARG FROM_IMAGE_NAME=nvcr.io/nvidia/tensorflow:23.08-tf2-py3
-FROM ${FROM_IMAGE_NAME}
 
-ENV XLA_PYTHON_CLIENT_PREALLOCATE=false
-ENV NCCL_LAUNCH_MODE="PARALLEL"
+set -xe
 
-WORKDIR /workdir
+DOCKER_PLATFORM=${1}
 
-COPY install.sh .
-RUN ./install.sh
-
-COPY . .
+WHEEL_ARCH=$(echo ${DOCKER_PLATFORM} | sed -e 's/^linux\/amd64$/linux_x86_64/g' -e  's/^linux\/arm64$/linux_aarch64/g')
+python3 -m build --wheel -C="--build-option=--plat-name" -C="--build-option=${WHEEL_ARCH}" .
+python3 -m build --sdist .

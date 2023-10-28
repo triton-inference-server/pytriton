@@ -27,8 +27,9 @@ fi
 docker pull -q --platform "${PLATFORM}" "${TRITON_SERVER_IMAGE}"
 
 if [[ "$(docker images -q "${PYTRITON_IMAGE_NAME}" 2> /dev/null)" == "" ]] || [[ "${PYTRITON_IMAGE_REBUILD}" == "1" ]]; then
-  docker build --platform "${PLATFORM}" \
+  docker buildx build --force-rm \
+    --platform "${PLATFORM}" \
     --build-arg FROM_IMAGE="${TRITON_SERVER_IMAGE}" \
     --file scripts/Dockerfile.build \
-    --tag "${PYTRITON_IMAGE_NAME}" .
+    --tag "${PYTRITON_IMAGE_NAME}" ${DOCKER_BUILD_ADDITIONAL_FLAGS} .
 fi

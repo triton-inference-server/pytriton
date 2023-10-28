@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,10 +25,15 @@ DIST_DIR="$(dirname "${WHEEL_PATH}")"
 
 DOCKER_PLATFORM=${4}
 # get arch from DOCKER_PLATFORM
-ARCH=$(echo "${DOCKER_PLATFORM}" | cut -d'/' -f2)
-WHEEL_PLATFORM=manylinux_2_35_${ARCH}
+DOCKER_ARCH=$(echo "${DOCKER_PLATFORM}" | cut -d'/' -f2)
+if [[ "$DOCKER_ARCH" == "amd64" ]]; then
+  WHEEL_ARCH=x86_64
+elif [[ "$DOCKER_ARCH" == "arm64" ]]; then
+  WHEEL_ARCH=aarch64
+fi
+WHEEL_PLATFORM=manylinux_2_35_${WHEEL_ARCH}
 
-DOCKER_CONTAINER_ID=$(docker create --rm --platform ${DOCKER_PLATFORM} -w "${PWD}" "${PYTRITON_IMAGE_NAME}" bash -c "sleep 1h")
+DOCKER_CONTAINER_ID=$(docker create --rm --platform "${DOCKER_PLATFORM}" -w "${PWD}" "${PYTRITON_IMAGE_NAME}" bash -c "sleep 1h")
 docker start "${DOCKER_CONTAINER_ID}"
 
 docker exec "${DOCKER_CONTAINER_ID}" mkdir -p "${DIST_DIR}"

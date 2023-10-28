@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -75,7 +75,7 @@ dev = [
     "nvidia-pytriton[test]",
     "nvidia-pytriton[doc]",
     "black >= 22.8",
-    "build >= 0.8",
+    "build >= 0.8, <1.0.0", # to support --plat-name for multiarch build
     "ipython >= 7.16",
     "isort >= 5.10",
     "pudb >= 2022.1.3",

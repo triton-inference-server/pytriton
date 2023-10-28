@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Server shows online learning model concept."""
+import argparse
 import logging
 import threading
 from queue import Queue
@@ -26,7 +27,7 @@ from torch.optim.lr_scheduler import StepLR  # pytype: disable=import-error
 
 from pytriton.decorators import batch
 from pytriton.model_config import ModelConfig, Tensor
-from pytriton.triton import Triton
+from pytriton.triton import Triton, TritonConfig
 
 from model import Net  # pytype: disable=import-error # isort:skip
 
@@ -132,13 +133,29 @@ class OnlineLearning(threading.Thread):
         return {"predictions": res}
 
 
+def _parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Enable verbose logging in debug mode.",
+    )
+    return parser.parse_args()
+
+
 def main():
+    args = _parse_args()
+    log_verbose = 1 if args.verbose else 0
+    log_level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(name)s: %(message)s")
+
     online_learning_model = OnlineLearning(
         device=torch.device("cuda"), lr=1.0, gamma=0.7, epoch_size=134, max_queue_size=1000
     )
     online_learning_model.start()
     try:
-        with Triton() as triton:
+        with Triton(config=TritonConfig(log_verbose=log_verbose)) as triton:
             LOGGER.info("Loading OnlineLearning model")
             triton.bind(
                 model_name="MnistTrain",

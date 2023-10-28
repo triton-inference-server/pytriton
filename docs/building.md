@@ -28,6 +28,17 @@ Before building the PyTriton binary package, ensure the following:
 - Docker is installed on the system. For more information, refer to the Docker documentation.
 - Access to the Docker daemon is available from the system or container.
 
+If you plan to build `arm64` wheel on `amd64` machine we suggest to use QUEMU for emulation.
+To enable QUEMU on Ubuntu you need to:
+- Install the QEMU packages on your x86 machine:
+```shell
+sudo apt-get install qemu binfmt-support qemu-user-static
+```
+- Register the QEMU emulators for ARM architectures:
+```shell
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+```
+
 ## Building PyTriton binary package
 
 To build the wheel binary package, follow these steps from the root directory of the project:
@@ -37,11 +48,19 @@ make install-dev
 make dist
 ```
 
+*Note*: The default build create wheel for `x86_64` architecture. If you would like to build the wheel for `aarch64` use
+```shell
+make dist -e PLATFORM=linux/arm64
+```
+We use Docker convention name for platforms. The supported options are `linux/amd64` and `linux/arm64`.
+
 The wheel package will be located in the `dist` directory. To install the library, run the following `pip` command:
 
 ```shell
-pip install dist/nvidia_pytriton-*-py3-none-*_x86_64.whl
+pip install dist/nvidia_pytriton-*-py3-none-*.whl
 ```
+
+*Note*: The wheel name would have `x86_64` or `aarch64` in name based on selected platform.
 
 ## Building for a specific Triton Inference Server version
 
@@ -58,12 +77,9 @@ For more information on the Triton Inference Server build process, refer to the
     officially supported. You can test the build by following the steps outlined in the
     [Triton Inference Server testing guide](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/test.md).
 
-Using the following [docker method steps](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/build.md#building-with-docker),
-you can create a `tritonserver:latest` Docker image that can be used to build PyTriton with the following command:
-
 By the following [docker method steps](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/build.md#building-with-docker)
 you can create a `tritonserver:latest` Docker image that can be used to build PyTriton with the following command:
 
 ```shell
-make TRITONSERVER_IMAGE_NAME=tritonserver:latest dist
+make dist -e TRITONSERVER_IMAGE_VERSION=latest -e TRITONSERVER_IMAGE_NAME=tritonserver:latest
 ```

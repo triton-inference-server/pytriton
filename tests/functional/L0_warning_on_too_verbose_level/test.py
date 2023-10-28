@@ -23,6 +23,7 @@ from tests.utils import search_warning_on_too_verbose_log_level
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 METADATA = {
     "image_name": "nvcr.io/nvidia/pytorch:{TEST_CONTAINER_VERSION}-py3",
+    "platforms": ["amd64", "arm64"],
 }
 
 

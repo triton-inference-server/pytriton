@@ -22,7 +22,7 @@ from pytriton.decorators import batch
 from pytriton.model_config import ModelConfig, Tensor
 from pytriton.triton import Triton
 
-logger = logging.getLogger("examples.linear_cupy.server")
+LOGGER = logging.getLogger("examples.linear_cupy.server")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s: %(message)s")
 
 VECTOR_SIZE = 10
@@ -42,7 +42,7 @@ class LinearModel:
 
 
 with Triton() as triton:
-    logger.info("Loading linear model")
+    LOGGER.info("Loading linear model")
     lin_model = LinearModel()
     triton.bind(
         model_name="Linear",
@@ -57,5 +57,5 @@ with Triton() as triton:
         config=ModelConfig(max_batch_size=128),
         strict=True,
     )
-    logger.info("Serving model")
+    LOGGER.info("Serving model")
     triton.serve()

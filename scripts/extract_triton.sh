@@ -21,7 +21,7 @@ export PLATFORM=$3
 
 rm -rf "${TARGET_DIR}"
 
-export PYTRITON_CONTAINER_ID=$(docker create --rm "${PYTRITON_IMAGE_NAME}" bash -c "sleep 1h")
+export PYTRITON_CONTAINER_ID=$(docker create --platform "$PLATFORM" --rm "${PYTRITON_IMAGE_NAME}" bash -c "sleep 1h")
 docker start "${PYTRITON_CONTAINER_ID}"
 
 mkdir -p "${TARGET_DIR}"/backends/python

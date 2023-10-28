@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ apt install -y software-properties-common
 
 add-apt-repository ppa:deadsnakes/ppa -y
 
-apt install -y python3.8 libpython3.8 python3.8-distutils python3.8-venv python3-pip python-is-python3 \
+apt install -y python3.8 python3.8-dev libpython3.8 python3.8-distutils python3.8-venv python3-pip python-is-python3 \
      build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libsqlite3-dev libreadline-dev \
      libffi-dev curl libbz2-dev pkg-config make
 

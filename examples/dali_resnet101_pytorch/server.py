@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import argparse
+import logging
 
 import numpy as np  # pytype: disable=import-error
 import nvidia.dali.fn as fn  # pytype: disable=import-error
@@ -27,6 +28,8 @@ from pytriton.model_config import DynamicBatcher, ModelConfig, Tensor
 from pytriton.triton import Triton, TritonConfig
 
 MAX_BATCH_SIZE = 32
+
+LOGGER = logging.getLogger("examples.dali_resnet101_pytorch.server")
 
 
 @pipeline_def(batch_size=MAX_BATCH_SIZE, num_threads=4, device_id=0, prefetch_queue_depth=1)
@@ -141,7 +144,11 @@ def parse_args():
 
 def main():
     args = parse_args()
-    with Triton(config=TritonConfig(log_verbose=args.verbose)) as triton:
+    log_verbose = 1 if args.verbose else 0
+    log_level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(name)s: %(message)s")
+
+    with Triton(config=TritonConfig(log_verbose=log_verbose)) as triton:
         triton.bind(
             model_name="ResNet101",
             infer_func=_infer_fn,
