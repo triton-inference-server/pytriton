@@ -29,7 +29,7 @@ auditwheel.policy.external_references.LIBPYTHON_RE = re.compile(r"__libpython\d\
 
 # Policies to ignore attaching Python libraries to wheel during fixing dependencies
 for p in POLICIES:
-    for version in ["3.8", "3.9", "3.10", "3.11"]:
+    for version in ["3.8", "3.9", "3.10", "3.11", "3.12"]:
         p["lib_whitelist"].append(f"libpython{version}.so.1.0")
 
 if __name__ == "__main__":

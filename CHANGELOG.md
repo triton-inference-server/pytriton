@@ -18,6 +18,7 @@ limitations under the License.
 
 ## Unreleased
 
+- New: support for Python 3.12
 - Fix: recover handling `KeyboardInterrupt` in `triton.serve()`
 - Build scripts update
   - Added support for arm64 platform builds

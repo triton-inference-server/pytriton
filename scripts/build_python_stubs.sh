@@ -24,7 +24,7 @@ fi
 
 export GIT_BRANCH_NAME="r${NVIDIA_TRITON_SERVER_VERSION}"
 
-PYTHON_VERSION=("3.8" "3.9" "3.10" "3.11")
+PYTHON_VERSION=("3.8" "3.9" "3.10" "3.11" "3.12")
 for version in "${PYTHON_VERSION[@]}"; do
   pyenv install -f ${version}
 done
