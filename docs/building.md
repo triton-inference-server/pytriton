@@ -25,7 +25,7 @@ Additionally, it allows you to incorporate hotfixes that have not yet been offic
 
 Before building the PyTriton binary package, ensure the following:
 
-- Docker is installed on the system. For more information, refer to the Docker documentation.
+- Docker with [buildx plugin](https://github.com/docker/buildx) is installed on the system. For more information, refer to the Docker documentation.
 - Access to the Docker daemon is available from the system or container.
 
 If you plan to build `arm64` wheel on `amd64` machine we suggest to use QUEMU for emulation.
