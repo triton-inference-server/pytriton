@@ -28,6 +28,7 @@ RUN apt update -y && apt install -y build-essential \
   libssl-dev \
   libsqlite3-dev \
   libbz2-dev \
+  liblzma-dev \
   libffi-dev \
   libreadline-dev
 
