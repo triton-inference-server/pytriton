@@ -26,7 +26,7 @@ fi
 # fetch base image earlier as in some environments there are issues with pulling base images while building
 docker pull -q --platform "${PLATFORM}" "${TRITON_SERVER_IMAGE}"
 
-if [[ "$(docker images -q "${PYTRITON_IMAGE_NAME}" 2> /dev/null)" == "" ]] || [[ "${PYTRITON_IMAGE_REBUILD}" == "1" ]]; then
+if [[ "$(docker images -q --platform "${PLATFORM}" "${PYTRITON_IMAGE_NAME}" 2> /dev/null)" == "" ]] || [[ "${PYTRITON_IMAGE_REBUILD}" == "1" ]]; then
   docker buildx build --force-rm \
     --platform "${PLATFORM}" \
     --build-arg FROM_IMAGE="${TRITON_SERVER_IMAGE}" \
