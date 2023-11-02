@@ -19,14 +19,16 @@ export PLATFORM=$3
 set -x
 
 # check if docker image name has docker registry prefix to not try to pull development image
-if [[ "${PYTRITON_IMAGE_NAME}" == *"/"* ]]; then
+PULL_RESULT="1"
+if [[ "${PYTRITON_IMAGE_NAME}" == *"/"* && "${PYTRITON_IMAGE_REBUILD}" != "1" ]]; then
   docker pull -q --platform "${PLATFORM}" "${PYTRITON_IMAGE_NAME}"
+  PULL_RESULT=$?
 fi
 
 # fetch base image earlier as in some environments there are issues with pulling base images while building
 docker pull -q --platform "${PLATFORM}" "${TRITON_SERVER_IMAGE}"
 
-if [[ "$(docker images -q --platform "${PLATFORM}" "${PYTRITON_IMAGE_NAME}" 2> /dev/null)" == "" ]] || [[ "${PYTRITON_IMAGE_REBUILD}" == "1" ]]; then
+if [[ "${PULL_RESULT}" != "0" ]]; then
   docker buildx build --force-rm \
     --platform "${PLATFORM}" \
     --build-arg FROM_IMAGE="${TRITON_SERVER_IMAGE}" \
