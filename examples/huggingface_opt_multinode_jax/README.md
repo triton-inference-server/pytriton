@@ -90,7 +90,7 @@ The easiest way of running this example is inside a [nvcr.io](https://catalog.ng
 container. Example `Dockerfile` that can be used to run the server:
 
 ```Dockerfile
-ARG FROM_IMAGE_NAME=nvcr.io/nvidia/tensorflow:23.08-tf2-py3
+ARG FROM_IMAGE_NAME=nvcr.io/nvidia/tensorflow:23.10-tf2-py3
 FROM ${FROM_IMAGE_NAME}
 
 ENV XLA_PYTHON_CLIENT_PREALLOCATE=false
@@ -181,7 +181,7 @@ export DOCKER_IMAGE_NAME_WITH_TAG=localhost:5000/jax-example:latest
 
 ```shell
 # Export the base image used for build. We use TensorFlow image for JAX
-export FROM_IMAGE_NAME=nvcr.io/nvidia/tensorflow:23.08-tf2-py3
+export FROM_IMAGE_NAME=nvcr.io/nvidia/tensorflow:23.10-tf2-py3
 ./examples/huggingface_opt_multinode_jax/kubernetes/build_and_push.sh
 ```
 **Note**: By default the container is built using `pytriton` package from pypi.org. To build container with wheel built

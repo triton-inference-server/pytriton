@@ -22,7 +22,7 @@ fi
 if [ -z ${FROM_IMAGE_NAME} ]; then
   echo "Provide Docker image that would be used as base image"
   echo "Example:"
-  echo "    export FROM_IMAGE_NAME=nvcr.io/nvidia/pytorch:23.08-py3"
+  echo "    export FROM_IMAGE_NAME=nvcr.io/nvidia/pytorch:23.10-py3"
   exit 1
 fi
 

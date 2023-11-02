@@ -36,7 +36,7 @@ export PRINT_HELP_PYSCRIPT
 
 BROWSER := python -c "$$BROWSER_PYSCRIPT"
 PIP_INSTALL := pip install --extra-index-url https://pypi.ngc.nvidia.com
-TRITONSERVER_IMAGE_VERSION = 23.08
+TRITONSERVER_IMAGE_VERSION = 23.10
 TRITONSERVER_IMAGE_NAME = nvcr.io/nvidia/tritonserver:$(TRITONSERVER_IMAGE_VERSION)-pyt-python-py3
 TRITONSERVER_OUTPUT_DIR = ${PWD}/pytriton/tritonserver
 TRITONSERVER_BASENAME = pytriton
