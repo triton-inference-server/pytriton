@@ -19,12 +19,13 @@ import logging
 import pathlib
 import tempfile
 import textwrap
-from concurrent.futures import FIRST_COMPLETED, wait
+from concurrent.futures import FIRST_COMPLETED
+from concurrent.futures import wait as futures_wait
 from typing import Callable
 
 import numpy as np
 
-from pytriton.client import FuturesModelClient
+from pytriton.client import AsyncioModelClient, FuturesModelClient
 from pytriton.decorators import batch
 from pytriton.model_config import DynamicBatcher, ModelConfig, Tensor
 from pytriton.triton import Triton, TritonConfig
@@ -37,7 +38,6 @@ VOCABULARY_SIZE = 30522
 VALID_TOKEN_ID = 5
 MIN_SEQUENCE_LENGTH = 20
 MAX_SEQUENCE_LENGTH = 128
-RANDOM_SEED = 42
 
 
 def futures_stress_test(test_time_s: int, init_timeout_s: int, batch_size: int, seed: int, verbose: bool):
@@ -47,8 +47,6 @@ def futures_stress_test(test_time_s: int, init_timeout_s: int, batch_size: int, 
     model_spec = _model_spec()
 
     import random
-
-    random.seed(seed)
 
     def requests_generator():
         while True:
@@ -97,6 +95,10 @@ def futures_stress_test(test_time_s: int, init_timeout_s: int, batch_size: int, 
                 )
                 triton.run()
 
+                # Set to infinity
+                previous_time_left = float("inf")
+                previous_number_of_requests = 0
+
                 # Send requests
                 url = f"http://localhost:{triton_config.http_port}"
                 with FuturesModelClient(url, model_spec.name, max_workers=batch_size) as client:
@@ -114,19 +116,21 @@ def futures_stress_test(test_time_s: int, init_timeout_s: int, batch_size: int, 
                         result_future = client.infer_batch(**request)
                         not_done.add(result_future)
                         if len(not_done) > batch_size:
-                            done, not_done = wait(not_done, return_when=FIRST_COMPLETED)
+                            done, not_done = futures_wait(not_done, return_when=FIRST_COMPLETED)
                             if len(done) > 0:
                                 future = done.pop()
                                 result = future.result()
                                 number_of_processed_requests += len(done)
-                                if number_of_processed_requests > 0 and number_of_processed_requests % 10 == 0:
+                                if number_of_processed_requests - previous_number_of_requests > 10:
+                                    previous_number_of_requests = number_of_processed_requests
                                     time_left_s = max(should_stop_at_s - time.time(), 0.0)
-                                    logger.debug(
+                                    logger.info(
                                         f"Processed {number_of_processed_requests} batches time left: {time_left_s:0.1f}s \n."
                                         f"Result: {len(result)}."
                                     )
                         time_left_s = max(should_stop_at_s - time.time(), 0.0)
-                        if time_left_s % 10 == 0:
+                        if previous_time_left - time_left_s > 10:
+                            previous_time_left = time_left_s
                             logger.info(f"Time left: {time_left_s:0.1f}s")
                         if time_left_s <= 0:
                             break
@@ -141,7 +145,114 @@ def futures_stress_test(test_time_s: int, init_timeout_s: int, batch_size: int, 
     logger.info("Test finished")
 
 
-def _create_hf_tensorflow_distilbert_base_uncased_fn(model_name: str) -> Callable:
+async def asyncio_stress_test(test_time_s: int, init_timeout_s: int, batch_size: int, seed: int, verbose: bool):
+
+    model_name = "distilbert-base-uncased"
+
+    model_spec = _model_spec()
+
+    import random
+
+    def requests_generator():
+        while True:
+            inputs_len = random.randint(MIN_SEQUENCE_LENGTH, MAX_SEQUENCE_LENGTH)
+            input_ids = (
+                np.zeros(
+                    (
+                        1,
+                        inputs_len,
+                    ),
+                    dtype=np.int64,
+                )
+                + 5
+            )
+            attention_mask = np.ones(
+                (
+                    1,
+                    inputs_len,
+                ),
+                dtype=np.int64,
+            )
+            yield {"input_ids": input_ids, "attention_mask": attention_mask}
+
+    requests = requests_generator()
+
+    logger.info("starting server")
+
+    infer_fn = model_spec.create_infer_fn(model_name=model_name)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        triton_log_path = pathlib.Path(temp_dir) / "triton.log"
+        try:
+            triton_config = TritonConfig(
+                grpc_port=find_free_port(),
+                http_port=find_free_port(),
+                metrics_port=find_free_port(),
+                log_verbose=int(verbose),
+                log_file=triton_log_path,
+            )
+            with Triton(config=triton_config) as triton:
+                triton.bind(
+                    model_name=model_spec.name,
+                    infer_func=infer_fn,
+                    inputs=model_spec.inputs,
+                    outputs=model_spec.outputs,
+                    config=model_spec.model_config,
+                )
+                triton.run()
+
+                # Set to infinity
+                previous_time_left = float("inf")
+                previous_number_of_requests = 0
+
+                # Send requests
+                url = f"http://localhost:{triton_config.http_port}"
+                async with AsyncioModelClient(url, model_spec.name) as client:
+                    # Wait for model
+                    await client.wait_for_model(init_timeout_s)
+
+                    import asyncio
+                    import time
+
+                    should_stop_at_s = time.time() + test_time_s
+
+                    number_of_processed_requests = 0
+
+                    not_done = {*()}
+                    for request in requests:
+                        result_future = client.infer_batch(**request)
+                        not_done.add(result_future)
+                        if len(not_done) > batch_size:
+                            done, not_done = await asyncio.wait(not_done, return_when=asyncio.FIRST_COMPLETED)
+                            if len(done) > 0:
+                                future = done.pop()
+                                result = await future
+                                number_of_processed_requests += len(done)
+                                if number_of_processed_requests - previous_number_of_requests > 10:
+                                    previous_number_of_requests = number_of_processed_requests
+                                    time_left_s = max(should_stop_at_s - time.time(), 0.0)
+                                    logger.info(
+                                        f"Processed {number_of_processed_requests} batches time left: {time_left_s:0.1f}s \n."
+                                        f"Result: {len(result)}."
+                                    )
+                        time_left_s = max(should_stop_at_s - time.time(), 0.0)
+                        if previous_time_left - time_left_s > 10:
+                            previous_time_left = time_left_s
+                            logger.info(f"Time left: {time_left_s:0.1f}s")
+                        if time_left_s <= 0:
+                            done, not_done = await asyncio.wait(not_done, return_when=asyncio.ALL_COMPLETED)
+                            break
+                logger.info(f"Test finished. Processed {number_of_processed_requests} requests")
+
+        finally:
+            if triton_log_path.exists():
+                logger.debug("-" * 64)
+                server_logs = triton_log_path.read_text(errors="replace")
+                server_logs = "--- triton logs:\n\n" + textwrap.indent(server_logs, prefix=" " * 8)
+                logger.debug(server_logs)
+    logger.info("Test finished")
+
+
+def _create_fake_bert_fn(model_name: str) -> Callable:
     @batch
     def _infer_fn(input_ids, attention_mask):
         assert input_ids.shape == attention_mask.shape
@@ -158,9 +269,9 @@ def _create_hf_tensorflow_distilbert_base_uncased_fn(model_name: str) -> Callabl
 
 def _model_spec() -> TestModelSpec:
     model_spec = TestModelSpec(
-        name="DistilBert",
+        name="FakeBert",
         framework=Framework.TENSORFLOW,
-        create_infer_fn=_create_hf_tensorflow_distilbert_base_uncased_fn,
+        create_infer_fn=_create_fake_bert_fn,
         inputs=(
             Tensor(name="input_ids", dtype=np.int64, shape=(-1,)),
             Tensor(name="attention_mask", dtype=np.int64, shape=(-1,)),

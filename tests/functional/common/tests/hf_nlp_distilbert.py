@@ -130,6 +130,7 @@ def huggingface_distilbert(test_time_s: int, init_timeout_s: int, batch_size: in
 
 
 def _create_hf_tensorflow_distilbert_base_uncased_fn(model_name: str) -> Callable:
+    import tensorflow as tf
     from transformers.models.distilbert.modeling_tf_distilbert import (  # pytype: disable=import-error
         TFDistilBertForMaskedLM,
     )
@@ -142,7 +143,9 @@ def _create_hf_tensorflow_distilbert_base_uncased_fn(model_name: str) -> Callabl
     def _infer_fn(input_ids, attention_mask):
         logger.debug(f"input_ids: {input_ids.shape}")
         logger.debug(f"attention_mask: {attention_mask.shape}")
-        result = model(input_ids, attention_mask)
+        device = "/GPU:0"  # change this to the GPU device you want to use
+        with tf.device(device):
+            result = model(input_ids, attention_mask)
         return {"logits": result.logits.numpy()}
 
     return _infer_fn

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,13 +24,10 @@ mkdir -p "$LOGS_DIR"
 # Set the log path with the date and time
 LOG_PATH="$LOGS_DIR/log_$(date '+%Y-%m-%d_%H-%M-%S').txt"
 
-pip install transformers datasets --upgrade
-
 python -m"${TEST_MODULE}" \
     --test-time-s 36000 \
-    --init-timeout-s 300 \
+    --init-timeout-s 200 \
     --batch-size 16 \
-    --sequence-length 128 \
     --seed 20221019 \
     --enable-fault-handler \
     --process-monitoring-interval 600 \

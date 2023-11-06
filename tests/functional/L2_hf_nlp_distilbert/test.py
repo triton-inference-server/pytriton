@@ -16,10 +16,8 @@
 Runs longer (10h) inference session over NLP model
 """
 import argparse
-import logging
 import random
 
-logger = logging.getLogger(__package__)
 METADATA = {
     "image_name": "nvcr.io/nvidia/tensorflow:{TEST_CONTAINER_VERSION}-tf2-py3",
     "shared_memory_size_mb": 512,
@@ -27,14 +25,15 @@ METADATA = {
 
 
 def main():
+
     from tests.functional.common.tests.hf_nlp_distilbert import huggingface_distilbert
-    from tests.utils import DEFAULT_LOG_FORMAT
+    from tests.utils import TestMonitoringContext
 
     parser = argparse.ArgumentParser(description="HuggigFace DistillBERT functional test.")
     parser.add_argument(
         "--test-time-s",
         required=False,
-        default=36000,
+        default=3000,
         type=int,
         help="Time for how long the test should be run.",
     )
@@ -65,25 +64,19 @@ def main():
         help="PRNG seed",
         required=False,
     )
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Provide verbose logs",
-    )
+    TestMonitoringContext.extend_args(parser)
     args = parser.parse_args()
 
     random.seed(args.seed)
 
-    log_level = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(level=log_level, format=DEFAULT_LOG_FORMAT)
-
-    huggingface_distilbert(
-        test_time_s=args.test_time_s,
-        init_timeout_s=args.init_timeout_s,
-        batch_size=args.batch_size,
-        sequence_length=args.sequence_length,
-        verbose=args.verbose,
-    )
+    with TestMonitoringContext(args):
+        huggingface_distilbert(
+            test_time_s=args.test_time_s,
+            init_timeout_s=args.init_timeout_s,
+            batch_size=args.batch_size,
+            verbose=args.verbose,
+            sequence_length=args.sequence_length,
+        )
 
 
 if __name__ == "__main__":
