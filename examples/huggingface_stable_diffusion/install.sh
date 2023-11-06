@@ -14,4 +14,4 @@
 # limitations under the License.
 set -xe
 
-pip install transformers accelerate diffusers Pillow filelock typing_extensions
+pip install transformers accelerate diffusers Pillow filelock
