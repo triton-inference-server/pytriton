@@ -96,3 +96,16 @@ triton.run()  # Triton Server started
 print("This print will appear")
 triton.stop()  # Triton Server stopped
 ```
+
+## Filesystem usage
+
+PyTriton needs to access the filesystem for two purposes:
+
+  - to communicate with the Triton backend using file sockets,
+  - storing copy of Triton backend and its binary dependencies.
+
+PyTriton creates temporary folders called Workspaces, where it stores the file descriptors for these operations. By default, these folders are located in `$HOME/.cache/pytriton` directory. However, you can change this location by setting the `PYTRITON_HOME` environment variable.
+
+
+
+

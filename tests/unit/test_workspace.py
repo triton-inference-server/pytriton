@@ -11,17 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import multiprocessing
 import os.path
 import pathlib
 import tempfile
 
 import pytest
 
-import pytriton.constants as constants
-from pytriton.utils.workspace import Workspace
-
 
 def test_workspace_exist_and_empty_when_created():
+    from pytriton.utils.workspace import Workspace
+
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = pathlib.Path(tempdir)
         workspace = Workspace(tempdir / "workspace")
@@ -34,6 +34,8 @@ def test_workspace_exist_and_empty_when_created():
 
 
 def test_workspace_not_exist_and_empty_when_removed():
+    from pytriton.utils.workspace import Workspace
+
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = pathlib.Path(tempdir)
         workspace = Workspace(tempdir / "workspace")
@@ -44,6 +46,8 @@ def test_workspace_not_exist_and_empty_when_removed():
 
 
 def test_workspace_initializer_raises_error_when_workspace_directory_already_exists():
+    from pytriton.utils.workspace import Workspace
+
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = pathlib.Path(tempdir)
         workspace = Workspace(tempdir / "workspace")
@@ -54,6 +58,8 @@ def test_workspace_initializer_raises_error_when_workspace_directory_already_exi
 
 
 def test_workspace_clean():
+    from pytriton.utils.workspace import Workspace
+
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = pathlib.Path(tempdir)
         workspace = Workspace(tempdir / "workspace")
@@ -72,15 +78,21 @@ def test_workspace_clean():
 
 
 def test_tmp_workspace_exist_when_created():
+    import pytriton.constants as constants
+    from pytriton.utils.workspace import Workspace
+
     with tempfile.TemporaryDirectory() as tempdir:
-        constants.PYTRITON_CACHE_DIR = pathlib.Path(tempdir)
+        constants.PYTRITON_HOME = pathlib.Path(tempdir)
         workspace = Workspace()
         assert workspace.exists()
 
 
 def test_tmp_workspace_not_exist_when_deleted():
+    import pytriton.constants as constants
+    from pytriton.utils.workspace import Workspace
+
     with tempfile.TemporaryDirectory() as tempdir:
-        constants.PYTRITON_CACHE_DIR = pathlib.Path(tempdir)
+        constants.PYTRITON_HOME = pathlib.Path(tempdir)
         workspace = Workspace()
         assert workspace.exists()
         p = workspace.path
@@ -89,9 +101,44 @@ def test_tmp_workspace_not_exist_when_deleted():
 
 
 def test_tmp_workspace_not_exist_when_cleaned():
+    import pytriton.constants as constants
+    from pytriton.utils.workspace import Workspace
+
     with tempfile.TemporaryDirectory() as tempdir:
-        constants.PYTRITON_CACHE_DIR = pathlib.Path(tempdir)
+        constants.PYTRITON_HOME = pathlib.Path(tempdir)
         workspace = Workspace()
         assert workspace.exists()
         workspace.clean()
         assert not workspace.exists()
+
+
+def _check(pytriton_home=None):
+    if pytriton_home is not None:
+        os.environ["PYTRITON_HOME"] = pytriton_home
+    else:
+        pytriton_home = pathlib.Path.home() / ".cache" / "pytriton"
+
+    from pytriton.constants import PYTRITON_HOME
+
+    assert PYTRITON_HOME == pathlib.Path(pytriton_home), f"{PYTRITON_HOME} != {pytriton_home}"
+
+    from pytriton.utils.workspace import Workspace
+
+    workspace = Workspace()
+    # below line will raise ValueError if workspace is not in pytriton_home
+    workspace.path.relative_to(pytriton_home)
+
+
+def test_use_env_variable_to_set_pytriton_home():
+    ctx = multiprocessing.get_context("spawn")
+
+    process = ctx.Process(target=_check)  # no pytriton_home environment
+    process.start()
+    process.join()
+    assert process.exitcode == 0
+
+    with tempfile.TemporaryDirectory() as tempdir:
+        process = ctx.Process(target=_check, args=(tempdir,))
+        process.start()
+        process.join()
+        assert process.exitcode == 0
