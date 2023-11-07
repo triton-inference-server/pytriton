@@ -82,6 +82,7 @@ nav:
       - Decorators: decorators.md
       - Custom parameters/headers: custom_params.md
       - Example with downloaded input data: downloaded_input_data.md
+      - Chunking and batching: chunking_guide.md
   - Clients: clients.md
   - Examples: examples.md
   - API Reference: api.md
