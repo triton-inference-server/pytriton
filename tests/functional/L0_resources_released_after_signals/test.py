@@ -140,6 +140,7 @@ def main():
 
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=log_level, format=DEFAULT_LOG_FORMAT)
+    logging.captureWarnings(True)
 
     _run_test(args.init_timeout_s, args.verbose, args.seed, signal.SIGINT, args.test_timeout_s)
     _run_test(args.init_timeout_s, args.verbose, args.seed, signal.SIGTERM, args.test_timeout_s)

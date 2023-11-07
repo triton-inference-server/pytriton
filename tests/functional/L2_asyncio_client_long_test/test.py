@@ -19,6 +19,7 @@ Runs long inference session with AsyncioModelClient over identity model
 
 import argparse
 import asyncio
+import logging
 import random
 
 METADATA = {
@@ -63,6 +64,8 @@ async def main():
     args = parser.parse_args()
 
     random.seed(args.seed)
+
+    logging.captureWarnings(True)
 
     with TestMonitoringContext(args):
         await asyncio_stress_test(

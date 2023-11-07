@@ -38,6 +38,7 @@ import itertools
 import logging
 import socket
 import time
+import warnings
 from concurrent.futures import Future
 from queue import Empty, Full, Queue
 from threading import Lock, Thread
@@ -68,6 +69,7 @@ from pytriton.client.utils import (
     wait_for_model_ready,
     wait_for_server_ready,
 )
+from pytriton.client.warnings import NotSupportedTimeoutWarning
 from pytriton.model_config.triton_model_config import TritonModelConfig
 
 _LOGGER = logging.getLogger(__name__)
@@ -228,8 +230,10 @@ class BaseModelClient:
         if self._triton_url.scheme == "grpc":
             # by default grpc client has very large number of timeout, thus we want to make it equal to http client timeout
             network_timeout_s = _DEFAULT_NETWORK_TIMEOUT_S if network_timeout_s is None else network_timeout_s
-            _LOGGER.warning(
-                f"tritonclient.grpc doesn't support timeout for other commands than infer. Ignoring network_timeout: {network_timeout_s}."
+            warnings.warn(
+                f"tritonclient.grpc doesn't support timeout for other commands than infer. Ignoring network_timeout: {network_timeout_s}.",
+                NotSupportedTimeoutWarning,
+                stacklevel=1,
             )
 
         triton_client_init_kwargs = self._get_init_extra_args()
@@ -412,7 +416,7 @@ class ModelClient(BaseModelClient):
             self._general_client = None
             self._infer_client = None
         except Exception as e:
-            _LOGGER.warning("Error while closing ModelClient resources: %s", e)
+            _LOGGER.error(f"Error while closing ModelClient resources: {e}")
             raise e
 
     def wait_for_model(self, timeout_s: float):
@@ -1418,7 +1422,6 @@ class FuturesModelClient:
             wait: If True, then shutdown will not return until all running futures have finished executing.
         """
         if self._closed:
-            _LOGGER.warning("FuturesModelClient is already closed")
             return
         _LOGGER.debug("Closing FuturesModelClient.")
 

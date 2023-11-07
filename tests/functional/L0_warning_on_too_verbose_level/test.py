@@ -55,6 +55,7 @@ def main():
     log_level = logging.DEBUG if args.verbose else logging.INFO
 
     logging.basicConfig(level=log_level, format=DEFAULT_LOG_FORMAT)
+    logging.captureWarnings(True)
 
     handler = logging.StreamHandler(io.StringIO())
     handler.setLevel(log_level)

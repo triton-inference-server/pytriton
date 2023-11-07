@@ -18,6 +18,7 @@ Runs long inference session with FuturesModelClient over identity model
 
 
 import argparse
+import logging
 import random
 
 METADATA = {
@@ -60,6 +61,8 @@ def main():
     )
     TestMonitoringContext.extend_args(parser)
     args = parser.parse_args()
+
+    logging.captureWarnings(True)
 
     random.seed(args.seed)
     with TestMonitoringContext(args):

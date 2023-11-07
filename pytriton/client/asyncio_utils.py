@@ -72,7 +72,6 @@ async def asyncio_get_model_state(
             version: state for (name, version), state in models_states.items() if name == model_name
         }
         if not requested_model_states:
-            _LOGGER.debug(f"Model {model_name} not found")
             return ModelState.UNAVAILABLE
         else:
             requested_model_states = sorted(requested_model_states.items(), key=lambda item: int(item[0]))
@@ -82,7 +81,6 @@ async def asyncio_get_model_state(
     else:
         key = (model_name, model_version)
         if key not in models_states:
-            _LOGGER.debug(f"Model {model_name} version {model_version} not found")
             return ModelState.UNAVAILABLE
         else:
             model_state = models_states[key]
@@ -177,32 +175,28 @@ async def asyncio_wait_for_server_ready(
                 server_ready = await asyncio_client.is_server_ready()
                 _LOGGER.debug("Waiting for server to be live")
                 server_live = await asyncio_client.is_server_live()
-            except tritonclient.utils.InferenceServerException as e:
+            except tritonclient.utils.InferenceServerException:
                 # Raised by tritonclient/grpc/__init__.py:75
-                _LOGGER.warning(f"Server is not ready (error={e})")
                 server_live = False
                 server_ready = False
-            except aiohttp.client_exceptions.ClientConnectorError as e:
+            except aiohttp.client_exceptions.ClientConnectorError:
                 # This exception is raised by aiohttp/connector.py:901 in _create_direct_connection
                 # and it is not translated to any other error by tritonclient/http/aio/__init__.py:132 in _get method.
                 #    res = await self._stub.get(url=req_url,
                 # and tritonclient/http/aio/__init__.py:242 in is_server_ready method.
                 #    response = await self._get(request_uri=request_uri,
-                _LOGGER.warning(f"Server is not ready (error={e})")
                 server_live = False
                 server_ready = False
-            except RuntimeError as e:
+            except RuntimeError:
                 # This exception is raised by aiohttp/client.py:400 in _request
                 # and it is not translated to any other error by tritonclient/grpc/aio/__init__.py:151: in is_server_ready method.
                 #    response = await self._client_stub.ServerReady(request=request,
-                _LOGGER.warning(f"Server is not ready (error={e})")
                 server_live = False
                 server_ready = False
-            except grpc._cython.cygrpc.UsageError as e:
+            except grpc._cython.cygrpc.UsageError:
                 # This exception is raised by grpcio/grpc/_cython/_cygrpc/aio/channel.pyx.pxi:124
                 # and it is not translated to any other error by tritonclient/grpc/aio/__init__.py", line 151, in is_server_ready
                 #   response = await self._client_stub.ServerReady(request=request,
-                _LOGGER.warning(f"Server is not ready (error={e})")
                 server_live = False
                 server_ready = False
             if server_ready and server_live:

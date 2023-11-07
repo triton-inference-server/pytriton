@@ -52,6 +52,7 @@ def main():
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG, format=DEFAULT_LOG_FORMAT)
+    logging.captureWarnings(True)
 
     docker_image_with_name = METADATA["image_name"].format(TEST_CONTAINER_VERSION=get_current_container_version())
     verify_docker_image_in_readme_same_as_tested("examples/simple_python_remote_mode/README.md", docker_image_with_name)

@@ -74,6 +74,7 @@ def main():
 
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=log_level, format=DEFAULT_LOG_FORMAT)
+    logging.captureWarnings(True)
 
     start_time_s = time.time()
     wait_time_s = min(args.timeout_s, 5)

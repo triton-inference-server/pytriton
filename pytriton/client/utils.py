@@ -19,6 +19,7 @@ import socket
 import sys
 import time
 import urllib
+import warnings
 from typing import Optional, Union
 
 import tritonclient.grpc
@@ -28,6 +29,7 @@ from grpc import RpcError
 from tritonclient.utils import InferenceServerException
 
 from pytriton.client.exceptions import PyTritonClientInvalidUrlError, PyTritonClientTimeoutError
+from pytriton.client.warnings import NotSupportedTimeoutWarning
 from pytriton.constants import DEFAULT_GRPC_PORT, DEFAULT_HTTP_PORT
 from pytriton.model_config.parser import ModelConfigParser
 
@@ -127,7 +129,8 @@ def get_model_state(
             latest_version, latest_version_state = requested_model_states[-1]
             return latest_version_state
     else:
-        return models_states.get((model_name, model_version), ModelState.UNAVAILABLE)
+        state = models_states.get((model_name, model_version), ModelState.UNAVAILABLE)
+        return state
 
 
 def get_model_config(
@@ -184,11 +187,13 @@ def _warn_on_too_big_network_timeout(client: _TritonSyncClientType, timeout_s: f
         connection_reldiff_s = (connection_pool.connection_timeout - timeout_s) / timeout_s
         rtol = 0.001
         if network_reldiff_s > rtol or connection_reldiff_s > rtol:
-            _LOGGER.warning(
+            warnings.warn(
                 "Client network and/or connection timeout is smaller than requested timeout_s. This may cause unexpected behavior. "
                 f"network_timeout={connection_pool.network_timeout} "
                 f"connection_timeout={connection_pool.connection_timeout} "
-                f"timeout_s={timeout_s}"
+                f"timeout_s={timeout_s}",
+                NotSupportedTimeoutWarning,
+                stacklevel=1,
             )
 
 
@@ -212,14 +217,12 @@ def wait_for_server_ready(
     """
     timeout_s = timeout_s if timeout_s is not None else _DEFAULT_WAIT_FOR_SERVER_READY_TIMEOUT_S
     should_finish_before_s = time.time() + timeout_s
-
     _warn_on_too_big_network_timeout(client, timeout_s)
 
     def _is_server_ready():
         try:
             return client.is_server_ready() and client.is_server_live()
-        except InferenceServerException as e:
-            _LOGGER.debug(f"Exception while checking server readiness: {e}")
+        except InferenceServerException:
             return False
         except (RpcError, ConnectionError, socket.gaierror):  # GRPC and HTTP clients raises these errors
             return False
@@ -299,8 +302,10 @@ def create_client_from_url(
     if url.scheme == "grpc":
         # by default grpc client has very large number of timeout, thus we want to make it equal to http client timeout
         network_timeout_s = _DEFAULT_NETWORK_TIMEOUT_S if network_timeout_s is None else network_timeout_s
-        _LOGGER.warning(
-            f"tritonclient.grpc doesn't support timeout for other commands than infer. Ignoring network_timeout: {network_timeout_s}."
+        warnings.warn(
+            f"tritonclient.grpc doesn't support timeout for other commands than infer. Ignoring network_timeout: {network_timeout_s}.",
+            NotSupportedTimeoutWarning,
+            stacklevel=1,
         )
 
     triton_client_init_kwargs = {}

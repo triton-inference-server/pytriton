@@ -68,6 +68,7 @@ def main():
 
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=log_level, format=DEFAULT_LOG_FORMAT)
+    logging.captureWarnings(True)
 
     tfhub_image_detection(
         test_time_s=args.test_time_s,

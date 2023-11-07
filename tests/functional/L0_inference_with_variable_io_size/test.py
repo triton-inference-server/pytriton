@@ -43,6 +43,7 @@ def main():
     log_level = logging.DEBUG if args.verbose else logging.INFO
     verbose_level = 3 if args.verbose else 0
     logging.basicConfig(level=log_level, format=DEFAULT_LOG_FORMAT)
+    logging.captureWarnings(True)
     LOGGER.debug(f"CLI args: {args}")
 
     random.seed(args.seed)
