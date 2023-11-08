@@ -16,7 +16,7 @@ limitations under the License.
 
 # Changelog
 
-## Unreleased
+## 0.4.1 (2023-11-09)
 
 - New: Place where workspaces with temporary Triton model repositories and communication file sockets can be configured by `$PYTRITON_HOME` environment variable
 - Fix: recover handling `KeyboardInterrupt` in `triton.serve()`
