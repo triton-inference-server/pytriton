@@ -138,7 +138,7 @@ def _deserialize_bytes_tensor(encoded_tensor, dtype, order: Literal["C", "F"] = 
     return np.array(strs, dtype=dtype, order=order)
 
 
-_MAX_DTYPE_DESCR = 8
+_MAX_DTYPE_DESCR = 16  # up to 16 chars in dtype descr; |S2147483647 (2^31-1) with margin
 _PARTIAL_HEADER_FORMAT = f"<{_MAX_DTYPE_DESCR}scH"
 
 

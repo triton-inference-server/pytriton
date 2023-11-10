@@ -156,12 +156,23 @@ _flat_array_header_size = len(serialize_numpy_with_struct_header(np.zeros((1,), 
             ],
             2,
         ),
+        # 2GB bytes array
+        (
+            [
+                np.array(b"a" * (2**31 - 1), dtype=bytes),
+            ],
+            1,
+        ),
     ),
 )
 def test_tensor_store_get_put_equal(tensor_store, tensors, n_times):
     for _ in range(n_times):
-        tensors_ids = tensor_store.put(tensors)
-        assert len(tensors) == len(tensors_ids)
-        for tensor, tensor_id in zip(tensors, tensors_ids):
-            tensor_retrieved = tensor_store.get(tensor_id)
-            np.testing.assert_equal(tensor, tensor_retrieved)
+        try:
+            tensors_ids = tensor_store.put(tensors)
+            assert len(tensors) == len(tensors_ids)
+            for tensor, tensor_id in zip(tensors, tensors_ids):
+                tensor_retrieved = tensor_store.get(tensor_id)
+                np.testing.assert_equal(tensor, tensor_retrieved)
+        finally:
+            for tensor_id in tensors_ids:
+                tensor_store.release_block(tensor_id)

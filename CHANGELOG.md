@@ -19,7 +19,8 @@ limitations under the License.
 ## 0.4.1 (2023-11-09)
 
 - New: Place where workspaces with temporary Triton model repositories and communication file sockets can be configured by `$PYTRITON_HOME` environment variable
-- Fix: recover handling `KeyboardInterrupt` in `triton.serve()`
+- Fix: Recover handling `KeyboardInterrupt` in `triton.serve()`
+- Fix: Remove limit for handling bytes dtype tensors
 - Build scripts update
   - Added support for arm64 platform builds
 
