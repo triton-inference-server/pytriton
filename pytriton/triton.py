@@ -289,8 +289,8 @@ class _LogLevelChecker:
         Raises:
             PyTritonClientInvalidUrlError: if url is invalid
         """
-        self._client = ModelClient(url, "Dummy")
         self._log_settings = None
+        self._url = url
 
     def check(self, skip_update: bool = False):
         """Check if log level is too verbose.
@@ -301,8 +301,9 @@ class _LogLevelChecker:
             PyTritonClientTimeoutError: if timeout is reached
         """
         if self._log_settings is None and not skip_update:
-            wait_for_server_ready(self._client._general_client, timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S)
-            self._log_settings = self._client._general_client.get_log_settings()
+            with ModelClient(self._url, "Dummy") as client:
+                wait_for_server_ready(client._general_client, timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S)
+                self._log_settings = client._general_client.get_log_settings()
 
         if self._log_settings is not None:
             log_settings = self._log_settings
