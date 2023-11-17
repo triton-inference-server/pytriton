@@ -14,7 +14,7 @@
 """Common data structures and type used by proxy model and inference handler."""
 
 import dataclasses
-from typing import Dict, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 
@@ -59,6 +59,9 @@ class Request:
         return self.data.values()
 
 
+Requests = List[Request]
+
+
 @dataclasses.dataclass
 class Response:
     """Data class for response data including numpy array outputs."""
@@ -96,3 +99,6 @@ class Response:
     def values(self):
         """Iterate over output data."""
         return self.data.values()
+
+
+Responses = List[Response]

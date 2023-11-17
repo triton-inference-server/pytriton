@@ -16,10 +16,40 @@ import logging
 
 import numpy as np
 
+from pytriton.proxy.types import Requests, Responses
+
 LOGGER = logging.getLogger(__name__)
 
 
-def validate_outputs(model_config, model_outputs, outputs, strict: bool, requests_number: int):
+class TritonResultsValidator:
+    """Validate results returned by inference callable against PyTriton and Triton requirements."""
+
+    def __init__(self, model_config, strict: bool):
+        """Validate results returned by inference callable against PyTriton and Triton requirements.
+
+        Args:
+            model_config: Model configuration on Triton side
+            strict: Enable/disable strict validation against model config
+        """
+        self._model_config = model_config
+        self._model_outputs = {output.name: output for output in model_config.outputs}
+        self._strict = strict
+
+    def validate_responses(self, requests: Requests, responses: Responses):
+        """Validate responses returned by inference callable against PyTriton and Triton requirements.
+
+        Args:
+            requests: Requests received from Triton
+            responses: Responses returned by inference callable
+
+        Raises:
+            ValueError if responses are incorrect
+        """
+        requests_number = len(requests)
+        _validate_outputs(self._model_config, self._model_outputs, responses, self._strict, requests_number)
+
+
+def _validate_outputs(model_config, model_outputs, outputs, strict: bool, requests_number: int):
     """Validate outputs of model.
 
     Args:
@@ -53,12 +83,12 @@ def validate_outputs(model_config, model_outputs, outputs, strict: bool, request
             )
         for name, value in response.items():
             LOGGER.debug(f"{name}: {value}")
-            validate_output_data(model_config, name, value)
+            _validate_output_data(model_config, name, value)
             if strict:
-                validate_output_dtype_and_shape(model_config, model_outputs, name, value)
+                _validate_output_dtype_and_shape(model_config, model_outputs, name, value)
 
 
-def validate_output_data(model_config, name, value):
+def _validate_output_data(model_config, name, value):
     """Validate output with given name and value.
 
     Args:
@@ -96,7 +126,7 @@ def validate_output_data(model_config, name, value):
                 )
 
 
-def validate_output_dtype_and_shape(model_config, model_outputs, name, value):
+def _validate_output_dtype_and_shape(model_config, model_outputs, name, value):
     """Validate output with given name and value against the model config.
 
     Args:

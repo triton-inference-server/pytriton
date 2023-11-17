@@ -47,7 +47,7 @@ from pytriton.proxy.communication import (
     TensorStore,
 )
 from pytriton.proxy.types import Request
-from pytriton.proxy.validators import validate_outputs
+from pytriton.proxy.validators import TritonResultsValidator
 
 LOGGER = logging.getLogger(__name__)
 
@@ -107,7 +107,7 @@ class InferenceHandler(th.Thread):
         shared_memory_socket: str,
         data_store_socket: str,
         zmq_context: zmq.Context,
-        strict: bool,
+        validator: TritonResultsValidator,
     ):
         """Create a PythonBackend object.
 
@@ -117,13 +117,12 @@ class InferenceHandler(th.Thread):
             shared_memory_socket: Socket path for shared memory communication
             data_store_socket: Socket path for data store communication
             zmq_context: zero mq context
-            strict: Enable strict validation for model callable outputs
+            validator: Result validator instance
         """
         super().__init__()
         self._model_config = model_config
         self._model_callable = model_callable
-        self._model_outputs = {output.name: output for output in model_config.outputs}
-        self._strict = strict
+        self._validator = validator
         self.stopped = False
 
         self._tensor_store = TensorStore(data_store_socket)
@@ -167,13 +166,7 @@ class InferenceHandler(th.Thread):
                     responses_iterator = _ResponsesIterator(responses, decoupled=self._model_config.decoupled)
                     for responses in responses_iterator:
                         LOGGER.debug(f"Validating outputs for {self._model_config.model_name}.")
-                        validate_outputs(
-                            model_config=self._model_config,
-                            model_outputs=self._model_outputs,
-                            outputs=responses,
-                            strict=self._strict,
-                            requests_number=len(requests),
-                        )
+                        self._validator.validate_responses(inputs, responses)
                         LOGGER.debug(f"Copying outputs to shared memory for {model_name}.")
                         output_arrays_with_coords = [
                             (response_idx, output_name, tensor)

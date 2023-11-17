@@ -26,6 +26,7 @@ from pytriton.model_config.triton_model_config import TensorSpec, TritonModelCon
 from pytriton.proxy.communication import InferenceHandlerRequests, MetaRequestResponse, TensorStore
 from pytriton.proxy.inference_handler import InferenceHandler, _ResponsesIterator
 from pytriton.proxy.types import Request
+from pytriton.proxy.validators import TritonResultsValidator
 from tests.unit.utils import verify_equalness_of_dicts_with_ndarray
 
 LOGGER = logging.getLogger("tests.unit.test_proxy_inference_handler")
@@ -147,16 +148,18 @@ def test_proxy_throws_exception_when_validate_outputs_raise_an_error(tmp_path, m
     try:
         tensor_store.start()  # start tensor store side process - this way InferenceHandler will create client for it
         mocker.patch(
-            "pytriton.proxy.inference_handler.validate_outputs", side_effect=ValueError("Validate outputs error.")
+            "pytriton.proxy.validators.TritonResultsValidator.validate_responses",
+            side_effect=ValueError("Validate outputs error."),
         )
         zmq_context = zmq.Context()
+        validator = TritonResultsValidator(triton_model_config, strict=False)
         inference_handler = InferenceHandler(
             infer_fn,
             triton_model_config,
             shared_memory_socket=f"ipc://{tmp_path}/my",
             data_store_socket=data_store_socket,
             zmq_context=zmq_context,
-            strict=False,
+            validator=validator,
         )
 
         mock_recv = mocker.patch.object(inference_handler.zmq_context._socket_class, "recv")

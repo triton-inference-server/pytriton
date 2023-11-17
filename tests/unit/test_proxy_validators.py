@@ -18,7 +18,7 @@ import numpy as np
 import pytest
 
 from pytriton.model_config.triton_model_config import TensorSpec, TritonModelConfig
-from pytriton.proxy.validators import validate_output_data, validate_output_dtype_and_shape, validate_outputs
+from pytriton.proxy.validators import _validate_output_data, _validate_output_dtype_and_shape, _validate_outputs
 
 LOGGER = logging.getLogger("tests.unit.test_proxy_validators")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s: %(message)s")
@@ -45,7 +45,7 @@ def test_validate_outputs_throws_exception_when_outputs_is_not_a_list():
         ValueError,
         match=r"Outputs returned by `Foo` model callable must be list of response dicts with numpy arrays",
     ):
-        validate_outputs(
+        _validate_outputs(
             model_config=MY_MODEL_CONFIG,
             model_outputs=MY_MODEL_OUTPUTS,
             outputs=outputs,
@@ -62,7 +62,7 @@ def test_validate_outputs_throws_exception_when_outputs_number_is_not_equal_to_r
         match=r"Number of outputs returned by `Foo` inference callable "
         r"\(1\) does not match number of requests \(2\) received from Triton\.",
     ):
-        validate_outputs(
+        _validate_outputs(
             model_config=MY_MODEL_CONFIG,
             model_outputs=MY_MODEL_OUTPUTS,
             outputs=outputs,
@@ -78,7 +78,7 @@ def test_validate_outputs_throws_exception_when_outputs_is_not_a_list_of_dicts()
         ValueError,
         match=r"Outputs returned by `Foo` model callable must be list of response dicts with numpy arrays",
     ):
-        validate_outputs(
+        _validate_outputs(
             model_config=MY_MODEL_CONFIG,
             model_outputs=MY_MODEL_OUTPUTS,
             outputs=outputs,
@@ -89,10 +89,10 @@ def test_validate_outputs_throws_exception_when_outputs_is_not_a_list_of_dicts()
 
 def test_validate_outputs_call_validate_outputs_data_if_strict_is_false(mocker):
     outputs = [{"output1": np.array([1, 2, 3]), "output2": np.array([1, 2, 3])}]
-    mock_validate_outputs_data = mocker.patch("pytriton.proxy.validators.validate_output_data")
-    mock_validate_output_dtype_and_shape = mocker.patch("pytriton.proxy.validators.validate_output_dtype_and_shape")
+    mock_validate_outputs_data = mocker.patch("pytriton.proxy.validators._validate_output_data")
+    mock_validate_output_dtype_and_shape = mocker.patch("pytriton.proxy.validators._validate_output_dtype_and_shape")
 
-    validate_outputs(
+    _validate_outputs(
         model_config=MY_MODEL_CONFIG,
         model_outputs=MY_MODEL_OUTPUTS,
         outputs=outputs,
@@ -106,10 +106,10 @@ def test_validate_outputs_call_validate_outputs_data_if_strict_is_false(mocker):
 
 def test_validate_outputs_call_validate_outputs_data_if_strict_is_true(mocker):
     outputs = [{"output1": np.array([1, 2, 3]), "output2": np.array([1, 2, 3])}]
-    mock_validate_outputs_data = mocker.patch("pytriton.proxy.validators.validate_output_data")
-    mock_validate_output_dtype_and_shape = mocker.patch("pytriton.proxy.validators.validate_output_dtype_and_shape")
+    mock_validate_outputs_data = mocker.patch("pytriton.proxy.validators._validate_output_data")
+    mock_validate_output_dtype_and_shape = mocker.patch("pytriton.proxy.validators._validate_output_dtype_and_shape")
 
-    validate_outputs(
+    _validate_outputs(
         model_config=MY_MODEL_CONFIG,
         model_outputs=MY_MODEL_OUTPUTS,
         outputs=outputs,
@@ -129,7 +129,7 @@ def test_validate_output_data_throws_exception_when_name_is_not_a_string():
         ValueError,
         match=r"Not all keys returned by `Foo` model callable are string",
     ):
-        validate_output_data(model_config=MY_MODEL_CONFIG, name=name, value=value)
+        _validate_output_data(model_config=MY_MODEL_CONFIG, name=name, value=value)
 
 
 def test_validate_output_data_throws_exception_when_value_is_not_numpy_array():
@@ -140,7 +140,7 @@ def test_validate_output_data_throws_exception_when_value_is_not_numpy_array():
         ValueError,
         match=r"Not all values returned by `Foo` model callable are numpy arrays",
     ):
-        validate_output_data(model_config=MY_MODEL_CONFIG, name=name, value=value)
+        _validate_output_data(model_config=MY_MODEL_CONFIG, name=name, value=value)
 
 
 def test_validate_output_data_throws_exception_when_value_is_not_supported_data_type():
@@ -154,7 +154,7 @@ def test_validate_output_data_throws_exception_when_value_is_not_supported_data_
         "Returned `output1` for model `Foo` "
         r"has `M` dtype\.kind\.",
     ):
-        validate_output_data(model_config=MY_MODEL_CONFIG, name=name, value=value)
+        _validate_output_data(model_config=MY_MODEL_CONFIG, name=name, value=value)
 
 
 def test_validate_output_data_throws_exception_when_value_is_list_of_strings():
@@ -165,7 +165,7 @@ def test_validate_output_data_throws_exception_when_value_is_list_of_strings():
         ValueError,
         match=r"Use string/byte-string instead of object for passing string in NumPy array from model `Foo`\.",
     ):
-        validate_output_data(model_config=MY_MODEL_CONFIG, name=name, value=value)
+        _validate_output_data(model_config=MY_MODEL_CONFIG, name=name, value=value)
 
 
 def test_validate_output_data_throws_exception_when_value_is_list_of_ints_defined_as_object():
@@ -178,7 +178,7 @@ def test_validate_output_data_throws_exception_when_value_is_list_of_ints_define
         "Returned `output1` from `Foo` "
         r"has `\<class 'int'\>` type\.",
     ):
-        validate_output_data(model_config=MY_MODEL_CONFIG, name=name, value=value)
+        _validate_output_data(model_config=MY_MODEL_CONFIG, name=name, value=value)
 
 
 def test_validate_output_dtype_and_shape_throws_exception_when_name_not_in_model_config():
@@ -189,7 +189,7 @@ def test_validate_output_dtype_and_shape_throws_exception_when_name_not_in_model
         ValueError,
         match=r"Returned output `output3` is not defined in model config for model `Foo`\.",
     ):
-        validate_output_dtype_and_shape(
+        _validate_output_dtype_and_shape(
             model_config=MY_MODEL_CONFIG, model_outputs=MY_MODEL_OUTPUTS, name=name, value=value
         )
 
@@ -202,7 +202,7 @@ def test_validate_output_dtype_and_shape_throws_exception_when_value_has_incorre
         ValueError,
         match=r"Returned output `output1` for model `Foo` has invalid type\. Returned: float64 \(f\). Expected: \<class 'numpy\.int32'\>\.",
     ):
-        validate_output_dtype_and_shape(
+        _validate_output_dtype_and_shape(
             model_config=MY_MODEL_CONFIG, model_outputs=MY_MODEL_OUTPUTS, name=name, value=value
         )
 
@@ -215,7 +215,7 @@ def test_validate_output_dtype_and_shape_throws_exception_when_value_has_incorre
         ValueError,
         match=r"Returned output `output1` for model `Foo` has invalid type\. Returned: \|S5 \(S\). Expected: \<class 'numpy\.int32'\>\.",
     ):
-        validate_output_dtype_and_shape(
+        _validate_output_dtype_and_shape(
             model_config=MY_MODEL_CONFIG, model_outputs=MY_MODEL_OUTPUTS, name=name, value=value
         )
 
@@ -228,7 +228,7 @@ def test_validate_output_dtype_and_shape_throws_exception_when_value_has_incorre
         ValueError,
         match=r"Returned output `output1` for model `Foo` has invalid shapes\. Returned: \(2, 1\)\. Expected: \(3,\)\.",
     ):
-        validate_output_dtype_and_shape(
+        _validate_output_dtype_and_shape(
             model_config=MY_MODEL_CONFIG, model_outputs=MY_MODEL_OUTPUTS, name=name, value=value
         )
 
@@ -241,7 +241,7 @@ def test_validate_output_dtype_and_shape_throws_exception_when_value_contains_to
         ValueError,
         match=r"Returned output `output1` for model `Foo` has invalid shapes at one or more positions\. Returned: \(2,\)\. Expected: \(3,\)\.",
     ):
-        validate_output_dtype_and_shape(
+        _validate_output_dtype_and_shape(
             model_config=MY_MODEL_CONFIG, model_outputs=MY_MODEL_OUTPUTS, name=name, value=value
         )
 
@@ -254,6 +254,6 @@ def test_validate_output_dtype_and_shape_throws_exception_when_value_contains_to
         ValueError,
         match=r"Returned output `output2` for model `Foo` has invalid shapes at one or more positions\. Returned: \(4,\)\. Expected: \(3,\)\.",
     ):
-        validate_output_dtype_and_shape(
+        _validate_output_dtype_and_shape(
             model_config=MY_MODEL_CONFIG, model_outputs=MY_MODEL_OUTPUTS, name=name, value=value
         )

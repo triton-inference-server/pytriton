@@ -33,6 +33,7 @@ from pytriton.model_config.model_config import ModelConfig
 from pytriton.model_config.tensor import Tensor
 from pytriton.model_config.triton_model_config import DeviceKind, ResponseCache, TensorSpec, TritonModelConfig
 from pytriton.proxy.inference_handler import InferenceHandler, InferenceHandlerEvent
+from pytriton.proxy.validators import TritonResultsValidator
 from pytriton.utils.workspace import Workspace
 
 LOGGER = logging.getLogger(__name__)
@@ -192,6 +193,7 @@ class Model:
         with self._inference_handlers_lock:
             if not self._inference_handlers:
                 triton_model_config = self._get_triton_model_config()
+                validator = TritonResultsValidator(triton_model_config, self._strict)
                 for i, infer_function in enumerate(self.infer_functions):
                     self.triton_context.model_configs[infer_function] = copy.deepcopy(triton_model_config)
                     _inject_triton_context(self.triton_context, infer_function)
@@ -201,7 +203,7 @@ class Model:
                         shared_memory_socket=f"{self._shared_memory_socket}_{i}",
                         data_store_socket=self._data_store_socket.as_posix(),
                         zmq_context=self.zmq_context,
-                        strict=self._strict,
+                        validator=validator,
                     )
                     inference_handler.on_proxy_backend_event(self._on_proxy_backend_event)
                     inference_handler.start()

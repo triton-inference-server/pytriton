@@ -29,6 +29,7 @@ import zmq
 from pytriton.model_config.generator import ModelConfigGenerator
 from pytriton.model_config.triton_model_config import TensorSpec, TritonModelConfig
 from pytriton.proxy.communication import TensorStore
+from pytriton.proxy.validators import TritonResultsValidator
 from pytriton.triton import TRITONSERVER_DIST_DIR
 
 LOGGER = logging.getLogger("tests.test_model_error_handling")
@@ -155,13 +156,14 @@ def test_model_throws_exception(tmp_path, mocker, infer_fn, decoupled):
 
         backend_model = _get_proxy_backend(mocker, model_config, shared_memory_socket, data_store_socket)
 
+        validator = TritonResultsValidator(model_config, strict=False)
         inference_handler = InferenceHandler(
             infer_fn,
             model_config,
             shared_memory_socket=shared_memory_socket,
             data_store_socket=data_store_socket,
             zmq_context=zmq_context,
-            strict=False,
+            validator=validator,
         )
         inference_handler.start()
 
