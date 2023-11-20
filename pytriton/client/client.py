@@ -38,7 +38,6 @@ from queue import Queue
 from threading import Thread
 from typing import Dict, Optional, Tuple, Union
 
-import async_timeout
 import gevent
 import numpy as np
 import tritonclient.grpc
@@ -854,10 +853,12 @@ class AsyncioModelClient(BaseModelClient):
         """
         _LOGGER.debug(f"Waiting for model {self._model_name} to be ready")
         try:
-            async with async_timeout.timeout(self._init_timeout_s):
-                await asyncio_wait_for_model_ready(
+            await asyncio.wait_for(
+                asyncio_wait_for_model_ready(
                     self._general_client, self._model_name, self._model_version, timeout_s=timeout_s
-                )
+                ),
+                self._init_timeout_s,
+            )
         except asyncio.TimeoutError as e:
             message = f"Timeout while waiting for model {self._model_name} to be ready for {self._init_timeout_s}s"
             _LOGGER.error(message)
@@ -870,19 +871,22 @@ class AsyncioModelClient(BaseModelClient):
         Also waits for server to get into readiness state.
         """
         try:
-            async with async_timeout.timeout(self._init_timeout_s):
-                if not self._model_config:
-                    kwargs = self._get_model_config_extra_args()
-                    _LOGGER.debug(f"Obtaining model config for {self._model_name}")
-                    self._model_config = await asyncio_get_model_config(
+            if not self._model_config:
+                kwargs = self._get_model_config_extra_args()
+                _LOGGER.debug(f"Obtaining model config for {self._model_name}")
+
+                self._model_config = await asyncio.wait_for(
+                    asyncio_get_model_config(
                         self._general_client,
                         self._model_name,
                         self._model_version,
                         timeout_s=self._init_timeout_s,
                         **kwargs,
-                    )
-                    _LOGGER.debug(f"Obtained model config for {self._model_name}")
-                return self._model_config
+                    ),
+                    self._init_timeout_s,
+                )
+                _LOGGER.debug(f"Obtained model config for {self._model_name}")
+            return self._model_config
         except asyncio.TimeoutError as e:
             message = f"Timeout while waiting for model {self._model_name} to be ready for {self._init_timeout_s}s"
             _LOGGER.error(message)
@@ -1029,18 +1033,22 @@ class AsyncioModelClient(BaseModelClient):
             PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
         """
         try:
-            async with async_timeout.timeout(init_timeout_s):
-                should_finish_before_s = time.time() + init_timeout_s
-                _LOGGER.debug(f"Waiting for model {self._model_name} to be ready")
-                await self.wait_for_model(init_timeout_s)
-                _LOGGER.debug(f"Model {self._model_name} is ready")
-                self._model_ready = True
-                timeout_s = max(0.0, should_finish_before_s - time.time())
-                _LOGGER.debug(f"Obtaining model config for {self._model_name}")
-                self._model_config = await asyncio_get_model_config(
+            should_finish_before_s = time.time() + init_timeout_s
+            _LOGGER.debug(f"Waiting for model {self._model_name} to be ready")
+
+            await asyncio.wait_for(self.wait_for_model(init_timeout_s), init_timeout_s)
+            _LOGGER.debug(f"Model {self._model_name} is ready")
+            self._model_ready = True
+
+            timeout_s = max(0.0, should_finish_before_s - time.time())
+            _LOGGER.debug(f"Obtaining model config for {self._model_name}")
+            self._model_config = await asyncio.wait_for(
+                asyncio_get_model_config(
                     self._general_client, self._model_name, self._model_version, timeout_s=timeout_s
-                )
-                _LOGGER.debug(f"Model config for {self._model_name} obtained")
+                ),
+                timeout_s,
+            )
+            _LOGGER.debug(f"Model config for {self._model_name} obtained")
         except asyncio.TimeoutError as e:
             _LOGGER.error(f"Timeout exceeded while waiting for model {self._model_name} to be ready")
             raise PyTritonClientTimeoutError(

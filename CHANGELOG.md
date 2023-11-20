@@ -19,6 +19,7 @@ limitations under the License.
 ## Unreleased
 
 - Fix: Leak of ModelClient during Triton creation
+- Fix: Fixed non-declared project dependencies (removed from use in code or added to package dependecies)
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 

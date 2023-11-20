@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import gc
 import logging
 import threading
 import unittest
 from unittest.mock import ANY
 
-import async_timeout
 import numpy as np
 import pytest
 from tritonclient.grpc.aio import InferenceServerClient as AsyncioGrpcInferenceServerClient
@@ -505,120 +505,96 @@ async def test_async_grpc_client_infer_sample_returns_expected_result_when_infer
 async def test_async_grpc_client_non_lazy_aenter_failure_triton_non_ready(mocker):
     model_config = ADD_SUB_WITH_BATCHING_MODEL_CONFIG
 
-    _LOGGER.debug("Entering timeout 0.2")
-    async with async_timeout.timeout(0.2):
-        _LOGGER.debug("Creating client")
-        client = AsyncioModelClient(GRPC_LOCALHOST_URL, model_config.model_name, init_timeout_s=0.1, lazy_init=False)
-        _LOGGER.debug("Before patching")
-        patch_client__server_up_and_ready(mocker, AsyncioGrpcInferenceServerClient, ready_server=False)
-        _LOGGER.debug("Entering client")
-        with pytest.raises(PyTritonClientTimeoutError):
-            await client.__aenter__()
-            _LOGGER.debug("Exiting client without error")
-        _LOGGER.debug("Exited client with error")
-
-    _LOGGER.debug("Exited timeout 0.2")
+    _LOGGER.debug("Creating client")
+    client = AsyncioModelClient(GRPC_LOCALHOST_URL, model_config.model_name, init_timeout_s=0.1, lazy_init=False)
+    _LOGGER.debug("Before patching")
+    patch_client__server_up_and_ready(mocker, AsyncioGrpcInferenceServerClient, ready_server=False)
+    _LOGGER.debug("Entering client")
+    with pytest.raises(PyTritonClientTimeoutError):
+        await asyncio.wait_for(client.__aenter__(), 0.2)
+        _LOGGER.debug("Exiting client without error")
+    _LOGGER.debug("Exited client with error")
 
 
 @pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_grpc_client_non_lazy_aenter_failure_triton_non_live(mocker):
     model_config = ADD_SUB_WITH_BATCHING_MODEL_CONFIG
 
-    _LOGGER.debug("Entering timeout 0.2")
-    async with async_timeout.timeout(0.2):
-        _LOGGER.debug("Creating client")
-        client = AsyncioModelClient(GRPC_LOCALHOST_URL, model_config.model_name, init_timeout_s=0.1, lazy_init=False)
-        _LOGGER.debug("Before patching")
-        patch_client__server_up_and_ready(mocker, AsyncioGrpcInferenceServerClient, live_server=False)
-        _LOGGER.debug("Entering client")
-        with pytest.raises(PyTritonClientTimeoutError):
-            await client.__aenter__()
-            _LOGGER.debug("Exiting client without error")
-        _LOGGER.debug("Exited client with error")
-
-    _LOGGER.debug("Exited timeout 0.2")
+    _LOGGER.debug("Creating client")
+    client = AsyncioModelClient(GRPC_LOCALHOST_URL, model_config.model_name, init_timeout_s=0.1, lazy_init=False)
+    _LOGGER.debug("Before patching")
+    patch_client__server_up_and_ready(mocker, AsyncioGrpcInferenceServerClient, live_server=False)
+    _LOGGER.debug("Entering client")
+    with pytest.raises(PyTritonClientTimeoutError):
+        await asyncio.wait_for(client.__aenter__(), 0.2)
+        _LOGGER.debug("Exiting client without error")
+    _LOGGER.debug("Exited client with error")
 
 
 @pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_grpc_client_non_lazy_aenter_failure_model_non_ready(mocker):
     model_config = ADD_SUB_WITH_BATCHING_MODEL_CONFIG
 
-    _LOGGER.debug("Entering timeout 0.2")
-    async with async_timeout.timeout(0.2):
-        _LOGGER.debug("Creating client")
-        client = AsyncioModelClient(GRPC_LOCALHOST_URL, model_config.model_name, init_timeout_s=0.1, lazy_init=False)
-        _LOGGER.debug("Before patching")
-        patch_client__server_up_and_ready(mocker, AsyncioGrpcInferenceServerClient)
-        patch_grpc_client__model_up_and_ready(mocker, model_config, AsyncioGrpcInferenceServerClient, ready=False)
-        _LOGGER.debug("Entering client")
-        with pytest.raises(PyTritonClientTimeoutError):
-            await client.__aenter__()
-            _LOGGER.debug("Exiting client without error")
-        _LOGGER.debug("Exited client with error")
-
-    _LOGGER.debug("Exited timeout 0.2")
+    _LOGGER.debug("Creating client")
+    client = AsyncioModelClient(GRPC_LOCALHOST_URL, model_config.model_name, init_timeout_s=0.1, lazy_init=False)
+    _LOGGER.debug("Before patching")
+    patch_client__server_up_and_ready(mocker, AsyncioGrpcInferenceServerClient)
+    patch_grpc_client__model_up_and_ready(mocker, model_config, AsyncioGrpcInferenceServerClient, ready=False)
+    _LOGGER.debug("Entering client")
+    with pytest.raises(PyTritonClientTimeoutError):
+        await asyncio.wait_for(client.__aenter__(), 0.2)
+        _LOGGER.debug("Exiting client without error")
+    _LOGGER.debug("Exited client with error")
 
 
 @pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_grpc_client_non_lazy_aenter_failure_model_state_unavailable(mocker):
     model_config = ADD_SUB_WITH_BATCHING_MODEL_CONFIG
 
-    _LOGGER.debug("Entering timeout 2")
-    async with async_timeout.timeout(2):
-        _LOGGER.debug("Creating client")
-        client = AsyncioModelClient(GRPC_LOCALHOST_URL, model_config.model_name, init_timeout_s=1, lazy_init=False)
-        _LOGGER.debug("Before patching")
-        patch_client__server_up_and_ready(mocker, AsyncioGrpcInferenceServerClient)
-        patch_grpc_client__model_up_and_ready(mocker, model_config, AsyncioGrpcInferenceServerClient, ready=False)
-        _LOGGER.debug("Entering client")
-        with pytest.raises(PyTritonClientTimeoutError):
-            await client.__aenter__()
-            _LOGGER.debug("Exiting client without error")
-        _LOGGER.debug("Exited client with error")
-
-    _LOGGER.debug("Exited timeout 0.2")
+    _LOGGER.debug("Creating client")
+    client = AsyncioModelClient(GRPC_LOCALHOST_URL, model_config.model_name, init_timeout_s=1, lazy_init=False)
+    _LOGGER.debug("Before patching")
+    patch_client__server_up_and_ready(mocker, AsyncioGrpcInferenceServerClient)
+    patch_grpc_client__model_up_and_ready(mocker, model_config, AsyncioGrpcInferenceServerClient, ready=False)
+    _LOGGER.debug("Entering client")
+    with pytest.raises(PyTritonClientTimeoutError):
+        await asyncio.wait_for(client.__aenter__(), 2)
+        _LOGGER.debug("Exiting client without error")
+    _LOGGER.debug("Exited client with error")
 
 
 @pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_grpc_client_non_lazy_aenter_failure_model_incorrect_name(mocker):
     model_config = ADD_SUB_WITH_BATCHING_MODEL_CONFIG
 
-    _LOGGER.debug("Entering timeout 2")
-    async with async_timeout.timeout(2):
-        _LOGGER.debug("Creating client")
-        client = AsyncioModelClient(GRPC_LOCALHOST_URL, "DUMMY", init_timeout_s=1, lazy_init=False)
-        _LOGGER.debug("Before patching")
-        patch_client__server_up_and_ready(mocker, AsyncioGrpcInferenceServerClient)
-        patch_grpc_client__model_up_and_ready(mocker, model_config, AsyncioGrpcInferenceServerClient)
-        _LOGGER.debug("Entering client")
-        with pytest.raises(PyTritonClientTimeoutError):
-            await client.__aenter__()
-            _LOGGER.debug("Exiting client without error")
-        _LOGGER.debug("Exited client with error")
-
-    _LOGGER.debug("Exited timeout 0.2")
+    _LOGGER.debug("Creating client")
+    client = AsyncioModelClient(GRPC_LOCALHOST_URL, "DUMMY", init_timeout_s=1, lazy_init=False)
+    _LOGGER.debug("Before patching")
+    patch_client__server_up_and_ready(mocker, AsyncioGrpcInferenceServerClient)
+    patch_grpc_client__model_up_and_ready(mocker, model_config, AsyncioGrpcInferenceServerClient)
+    _LOGGER.debug("Entering client")
+    with pytest.raises(PyTritonClientTimeoutError):
+        await asyncio.wait_for(client.__aenter__(), 2)
+        _LOGGER.debug("Exiting client without error")
+    _LOGGER.debug("Exited client with error")
 
 
 @pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_grpc_client_non_lazy_aenter_failure_model_incorrect_version(mocker):
     model_config = ADD_SUB_WITH_BATCHING_MODEL_CONFIG
 
-    _LOGGER.debug("Entering timeout 2")
-    async with async_timeout.timeout(2):
-        _LOGGER.debug("Creating client")
-        client = AsyncioModelClient(
-            GRPC_LOCALHOST_URL, model_config.model_name, model_version="2", init_timeout_s=1, lazy_init=False
-        )
-        _LOGGER.debug("Before patching")
-        patch_client__server_up_and_ready(mocker, AsyncioGrpcInferenceServerClient)
-        patch_grpc_client__model_up_and_ready(mocker, model_config, AsyncioGrpcInferenceServerClient)
-        _LOGGER.debug("Entering client")
-        with pytest.raises(PyTritonClientTimeoutError):
-            await client.__aenter__()
-            _LOGGER.debug("Exiting client without error")
-        _LOGGER.debug("Exited client with error")
-
-    _LOGGER.debug("Exited timeout 0.2")
+    _LOGGER.debug("Creating client")
+    client = AsyncioModelClient(
+        GRPC_LOCALHOST_URL, model_config.model_name, model_version="2", init_timeout_s=1, lazy_init=False
+    )
+    _LOGGER.debug("Before patching")
+    patch_client__server_up_and_ready(mocker, AsyncioGrpcInferenceServerClient)
+    patch_grpc_client__model_up_and_ready(mocker, model_config, AsyncioGrpcInferenceServerClient)
+    _LOGGER.debug("Entering client")
+    with pytest.raises(PyTritonClientTimeoutError):
+        await asyncio.wait_for(client.__aenter__(), 2)
+        _LOGGER.debug("Exiting client without error")
+    _LOGGER.debug("Exited client with error")
 
 
 @pytest.mark.async_timeout(_MAX_TEST_TIME)
