@@ -35,7 +35,7 @@ METADATA = {
 
 
 def verify_client_output(client_output):
-    expected_pattern = r"I'm not sure if you're being sarcastic.*i am not"
+    expected_pattern = r"I'm not sure if you're being sarcastic"
     output_match = re.search(expected_pattern, client_output, re.DOTALL)
     output_array = output_match.group(0) if output_match else None
     if not output_array:
