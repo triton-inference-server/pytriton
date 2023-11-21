@@ -14,7 +14,6 @@
 """Utility module supporting model clients."""
 import dataclasses
 import enum
-import inspect
 import logging
 import socket
 import sys
@@ -22,7 +21,6 @@ import time
 import urllib
 from typing import Optional, Union
 
-import gevent
 import tritonclient.grpc
 import tritonclient.http
 import tritonclient.http.aio
@@ -295,52 +293,10 @@ def create_client_from_url(
     Raises:
         PyTritonClientInvalidUrlError: If provided Triton Inference Server url is invalid.
     """
-    if not isinstance(url, str):
-        raise PyTritonClientInvalidUrlError(f"Invalid url {url}. Url must be a string.")
+    url = TritonUrl.from_url(url)
+    triton_client_lib = {"grpc": tritonclient.grpc, "http": tritonclient.http}[url.scheme]
 
-    try:
-        parsed_url = urllib.parse.urlparse(url)
-        # change in py3.9+
-        # https://github.com/python/cpython/commit/5a88d50ff013a64fbdb25b877c87644a9034c969
-        if sys.version_info < (3, 9) and not parsed_url.scheme and "://" in parsed_url.path:
-            raise ValueError(f"Invalid url {url}. Only grpc and http are supported.")
-        if (sys.version_info < (3, 9) and not parsed_url.scheme and "://" not in parsed_url.path) or (
-            sys.version_info >= (3, 9) and parsed_url.scheme and not parsed_url.netloc
-        ):
-            _LOGGER.debug(f"Adding http scheme to {url}")
-            parsed_url = urllib.parse.urlparse(f"http://{url}")
-
-        scheme = parsed_url.scheme.lower()
-        if scheme not in ["grpc", "http"]:
-            raise ValueError(f"Invalid scheme {scheme}. Only grpc and http are supported.")
-        port = parsed_url.port or {"grpc": DEFAULT_GRPC_PORT, "http": DEFAULT_HTTP_PORT}[scheme]
-    except ValueError as e:
-        raise PyTritonClientInvalidUrlError(f"Invalid url {url}") from e
-
-    url = f"{parsed_url.hostname}:{port}"
-    triton_client_lib = {"grpc": tritonclient.grpc, "http": tritonclient.http}[scheme]
-
-    def _monkey_patch_client():
-        old_del = getattr(triton_client_lib.InferenceServerClient, "__del__")  # noqa: B009
-
-        # Monkey patch __del__ method from client to catch error in client when instance is garbage collected.
-        # This is needed because we are closing client in __exit__ method or in close method.
-        # (InferenceClient uses gevent library which does not support closing twice from different threads)
-        def _monkey_patched_del(self):
-            """Monkey patched del."""
-            try:
-                old_del(self)
-            except gevent.exceptions.InvalidThreadUseError:
-                _LOGGER.warning("gevent.exceptions.InvalidThreadUseError in __del__ of InferenceServerClient")
-            except Exception as e:
-                _LOGGER.error("Exception in __del__ of InferenceServerClient: %s", e)
-
-        if old_del:
-            triton_client_lib.InferenceServerClient.__del__ = _monkey_patched_del
-
-    _monkey_patch_client()
-
-    if scheme == "grpc":
+    if url.scheme == "grpc":
         # by default grpc client has very large number of timeout, thus we want to make it equal to http client timeout
         network_timeout_s = _DEFAULT_NETWORK_TIMEOUT_S if network_timeout_s is None else network_timeout_s
         _LOGGER.warning(
@@ -352,33 +308,12 @@ def create_client_from_url(
         triton_client_init_kwargs.update(
             **{
                 "grpc": {},
-                # connection_timeout
-                #     This value sets the maximum time allowed for establishing a connection to the server.
-                #     We use the inference timeout here instead of the init timeout because the init timeout
-                #     is meant for waiting for the model to be ready. The connection timeout should be shorter
-                #     than the init timeout because it only checks if connection is established (e.g. correct port)
-                # network_timeout
-                #     This value sets the maximum time allowed for each network request
-                #     in both model loading and inference process
                 "http": {"connection_timeout": network_timeout_s, "network_timeout": network_timeout_s},
-            }[scheme]
+            }[url.scheme]
         )
 
-    _LOGGER.debug(f"Creating InferenceServerClient for {parsed_url.scheme}://{url} with {triton_client_init_kwargs}")
-    return triton_client_lib.InferenceServerClient(url, **triton_client_init_kwargs)
-
-
-def get_client_lib_from_client(client: _TritonSyncClientType):
-    """Get Triton Inference Server client library module.
-
-    Args:
-        client: Triton Inference Server client.
-
-    Returns:
-        Triton Inference Server client library module.
-    """
-    package_name: str = inspect.getmodule(client).__package__  # pytype: disable=attribute-error
-    return sys.modules[package_name]
+    _LOGGER.debug(f"Creating InferenceServerClient for {url.with_scheme} with {triton_client_init_kwargs}")
+    return triton_client_lib.InferenceServerClient(url.without_scheme, **triton_client_init_kwargs)
 
 
 @dataclasses.dataclass

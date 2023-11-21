@@ -33,6 +33,7 @@ for models inference.
 """
 import atexit
 import codecs
+import contextlib
 import dataclasses
 import logging
 import os
@@ -48,7 +49,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 import typing_inspect
 
 from pytriton.client import ModelClient
-from pytriton.client.utils import TritonUrl, wait_for_server_ready
+from pytriton.client.utils import TritonUrl, create_client_from_url, wait_for_server_ready
 from pytriton.constants import DEFAULT_TRITON_STARTUP_TIMEOUT_S
 from pytriton.decorators import TritonContext
 from pytriton.exceptions import PyTritonValidationError
@@ -301,9 +302,9 @@ class _LogLevelChecker:
             PyTritonClientTimeoutError: if timeout is reached
         """
         if self._log_settings is None and not skip_update:
-            with ModelClient(self._url, "Dummy") as client:
-                wait_for_server_ready(client._general_client, timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S)
-                self._log_settings = client._general_client.get_log_settings()
+            with contextlib.closing(create_client_from_url(self._url)) as client:
+                wait_for_server_ready(client, timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S)
+                self._log_settings = client.get_log_settings()
 
         if self._log_settings is not None:
             log_settings = self._log_settings
@@ -493,8 +494,8 @@ class TritonBase:
         """Wait for Triton Inference Server to be ready."""
         self._log_level_checker.check()
         try:
-            with ModelClient(url=self._url, model_name="Dummy") as client:
-                client.wait_for_server(timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S)
+            with contextlib.closing(create_client_from_url(self._url)) as client:
+                wait_for_server_ready(client, timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S)
         except TimeoutError as e:
             LOGGER.warning(
                 f"Could not verify locally if Triton Inference Server is ready using {self._url}. "
