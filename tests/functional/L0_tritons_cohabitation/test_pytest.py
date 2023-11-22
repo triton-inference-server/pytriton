@@ -32,7 +32,6 @@ _LOGGER = logging.getLogger(__name__)
 
 _SMALL_TIMEOUT = 0.5
 _LARGE_TIMEOUT = 1.5
-_TEST_TIMEOUT = 60.0
 _GARGANTUAN_TIMEOUT = 5.0
 
 
@@ -167,7 +166,6 @@ def input_sleep_large():
     yield np.array([[_LARGE_TIMEOUT]], dtype=np.float64)
 
 
-@pytest.mark.timeout(_TEST_TIMEOUT)
 def test_infer_sample_success_futures(first_async_http_client, second_async_http_client, input_sleep_large):
     _LOGGER.debug(f"Testing async grpc_client with input {input_sleep_large}.")
     with first_async_http_client as first_client:

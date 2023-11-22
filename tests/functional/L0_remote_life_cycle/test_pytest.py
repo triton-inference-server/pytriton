@@ -32,8 +32,6 @@ _LOGGER = logging.getLogger(__name__)
 
 _SMALLEST_TIMEOUT = 0.0
 _SMALL_TIMEOUT = 0.5
-_LARGE_TIMEOUT = 1.5
-_TEST_TIMEOUT = 25.0
 _GARGANTUAN_TIMEOUT = 10.0
 
 
@@ -171,14 +169,12 @@ def input_sleep_smallest():
     yield np.array([[_SMALLEST_TIMEOUT]], dtype=np.float64)
 
 
-@pytest.mark.timeout(_TEST_TIMEOUT)
 def test_remote_triton_not_connected():
     _LOGGER.debug("Testing RemoteTriton not connected after instantiation.")
     t = RemoteTriton(url="localhost:8000")
     assert not t.is_connected()
 
 
-@pytest.mark.timeout(_TEST_TIMEOUT)
 def test_remote_triton_connect_with_context():
     _LOGGER.debug("Testing RemoteTriton connect with context manager.")
     with Triton() as t:
@@ -192,7 +188,6 @@ def test_remote_triton_connect_with_context():
             assert rt.is_alive()
 
 
-@pytest.mark.timeout(_TEST_TIMEOUT)
 def test_remote_triton_connect():
     _LOGGER.debug("Testing RemoteTriton connect with connect method.")
     with Triton() as t:
@@ -215,7 +210,6 @@ def test_remote_triton_connect():
         rt2.stop()
 
 
-@pytest.mark.timeout(_TEST_TIMEOUT)
 def test_bind_multiple_models():
     _LOGGER.debug("Testing Triton bind multiple models.")
     t = Triton()
@@ -238,7 +232,6 @@ def test_bind_multiple_models():
     assert not t.is_connected()
 
 
-@pytest.mark.timeout(_TEST_TIMEOUT)
 def test_local_and_remote_models_context_manager(triton_server, http_client, input_sleep_smallest):
     _LOGGER.debug(f"Testing http_client with input {input_sleep_smallest}.")
     with http_client as local_client:
@@ -279,7 +272,6 @@ def test_local_and_remote_models_context_manager(triton_server, http_client, inp
             assert result["OUTPUT_1"] == input_sleep_smallest
 
 
-@pytest.mark.timeout(_TEST_TIMEOUT)
 def test_local_and_remote_models_explicite_run(triton_server, http_client, input_sleep_smallest):
     _LOGGER.debug(f"Testing http_client with input {input_sleep_smallest}.")
     with http_client as local_client:
@@ -322,7 +314,6 @@ def test_local_and_remote_models_explicite_run(triton_server, http_client, input
     triton.stop()
 
 
-@pytest.mark.timeout(_TEST_TIMEOUT)
 def test_local_and_remote_models_survive_remote_close(triton_server, http_client, input_sleep_smallest):
     _LOGGER.debug(f"Testing http_client with input {input_sleep_smallest}.")
     with http_client as local_client:
@@ -420,7 +411,6 @@ def test_local_and_remote_models_closes_client(triton_server, http_client, input
             remote_client_for_dead_model.infer_sample(input_sleep_smallest)
 
 
-@pytest.mark.timeout(_TEST_TIMEOUT)
 def test_local_and_remote_models_inflight_requests(triton_server, http_client, input_sleep_smallest):
     _LOGGER.debug(f"Testing http_client with input {input_sleep_smallest}.")
     with http_client as local_client:
@@ -472,7 +462,6 @@ def test_local_and_remote_models_inflight_requests(triton_server, http_client, i
         futures_client.close()
 
 
-@pytest.mark.timeout(_TEST_TIMEOUT)
 def test_local_and_remote_models_name_clash(triton_server, http_client, input_sleep_smallest):
     _LOGGER.debug(f"Testing http_client with input {input_sleep_smallest}.")
     i_was_called = False

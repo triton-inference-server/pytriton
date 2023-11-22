@@ -35,12 +35,10 @@ from pytriton.triton import Triton, TritonConfig
 _LOGGER = logging.getLogger(__name__)
 
 _SMALL_TIMEOUT = 0.1
-_TEST_TIMEOUT = 25.0
 _GARGANTUAN_TIMEOUT = 10.0
 _WRONG_TIMEOUT = -1.0
 _CORRECT_REPEAT = 2
 _WRONG_REPEAT = -2
-_NO_REPEAT = 0
 
 
 @pytest.fixture(scope="function")
@@ -259,21 +257,18 @@ def http_coupled_client_decoupled_server(triton_decoupled_server):
     )
 
 
-@pytest.mark.timeout(_TEST_TIMEOUT)
 def test_coupled_infer_sample_failure_http(grpc_coupled_client_decoupled_server):
     with pytest.raises(PyTritonClientInferenceServerError):
         with grpc_coupled_client_decoupled_server as client:
             client.infer_sample(np.array([_SMALL_TIMEOUT]), np.array([1]))
 
 
-@pytest.mark.timeout(_TEST_TIMEOUT)
 def test_coupled_infer_batch_failure_http(grpc_coupled_client_decoupled_server):
     with pytest.raises(PyTritonClientInferenceServerError):
         with grpc_coupled_client_decoupled_server as client:
             client.infer_batch(np.array([[_SMALL_TIMEOUT]]), np.array([[1]]))
 
 
-@pytest.mark.timeout(_TEST_TIMEOUT)
 def test_decoupled_init_failure_http(triton_decoupled_server):
     with pytest.raises(PyTritonClientValueError):
         DecoupledModelClient(
@@ -282,7 +277,6 @@ def test_decoupled_init_failure_http(triton_decoupled_server):
         )
 
 
-@pytest.mark.timeout(_TEST_TIMEOUT)
 def test_decoupled_infer_sample_success_grpc(grpc_decoupled_client_server):
     with grpc_decoupled_client_server as client:
         responses = list(client.infer_sample(np.array([_SMALL_TIMEOUT]), np.array([_CORRECT_REPEAT])))
@@ -293,7 +287,6 @@ def test_decoupled_infer_sample_success_grpc(grpc_decoupled_client_server):
         assert responses[1]["OUTPUT_2"] == _CORRECT_REPEAT
 
 
-@pytest.mark.timeout(_TEST_TIMEOUT)
 def test_decoupled_infer_batch_success_grpc(grpc_decoupled_client_server):
     with grpc_decoupled_client_server as client:
         responses = list(client.infer_batch(np.array([[_SMALL_TIMEOUT]]), np.array([[_CORRECT_REPEAT]])))
@@ -304,34 +297,29 @@ def test_decoupled_infer_batch_success_grpc(grpc_decoupled_client_server):
         assert responses[1]["OUTPUT_2"] == _CORRECT_REPEAT
 
 
-@pytest.mark.timeout(_TEST_TIMEOUT)
 def test_decoupled_infer_sample_failure_coupled_server_grpc(grpc_decoupled_client_coupled_server):
     with grpc_decoupled_client_coupled_server as client:
         with pytest.raises(PyTritonClientInferenceServerError):
             client.infer_sample(np.array([_SMALL_TIMEOUT]), np.array([_CORRECT_REPEAT]))
 
 
-@pytest.mark.timeout(_TEST_TIMEOUT)
 def test_decoupled_infer_batch_failure_coupled_server_grpc(grpc_decoupled_client_coupled_server):
     with grpc_decoupled_client_coupled_server as client:
         with pytest.raises(PyTritonClientInferenceServerError):
             client.infer_batch(np.array([[_SMALL_TIMEOUT]]), np.array([[_CORRECT_REPEAT]]))
 
 
-@pytest.mark.timeout(_TEST_TIMEOUT)
 def test_decoupled_infer_sample_fast_failure_no_iter_grpc(grpc_decoupled_client_server):
     with grpc_decoupled_client_server as client:
         client.infer_sample(np.array([_WRONG_TIMEOUT]), np.array([_CORRECT_REPEAT]))
 
 
-@pytest.mark.timeout(_TEST_TIMEOUT)
 def test_decoupled_infer_sample_fast_failure_iter_grpc(grpc_decoupled_client_server):
     with grpc_decoupled_client_server as client:
         with pytest.raises(PyTritonClientInferenceServerError):
             list(client.infer_sample(np.array([_WRONG_TIMEOUT]), np.array([_CORRECT_REPEAT])))
 
 
-@pytest.mark.timeout(_TEST_TIMEOUT)
 def test_decoupled_infer_sample_slow_failure_iter_grpc(grpc_decoupled_client_server):
     with grpc_decoupled_client_server as client:
         iterator = client.infer_sample(np.array([_SMALL_TIMEOUT]), np.array([_WRONG_REPEAT]))

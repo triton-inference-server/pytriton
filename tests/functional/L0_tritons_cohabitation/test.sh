@@ -18,4 +18,8 @@ set -xe
 THIS_SCRIPT_DIR="$(realpath --relative-to="${PWD}" "$(dirname "$0")")"
 
 pip install pytest-timeout numpy
-python3 $THIS_SCRIPT_DIR/test.py --verbose
+pytest -svvv \
+    --log-cli-level=DEBUG \
+    --log-cli-format='%(asctime)s [%(levelname)s] [%(process)d:%(thread)d] %(name)s:%(lineno)d:  %(message)s' \
+    --timeout=60 \
+    ${THIS_SCRIPT_DIR}/test_pytest.py
