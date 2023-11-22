@@ -27,7 +27,6 @@ METADATA = {
 
 
 def main():
-
     from tests.functional.common.tests.client_stress import futures_stress_test
     from tests.utils import TestMonitoringContext
 

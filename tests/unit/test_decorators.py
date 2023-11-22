@@ -306,7 +306,6 @@ def test_first_value_with_requests(mocker, requests, keys, expected):
 
 
 def test_first_value_raises_on_special_key():
-
     with pytest.raises(PyTritonBadParameterError, match="not allowed as keys for @first_value wrapper."):
 
         @first_value("__triton_context__")

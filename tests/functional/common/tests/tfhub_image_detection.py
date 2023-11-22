@@ -63,7 +63,6 @@ def tfhub_image_detection(test_time_s: int, init_timeout_s: int, batch_size: int
                 classes_counter = collections.Counter()
                 url = f"http://localhost:{triton_config.http_port}"
                 with ModelClient(url, model_spec.name, init_timeout_s=init_timeout_s) as client:
-
                     should_stop_at_s = time.time() + test_time_s
                     dataset = dataset["train"].repeat()
                     for idx, (image_tensor, _) in enumerate(dataset):

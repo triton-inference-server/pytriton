@@ -115,7 +115,6 @@ def _get_proxy_backend(mocker, model_config, shared_memory_socket, data_store_so
     ],
 )
 def test_model_throws_exception(tmp_path, mocker, infer_fn, decoupled):
-
     # add python backend folder to find triton_python_backend_utils from model.py
     python_backend_path = TRITONSERVER_DIST_DIR / "backends" / "python"
     sys.path.append(str(python_backend_path))

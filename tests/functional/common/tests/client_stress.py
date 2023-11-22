@@ -41,7 +41,6 @@ MAX_SEQUENCE_LENGTH = 128
 
 
 def futures_stress_test(test_time_s: int, init_timeout_s: int, batch_size: int, seed: int, verbose: bool):
-
     model_name = "distilbert-base-uncased"
 
     model_spec = _model_spec()
@@ -146,7 +145,6 @@ def futures_stress_test(test_time_s: int, init_timeout_s: int, batch_size: int, 
 
 
 async def asyncio_stress_test(test_time_s: int, init_timeout_s: int, batch_size: int, seed: int, verbose: bool):
-
     model_name = "distilbert-base-uncased"
 
     model_spec = _model_spec()

@@ -136,7 +136,6 @@ def main():
 
     app_state = setup_distributed_environment(trainer)
     if app_state.global_rank == 0:
-
         infer_callable = NemoGptCallable(model_name=args.model_name, model=model)
         if args.triton_config is None:
             triton_config = TritonConfig(http_address=ENDPOINT_BIND_ADDRESS, http_port=HTTP_PORT)

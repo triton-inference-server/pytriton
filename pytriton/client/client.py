@@ -724,7 +724,7 @@ class DecoupledModelClient(ModelClient):
     def _create_response_iterator(self):
         while True:
             item = self.queue.get()
-            if type(item) == tritonclient.utils.InferenceServerException:
+            if isinstance(item, tritonclient.utils.InferenceServerException):
                 message = f"Error occurred during inference request. Message: {item.message()}"
                 _LOGGER.error(message)
                 raise PyTritonClientInferenceServerError(message) from item

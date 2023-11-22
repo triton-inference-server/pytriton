@@ -297,7 +297,6 @@ def group_by_values(*keys, pad_fn: typing.Optional[typing.Callable[[InferenceReq
 
     @wrapt.decorator
     def _wrapper(wrapped, instance, args, kwargs):
-
         wrappers_stack = [
             callable_with_wrapper.wrapper
             for callable_with_wrapper in _get_wrapt_stack(wrapped)
@@ -612,7 +611,6 @@ def first_value(*keys: str, squeeze_single_values=True, strict: bool = True):
 
     @wrapt.decorator
     def wrapper(wrapped, instance, args, kwargs):
-
         model_config = get_model_config(wrapped, instance)
         if not model_config.batching:
             raise PyTritonRuntimeError("The @first_value decorator can only be used with models that support batching.")

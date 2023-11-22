@@ -27,7 +27,6 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 
 def _get_model():  # Load model into Triton Inference Server
-
     input_layer = tf.keras.layers.Input((224, 224, 3))
     layer_output = tf.keras.layers.Lambda(lambda x: x)(input_layer)
     model_output = tf.keras.layers.Lambda(lambda x: x)(layer_output)

@@ -193,7 +193,6 @@ def test_infer_sample_list_passed_arguments_returns_arguments(mocker):
     patch_client_infer_sample = mocker.patch.object(ModelClient, ModelClient.infer_sample.__name__)
     patch_client_infer_sample.return_value = ret
     with FuturesModelClient(GRPC_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
-
         return_value = client.infer_sample(a, b).result()
         assert return_value == ret
         patch_client_infer_sample.assert_called_once_with(a, b, parameters=None, headers=None)
@@ -208,7 +207,6 @@ def test_infer_sample_dict_passed_arguments_returns_arguments(mocker):
     patch_client_infer_sample = mocker.patch.object(ModelClient, ModelClient.infer_sample.__name__)
     patch_client_infer_sample.return_value = ret
     with FuturesModelClient(GRPC_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
-
         return_value = client.infer_sample(a=a, b=b).result()
         assert return_value == ret
         patch_client_infer_sample.assert_called_once_with(a=a, b=b, parameters=None, headers=None)
@@ -237,7 +235,6 @@ def test_infer_batch_dict_passed_arguments_returns_arguments(mocker):
     patch_client_infer_batch = mocker.patch.object(ModelClient, ModelClient.infer_batch.__name__)
     patch_client_infer_batch.return_value = ret
     with FuturesModelClient(GRPC_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
-
         return_value = client.infer_batch(a=a, b=b).result()
         assert return_value == ret
         patch_client_infer_batch.assert_called_once_with(parameters=None, headers=None, a=a, b=b)

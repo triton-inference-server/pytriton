@@ -63,7 +63,6 @@ def batched_multiply_2_gen(**_inputs):
     ),
 )
 def test_batch(inputs, infer_fn, expected):
-
     results = infer_fn(inputs)
 
     if inspect.isgenerator(results):
@@ -112,7 +111,6 @@ def _prepare_and_inject_context_with_config(config, fn):
     ),
 )
 def test_batch_with_context(inputs, infer_fn, expected):
-
     # list outputs require the context to be injected
     _prepare_and_inject_context_with_config(
         config=TritonModelConfig(

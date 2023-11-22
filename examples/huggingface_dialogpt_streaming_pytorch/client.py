@@ -84,13 +84,11 @@ def main():
 
         chat_history = chat_history_items[0]
         for idx in idx_generator():
-
             if idx > 0:
                 print(f"({idx}) > ", end="", flush=True)  # noqa: T201
             for partial_result_dict in client.infer_sample(
                 new_inputs=np.array(chat_history_items[-1:]), chat_history=np.array([chat_history])
             ):
-
                 response_tokens = partial_result_dict["response"].tolist()  # pytype: disable=unsupported-operands
                 chat_history_items.extend(response_tokens)  # noqa: T201
 

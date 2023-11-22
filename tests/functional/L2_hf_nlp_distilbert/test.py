@@ -25,7 +25,6 @@ METADATA = {
 
 
 def main():
-
     from tests.functional.common.tests.hf_nlp_distilbert import huggingface_distilbert
     from tests.utils import TestMonitoringContext
 

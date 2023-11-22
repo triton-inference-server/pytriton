@@ -110,7 +110,6 @@ class _DecoupledResponsesSender:
         assert len(responses) == len(self._senders)
         eos = eos or [None] * len(self._senders)
         for response_idx, (response, response_eos) in enumerate(zip(responses, eos)):
-
             if response is None and not response_eos:
                 continue
 

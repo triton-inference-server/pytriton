@@ -28,7 +28,6 @@ METADATA = {
 
 
 async def main():
-
     from tests.functional.common.tests.client_stress import asyncio_stress_test
     from tests.utils import TestMonitoringContext
 
