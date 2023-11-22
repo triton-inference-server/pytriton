@@ -18,16 +18,45 @@ This file is automatically copied during deployment on Triton.
 import base64
 import itertools
 import json
+import logging
+import multiprocessing
 import traceback
 import typing
 
 import triton_python_backend_utils as pb_utils  # pytype: disable=import-error
 import zmq  # pytype: disable=import-error
 
+from . import communication
 from .communication import InferenceHandlerRequests, InferenceHandlerResponses, MetaRequestResponse, TensorStore
 from .types import Request
 
+LOGGER = logging.getLogger(__name__)
+
+
 _ACK = b""
+
+
+def _update_loggers():
+    def get_triton_backend_logger():
+        try:
+            # https://github.com/triton-inference-server/python_backend/blob/main/src/pb_stub.cc#L1501
+            logger = pb_utils.Logger  # pytype: disable=module-attr
+            logger.error = logger.log_error
+            logger.warning = logger.log_warn
+            logger.info = logger.log_info
+            logger.debug = logger.log_verbose
+            # do not set log_to_stderr in Backend
+        except (ImportError, AttributeError):
+            logger = logging.getLogger("backend")
+            root_logger = logging.getLogger()
+            if root_logger.level <= logging.INFO:
+                multiprocessing.util.log_to_stderr(logging.INFO)
+        return logger
+
+    logger = get_triton_backend_logger()
+    global LOGGER
+    LOGGER = logger
+    communication.LOGGER = logger
 
 
 class _ResponsesIterator:
@@ -135,23 +164,23 @@ class TritonPythonModel:
                 * model_version: Model version
                 * model_name: Model name
         """
-        logger = pb_utils.Logger  # pytype: disable=module-attr
+        _update_loggers()
         try:
-            logger.log_verbose("Reading model config")
+            LOGGER.debug("Reading model config")
             self.model_config = json.loads(args["model_config"])
             shared_memory_socket = self.model_config["parameters"]["shared-memory-socket"]["string_value"]
-            logger.log_verbose(f"Connecting to IPC socket at {shared_memory_socket}")
+            LOGGER.debug(f"Connecting to IPC socket at {shared_memory_socket}")
 
             instance_data = self._get_instance_data(shared_memory_socket)
             self.socket.connect(instance_data["shared-memory-socket"])
-            logger.log_verbose(f"Connected to socket {shared_memory_socket}.")
+            LOGGER.debug(f"Connected to socket {shared_memory_socket}.")
 
             self.model_inputs = self.model_config["input"]
             self.model_outputs = self.model_config["output"]
             self.model_outputs_dict = {output_def["name"]: output_def for output_def in self.model_outputs}
 
-            logger.log_verbose(f"Model inputs: {self.model_inputs}")
-            logger.log_verbose(f"Model outputs: {self.model_outputs}")
+            LOGGER.debug(f"Model inputs: {self.model_inputs}")
+            LOGGER.debug(f"Model outputs: {self.model_outputs}")
 
             data_store_socket = instance_data["data-store-socket"]
             auth_key = base64.b64decode(instance_data["auth-key"])
@@ -178,18 +207,16 @@ class TritonPythonModel:
         Returns:
             A list of pb_utils.InferenceResponse. The length of this list is the same as `triton_requests`
         """
-        logger = pb_utils.Logger  # pytype: disable=module-attr
-
         try:
             meta_requests = self._put_requests_to_buffer(triton_requests)
-            logger.log_verbose(f"Sending requests {meta_requests}.")
+            LOGGER.debug(f"Sending requests {meta_requests}.")
             self.socket.send(meta_requests.as_bytes())
 
             responses_iterator = _ResponsesIterator(self.socket, len(triton_requests))
             responses_sender = self._sender_cls(triton_requests)
-            logger.log_verbose(f"using sender {responses_sender}")
+            LOGGER.debug(f"using sender {responses_sender}")
             for meta_responses in responses_iterator:
-                logger.log_verbose(f"Received response: {meta_responses}")
+                LOGGER.debug(f"Received response: {meta_responses}")
                 triton_responses = self._handle_responses_from_buffer(meta_responses, len(triton_requests))
                 responses_sender.send(
                     triton_responses, eos=[meta_response.eos for meta_response in meta_responses.responses]
@@ -214,9 +241,8 @@ class TritonPythonModel:
 
     def finalize(self) -> None:
         """Finalize the model cleaning the buffers."""
-        logger = pb_utils.Logger  # pytype: disable=module-attr
-        logger.log_verbose("Finalizing backend instance.")
-        logger.log_verbose("Cleaning socket and context.")
+        LOGGER.debug("Finalizing backend instance.")
+        LOGGER.debug("Cleaning socket and context.")
         socket_close_timeout_s = 0
         if self.socket:
             self.socket.close(linger=socket_close_timeout_s)
@@ -225,14 +251,14 @@ class TritonPythonModel:
         self.socket = None
         self.context = None
 
-        logger.log_verbose("Removing allocated shared memory.")
+        LOGGER.debug("Removing allocated shared memory.")
         for tensor_id in self._last_response_ids:
             self._tensor_store.release_block(tensor_id)
         self._last_response_ids = []
         self._tensor_store.close()
         self._tensor_store = None
 
-        logger.log_verbose("Finalized.")
+        LOGGER.debug("Finalized.")
 
     @property
     def model_supports_batching(self) -> bool:
@@ -250,21 +276,18 @@ class TritonPythonModel:
         instance_data_payload = handshake_socket.recv()
         handshake_socket.close()
         instance_data = json.loads(instance_data_payload.decode("utf-8"))
-        logger = pb_utils.Logger  # pytype: disable=module-attr
         instance_data_copy = instance_data.copy()
         if "auth-key" in instance_data_copy:
             instance_data_copy["auth-key"] = "***"
-        logger.log_verbose(f"Obtained instance data: {instance_data_copy}")
+        LOGGER.debug(f"Obtained instance data: {instance_data_copy}")
         return instance_data
 
     def _put_requests_to_buffer(self, triton_requests) -> InferenceHandlerRequests:
-        logger = pb_utils.Logger  # pytype: disable=module-attr
-
         while self._last_response_ids:
             tensor_id = self._last_response_ids.pop()
             self._tensor_store.release_block(tensor_id)
 
-        logger.log_verbose("Collecting input data from request.")
+        LOGGER.debug("Collecting input data from request.")
 
         requests = []
         for triton_request in triton_requests:

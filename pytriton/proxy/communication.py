@@ -39,29 +39,7 @@ from typing import Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
-_LOGGER = None
-
-
-def _update_logger():
-    """Update module logger."""
-    try:
-        # https://github.com/triton-inference-server/python_backend/blob/main/src/pb_stub.cc#L1501
-        import triton_python_backend_utils as pb_utils  # pytype: disable=import-error
-
-        logger = pb_utils.Logger  # pytype: disable=module-attr
-        logger.error = logger.log_error
-        logger.warning = logger.log_warn
-        logger.info = logger.log_info
-        logger.debug = logger.log_verbose
-        # do not set log_to_stderr in Proxy Backend
-    except (ImportError, AttributeError):
-        logger = logging.getLogger(__name__)
-        root_logger = logging.getLogger()
-        if root_logger.level <= logging.INFO:
-            multiprocessing.util.log_to_stderr(logging.INFO)
-    global _LOGGER
-    _LOGGER = logger
-    return logger
+LOGGER = logging.getLogger(__name__)
 
 
 # copy from
@@ -532,7 +510,7 @@ class _FileLock:
         try:
             self._file_path.unlink(missing_ok=True)
         except OSError as e:
-            _LOGGER.warning(f"Could not remove lock file {self._file_path}; {e}")
+            LOGGER.warning(f"Could not remove lock file {self._file_path}; {e}")
 
 
 class _Popen(multiprocessing.popen_spawn_posix.Popen):
@@ -625,7 +603,6 @@ class TensorStore:
             auth_key: authentication key required to setup connection. If not provided, current process authkey will be used
         """
         if not hasattr(self, "_remote_blocks_store_manager"):
-            _update_logger()
             address = address.as_posix() if isinstance(address, pathlib.Path) else address
             self._remote_blocks_store_manager = BlocksStoreManager(address, authkey=auth_key, ctx=_SpawnContext())
             self._remote_blocks_store = None
@@ -658,7 +635,7 @@ class TensorStore:
 
             address = pathlib.Path(self._remote_blocks_store_manager.address)
             self._wait_for_address(address)
-            _LOGGER.debug(
+            LOGGER.debug(
                 f"Started remote block store at {address} (pid={self._remote_blocks_store_manager._process.pid})"  # pytype: disable=attribute-error
             )
 
@@ -670,9 +647,9 @@ class TensorStore:
             self._wait_for_address(address, timeout_s)
             self._remote_blocks_store_manager.connect()
             self._remote_blocks_store = self._remote_blocks_store_manager.blocks()  # pytype: disable=attribute-error
-            _LOGGER.debug(f"Connected to remote block store at {address})")
+            LOGGER.debug(f"Connected to remote block store at {address})")
         else:
-            _LOGGER.debug(f"Already connectd to remote block store at {self.address}")
+            LOGGER.debug(f"Already connectd to remote block store at {self.address}")
 
     def _wait_for_address(self, address, timeout_s: Optional[float] = None):
         should_stop_at = time.time() + timeout_s if timeout_s is not None else None
@@ -761,7 +738,7 @@ class TensorStore:
         Args:
             tensor_id: id of tensor to release
         """
-        _LOGGER.debug(f"Releasing shared memory block for tensor {tensor_id}")
+        LOGGER.debug(f"Releasing shared memory block for tensor {tensor_id}")
 
         tensor_ref = None
         with self._handled_blocks_lock:
@@ -771,7 +748,7 @@ class TensorStore:
             if tensor_ref is not None:
                 self._remote_blocks_store.release_block(tensor_id)
         except OSError:  # thrown when remote process is already closed
-            _LOGGER.warning(
+            LOGGER.warning(
                 f"Failed to release block {tensor_id} on remote process at {self.address}. Probably remote process is already closed"
             )
 
@@ -813,7 +790,7 @@ class TensorStore:
         from multiprocessing.resource_tracker import register, unregister
 
         started_server = hasattr(self._remote_blocks_store_manager, "shutdown")
-        _LOGGER.debug(f"TensorStore is being closed (started_server={started_server})")
+        LOGGER.debug(f"TensorStore is being closed (started_server={started_server})")
 
         gc.collect()
         with self._handled_blocks_lock:
@@ -824,11 +801,11 @@ class TensorStore:
         with self._shm_segments_lock:
             while self._shm_segments:
                 _, shm = self._shm_segments.popitem()
-                _LOGGER.debug(f"Closing shared memory {shm.name}")
+                LOGGER.debug(f"Closing shared memory {shm.name}")
                 try:
                     shm.close()
                 except Exception as e:
-                    _LOGGER.warning(f"Failed to close shared memory {shm.name}: {e}")
+                    LOGGER.warning(f"Failed to close shared memory {shm.name}: {e}")
                 finally:
                     if not started_server:
                         register(shm._name, "shared_memory")  # pytype: disable=attribute-error
@@ -836,12 +813,12 @@ class TensorStore:
 
         if started_server:
             if self._remote_blocks_store is not None:
-                _LOGGER.debug(f"Releasing all resources on remote process at {self.address}")
+                LOGGER.debug(f"Releasing all resources on remote process at {self.address}")
                 try:
                     self._remote_blocks_store.close()
                 except FileNotFoundError:  # thrown when remote process is already closed
                     pass
             self._remote_blocks_store = None
-            _LOGGER.debug(f"Shutting down side process of data store at {self.address}")
+            LOGGER.debug(f"Shutting down side process of data store at {self.address}")
             self._remote_blocks_store_manager.shutdown()
-        _LOGGER.debug(f"TensorStore at {self.address} closed")
+        LOGGER.debug(f"TensorStore at {self.address} closed")
