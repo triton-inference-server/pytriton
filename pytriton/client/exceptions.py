@@ -84,3 +84,9 @@ class PyTritonClientInferenceServerError(PyTritonClientError):
     """Error raised in case of error on inference callable or Triton Inference Server side."""
 
     pass
+
+
+class PyTritonClientQueueFullError(PyTritonClientError):
+    """Error raised in case of trying to push request to full queue."""
+
+    pass

@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from threading import Thread
+import time
+from threading import Event, Thread
 
 import gevent
 import numpy as np
@@ -23,6 +24,7 @@ from pytriton.client import FuturesModelClient, ModelClient
 from pytriton.client.exceptions import (
     PyTritonClientClosedError,
     PyTritonClientInvalidUrlError,
+    PyTritonClientQueueFullError,
     PyTritonClientTimeoutError,
     PyTritonClientValueError,
 )
@@ -238,6 +240,215 @@ def test_infer_batch_dict_passed_arguments_returns_arguments(mocker):
         return_value = client.infer_batch(a=a, b=b).result()
         assert return_value == ret
         patch_client_infer_batch.assert_called_once_with(parameters=None, headers=None, a=a, b=b)
+
+
+@patch_server_model_addsub_no_batch_ready
+def test_infer_batch_blocking_behaviour(mocker):
+    a = np.array([1], dtype=np.float32)
+    b = np.array([2], dtype=np.float32)
+    c = np.array([2], dtype=np.float32)
+    ret = np.array([3], dtype=np.float32)
+
+    # Set up the queue return values to block the queue and then release it
+    infer_called_with_b_event = Event()
+    infer_called_with_c_event = Event()
+
+    queue_is_full_event = Event()
+
+    def mock_submit_side_effect(*args, **kwargs):
+        LOGGER.debug("mock_submit_side_effect called")
+        assert "b" in kwargs
+        if kwargs["b"] is b:
+            infer_called_with_b_event.set()
+        elif kwargs["b"] is c:
+            infer_called_with_c_event.set()
+        if not queue_is_full_event.is_set():
+            LOGGER.debug("mock_submit_side_effect waiting for queue to be full")
+            queue_is_full_event.wait()  # Block until the event is set
+        LOGGER.debug("mock_submit_side_effect returning")
+        return ret
+
+    patch_client_infer_batch = mocker.patch.object(ModelClient, ModelClient.infer_batch.__name__)
+    patch_client_infer_batch.side_effect = mock_submit_side_effect
+
+    # Set up the client with a max_queue_size of 1 to easily simulate full condition
+    with FuturesModelClient(
+        GRPC_LOCALHOST_URL,
+        ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
+        max_workers=1,
+        max_queue_size=1,
+        non_blocking=False,
+    ) as client:
+        client.model_config().result()  # Wait for the model to be ready
+        LOGGER.debug("Client created")
+        first_future = client.infer_batch(a=a, b=b)
+        LOGGER.debug("First future created")
+        infer_called_with_b_event.wait()  # Wait for the first call to be made
+        LOGGER.debug("First call made")
+
+        blocked_thread_start_event = Event()
+        blocked_thread_result = {}
+
+        def blocked_thread():
+            LOGGER.debug("Blocked thread started")
+            blocked_thread_start_event.set()
+            LOGGER.debug("Blocked thread waiting for queue to be full")
+            result = client.infer_batch(a=a, b=c).result()
+            LOGGER.debug("Blocked thread got result")
+            blocked_thread_result["ret"] = result
+
+        infer_thread = Thread(target=blocked_thread)
+        infer_thread.start()
+        LOGGER.debug("Waiting for blocked thread to start")
+        blocked_thread_start_event.wait()  # Wait for the thread to start
+        LOGGER.debug("Blocked thread started")
+        time.sleep(0.1)  # Wait a bit to make sure the thread is blocked
+        assert not infer_called_with_c_event.is_set(), "infer_batch should not have been called with c yet."
+
+        # The blocking call should be waiting by now, so let's release the block
+        LOGGER.debug("Releasing queue")
+        queue_is_full_event.set()
+
+        # Wait for the blocked thread to finish
+        LOGGER.debug("Waiting for blocked thread to finish")
+        infer_thread.join()
+        assert blocked_thread_result["ret"] is ret
+
+        # Wait for the first future to finish
+        assert first_future.result() is ret
+
+        assert (
+            patch_client_infer_batch.call_count == 2
+        ), "infer_batch should have been called twice (one blocked, one released)."
+
+
+@patch_server_model_addsub_no_batch_ready
+def test_infer_batch_non_blocking_behaviour(mocker):
+    a = np.array([1], dtype=np.float32)
+    b = np.array([2], dtype=np.float32)
+    c = np.array([2], dtype=np.float32)
+    ret = np.array([3], dtype=np.float32)
+
+    # Set up the queue return values to block the queue and then release it
+    infer_called_with_b_event = Event()
+
+    queue_is_full_event = Event()
+
+    def mock_submit_side_effect(*args, **kwargs):
+        LOGGER.debug("mock_submit_side_effect called")
+        infer_called_with_b_event.set()
+        if not queue_is_full_event.is_set():
+            LOGGER.debug("mock_submit_side_effect waiting for queue to be full")
+            queue_is_full_event.wait()  # Block until the event is set
+        LOGGER.debug("mock_submit_side_effect returning")
+        return ret
+
+    patch_client_infer_batch = mocker.patch.object(ModelClient, ModelClient.infer_batch.__name__)
+    patch_client_infer_batch.side_effect = mock_submit_side_effect
+
+    # Set up the client with a max_queue_size of 1 to easily simulate full condition
+    with FuturesModelClient(
+        GRPC_LOCALHOST_URL,
+        ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
+        max_workers=1,
+        max_queue_size=1,
+        non_blocking=True,
+    ) as client:
+        LOGGER.debug("Client created")
+        while True:
+            try:
+                client.model_config().result()  # Wait for the model to be ready
+                break
+            except PyTritonClientQueueFullError:
+                LOGGER.debug("Waiting for model to be ready")
+                time.sleep(0.1)
+                pass
+        first_future = client.infer_batch(a=a, b=b)
+        LOGGER.debug("First future created")
+        infer_called_with_b_event.wait()  # Wait for the first call to be made
+        LOGGER.debug("First call made")
+        second_future = client.infer_batch(a=a, b=c)
+        LOGGER.debug("Second future created")
+        with pytest.raises(PyTritonClientQueueFullError):
+            LOGGER.debug("Calling infer_batch with queue full")
+            client.infer_batch(a=a, b=c)
+
+        # The blocking call should be waiting by now, so let's release the block
+        LOGGER.debug("Releasing queue")
+        queue_is_full_event.set()
+
+        # Wait for the first future to finish
+        assert first_future.result() is ret
+        assert second_future.result() is ret
+
+        assert patch_client_infer_batch.call_count == 2, "infer_batch should have been called once."
+
+
+@patch_server_model_addsub_no_batch_ready
+def test_infer_batch_queue_timeout(mocker):
+    a = np.array([1], dtype=np.float32)
+    b = np.array([2], dtype=np.float32)
+    c = np.array([2], dtype=np.float32)
+    ret = np.array([3], dtype=np.float32)
+
+    # Set up the queue return values to block the queue and then release it
+    infer_called_with_b_event = Event()
+
+    queue_is_full_event = Event()
+
+    def mock_submit_side_effect(*args, **kwargs):
+        LOGGER.debug("mock_submit_side_effect called")
+        infer_called_with_b_event.set()
+        if not queue_is_full_event.is_set():
+            LOGGER.debug("mock_submit_side_effect waiting for queue to be full")
+            queue_is_full_event.wait()  # Block until the event is set
+        LOGGER.debug("mock_submit_side_effect returning")
+        return ret
+
+    patch_client_infer_batch = mocker.patch.object(ModelClient, ModelClient.infer_batch.__name__)
+    patch_client_infer_batch.side_effect = mock_submit_side_effect
+
+    # Set up the client with a max_queue_size of 1 to easily simulate full condition
+    with FuturesModelClient(
+        GRPC_LOCALHOST_URL,
+        ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
+        max_workers=1,
+        max_queue_size=1,
+        inference_timeout_s=0.1,
+    ) as client:
+        LOGGER.debug("Client created")
+        client.model_config().result()  # Wait for the model to be ready
+        first_future = client.infer_batch(a=a, b=b)
+        LOGGER.debug("First future created")
+        infer_called_with_b_event.wait()  # Wait for the first call to be made
+        LOGGER.debug("First call made")
+        second_future = client.infer_batch(a=a, b=c)
+        LOGGER.debug("Second future created")
+        with pytest.raises(PyTritonClientQueueFullError):
+            LOGGER.debug("Calling infer_batch with queue full")
+            client.infer_batch(a=a, b=c)
+
+        # The blocking call should be waiting by now, so let's release the block
+        LOGGER.debug("Releasing queue")
+        queue_is_full_event.set()
+
+        # Wait for the first future to finish
+        assert first_future.result() is ret
+        assert second_future.result() is ret
+
+        assert patch_client_infer_batch.call_count == 2, "infer_batch should have been called once."
+
+
+def test_init_raises_error_when_invalid_max_workers_provided(mocker):
+    with pytest.raises(ValueError):
+        with FuturesModelClient(GRPC_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name, max_workers=-1):
+            pass
+
+
+def test_init_raises_error_when_invalid_max_queue_size_provided(mocker):
+    with pytest.raises(ValueError):
+        with FuturesModelClient(GRPC_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name, max_queue_size=-1):
+            pass
 
 
 @pytest.mark.timeout(1.0)

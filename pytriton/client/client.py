@@ -34,7 +34,7 @@ import logging
 import socket
 import time
 from concurrent.futures import Future
-from queue import Queue
+from queue import Full, Queue
 from threading import Thread
 from typing import Dict, Optional, Tuple, Union
 
@@ -51,6 +51,7 @@ from pytriton.client.exceptions import (
     PyTritonClientClosedError,
     PyTritonClientInferenceServerError,
     PyTritonClientModelDoesntSupportBatchingError,
+    PyTritonClientQueueFullError,
     PyTritonClientTimeoutError,
     PyTritonClientValueError,
 )
@@ -1207,7 +1208,9 @@ class FuturesModelClient:
         model_name: str,
         model_version: Optional[str] = None,
         *,
-        max_workers: Optional[int] = None,
+        max_workers: int = 128,
+        max_queue_size: int = 128,
+        non_blocking: bool = False,
         init_timeout_s: Optional[float] = None,
         inference_timeout_s: Optional[float] = None,
     ):
@@ -1218,6 +1221,8 @@ class FuturesModelClient:
             model_name: The name of the model to interact with.
             model_version: The version of the model to interact with. If None, the latest version will be used.
             max_workers: The maximum number of threads that can be used to execute the given calls. If None, there is not limit on the number of threads.
+            max_queue_size: The maximum number of requests that can be queued. If None, there is not limit on the number of requests.
+            non_blocking: If True, the client will raise a PyTritonClientQueueFullError if the queue is full. If False, the client will block until the queue is not full.
             init_timeout_s: Timeout in seconds for server and model being ready. If non passed default 60 seconds timeout will be used.
             inference_timeout_s: Timeout in seconds for the single model inference request. If non passed default 60 seconds timeout will be used.
         """
@@ -1226,11 +1231,17 @@ class FuturesModelClient:
         self._model_version = model_version
         self._threads = []
         self._max_workers = max_workers
+        self._max_queue_size = max_queue_size
+        self._non_blocking = non_blocking
+
         if self._max_workers is not None and self._max_workers <= 0:
             raise ValueError("max_workers must be greater than 0")
+        if self._max_queue_size is not None and self._max_queue_size <= 0:
+            raise ValueError("max_queue_size must be greater than 0")
+
         kwargs = {}
-        if self._max_workers is not None:
-            kwargs["maxsize"] = self._max_workers
+        if self._max_queue_size is not None:
+            kwargs["maxsize"] = self._max_queue_size
         self._queue = Queue(**kwargs)
         self._queue.put((_INIT, None, None))
         self._init_timeout_s = _DEFAULT_FUTURES_INIT_TIMEOUT_S if init_timeout_s is None else init_timeout_s
@@ -1401,7 +1412,19 @@ class FuturesModelClient:
             raise PyTritonClientClosedError("FutureModelClient is already closed")
         self._extend_thread_pool()
         future = Future()
-        self._queue.put((future, request, name))
+        if self._non_blocking:
+            try:
+                self._queue.put_nowait((future, request, name))
+            except Full as e:
+                raise PyTritonClientQueueFullError("Queue is full") from e
+        else:
+            kwargs = {}
+            if self._inference_timeout_s is not None:
+                kwargs["timeout"] = self._inference_timeout_s
+            try:
+                self._queue.put((future, request, name), **kwargs)
+            except Full as e:
+                raise PyTritonClientQueueFullError("Queue is full") from e
         return future
 
     def _extend_thread_pool(self):
