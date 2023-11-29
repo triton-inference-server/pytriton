@@ -642,6 +642,127 @@ def test_sync_http_client_infer_sample_returns_expected_result_when_positional_a
         verify_equalness_of_dicts_with_ndarray(expected_result, result)
 
 
+@pytest.fixture(params=["after_infer", "no_infer"])
+def infer_state(request):
+    return request.param
+
+
+def test_sync_http_client_infer_sample_from_existing_client(mocker, infer_state):
+    patch_http_client__server_up_and_ready(mocker)
+    patch_http_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
+
+    a = np.array([1], dtype=np.float32)
+    b = np.array([1], dtype=np.float32)
+    expected_result = {"add": a + b, "sub": a - b}
+    server_result = expected_result
+
+    with ModelClient(_HTTP_LOCALHOST_URL, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name) as client:
+        mock_infer = mocker.patch.object(client._infer_client, "infer")
+        mock_infer.return_value = wrap_to_http_infer_result(ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG, "0", server_result)
+
+        if infer_state == "after_infer":
+            client.infer_sample(a, b)
+        # After client is created, there should be no call to get_model_config
+        spy_get_model_config = mocker.spy(tritonclient.http.InferenceServerClient, "get_model_config")
+        spy_is_server_ready = mocker.spy(tritonclient.http.InferenceServerClient, "is_server_ready")
+        spy_is_server_live = mocker.spy(tritonclient.http.InferenceServerClient, "is_server_live")
+        with ModelClient.from_existing_client(client) as client_from_existing:
+            mock_infer_from_existing = mocker.patch.object(client_from_existing._infer_client, "infer")
+            mock_infer_from_existing.return_value = mock_infer.return_value
+            result_from_existing = client_from_existing.infer_sample(a, b)
+
+            if infer_state == "after_infer":
+                spy_get_model_config.not_called()
+                spy_is_server_ready.not_called()
+                spy_is_server_live.not_called()
+            else:
+                assert len(spy_get_model_config.mock_calls) == 2
+                assert len(spy_is_server_ready.mock_calls) == 3
+                assert len(spy_is_server_live.mock_calls) == 3
+
+            called_kwargs = mock_infer_from_existing.call_args.kwargs
+            expected_kwargs = dict(EXPECTED_KWARGS_HTTP_DEFAULT)
+            expected_kwargs.update(
+                {
+                    "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
+                    "inputs": {"a": a, "b": b},
+                    "outputs": list(expected_result),
+                }
+            )
+            for arg_name, arg_value in expected_kwargs.items():
+                if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
+                    assert called_kwargs.get(arg_name) == arg_value
+            for key in called_kwargs:
+                assert key in expected_kwargs
+            assert [output.name() for output in called_kwargs.get("outputs")] == list(expected_kwargs["outputs"])
+            inputs_called_arg = {i.name(): extract_array_from_http_infer_input(i) for i in called_kwargs.get("inputs")}
+            verify_equalness_of_dicts_with_ndarray(inputs_called_arg, expected_kwargs["inputs"])
+
+            verify_equalness_of_dicts_with_ndarray(expected_result, result_from_existing)
+
+
+@pytest.fixture(params=["ensure_model_is_ready=True", "ensure_model_is_ready=False"])
+def ensure_model_is_ready(request):
+    return request.param
+
+
+def test_sync_http_client_infer_batch_init_from_client(mocker, ensure_model_is_ready):
+    patch_http_client__server_up_and_ready(mocker)
+    patch_http_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
+
+    ensure_model_is_ready = ensure_model_is_ready == "ensure_model_is_ready=True"
+
+    a = np.array([1], dtype=np.float32)
+    b = np.array([1], dtype=np.float32)
+    expected_result = {"add": a + b, "sub": a - b}
+    server_result = expected_result
+
+    # After client is created, there should be no call to get_model_config
+    spy_get_model_config = mocker.spy(tritonclient.http.InferenceServerClient, "get_model_config")
+    spy_is_server_ready = mocker.spy(tritonclient.http.InferenceServerClient, "is_server_ready")
+    spy_is_server_live = mocker.spy(tritonclient.http.InferenceServerClient, "is_server_live")
+    with ModelClient(
+        url=_HTTP_LOCALHOST_URL,
+        model_name=ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
+        model_config=ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG,
+        ensure_model_is_ready=ensure_model_is_ready,
+    ) as client_from_existing:
+        mock_infer_from_existing = mocker.patch.object(client_from_existing._infer_client, "infer")
+        mock_infer_from_existing.return_value = wrap_to_http_infer_result(
+            ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG, "0", server_result
+        )
+        result_from_existing = client_from_existing.infer_batch(a, b)
+
+        if ensure_model_is_ready:
+            spy_get_model_config.not_called()
+            assert len(spy_is_server_ready.mock_calls) == 2
+            assert len(spy_is_server_live.mock_calls) == 2
+        else:
+            spy_get_model_config.not_called()
+            spy_is_server_ready.not_called()
+            spy_is_server_live.not_called()
+
+        called_kwargs = mock_infer_from_existing.call_args.kwargs
+        expected_kwargs = dict(EXPECTED_KWARGS_HTTP_DEFAULT)
+        expected_kwargs.update(
+            {
+                "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
+                "inputs": {"a": a, "b": b},
+                "outputs": list(expected_result),
+            }
+        )
+        for arg_name, arg_value in expected_kwargs.items():
+            if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
+                assert called_kwargs.get(arg_name) == arg_value
+        for key in called_kwargs:
+            assert key in expected_kwargs
+        assert [output.name() for output in called_kwargs.get("outputs")] == list(expected_kwargs["outputs"])
+        inputs_called_arg = {i.name(): extract_array_from_http_infer_input(i) for i in called_kwargs.get("inputs")}
+        verify_equalness_of_dicts_with_ndarray(inputs_called_arg, expected_kwargs["inputs"])
+
+        verify_equalness_of_dicts_with_ndarray(expected_result, result_from_existing)
+
+
 def test_sync_http_client_infer_sample_returns_expected_result_when_named_args_are_used(mocker):
     patch_http_client__server_up_and_ready(mocker)
     patch_http_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)

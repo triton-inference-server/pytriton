@@ -466,19 +466,22 @@ def test_init_grpc_passes_timeout_5(mocker):
 
 
 @pytest.mark.timeout(5)
-def test_init_grpc_spaws_5_threads(mocker):
+def test_init_http_spaws_several_threads(mocker):
     spy_thread_start = mocker.spy(Thread, Thread.start.__name__)
 
-    with FuturesModelClient("grpc://localhost:6669", "dummy", init_timeout_s=1, inference_timeout_s=0.1) as client:
+    with FuturesModelClient("http://localhost:6669", "dummy", init_timeout_s=1, inference_timeout_s=0.2) as client:
         timeout_s = 0.2
-        with pytest.raises(PyTritonClientTimeoutError):
-            # The list function is used to force the evaluation of the list comprehension before iterating over the futures and
-            # calling their result method. This is done to ensure that all the calls occur before the iteration starts,
-            # and to verify that five threads are created.
-            futures = list([client.wait_for_model(timeout_s=timeout_s) for _ in range(5)])  # noqa: C411
-            for future in futures:
+        # The list function is used to force the evaluation of the list comprehension before iterating over the futures and
+        # calling their result method. This is done to ensure that all the calls occur before the iteration starts,
+        # and to verify that five threads are created.
+        futures = list([client.wait_for_model(timeout_s=timeout_s) for _ in range(5)])  # noqa: C411
+        for future in futures:
+            with pytest.raises(PyTritonClientTimeoutError):
                 future.result()
-        assert spy_thread_start.call_count == 5
+        # Reusing client configuration from existing clients forces wait in other threads to finish first configuration
+        # request. It sometimes prevents creation of a fifth thread because one of the existing threads can handle another request
+        # before the new thread is created. This results in a race condition that affects the number of created threads.
+        assert spy_thread_start.call_count > 1
 
 
 def test_http_client_raises_error_when_used_after_close(mocker):

@@ -27,7 +27,55 @@ ModelClient is a simple client that can perform inference requests synchronously
 
 For example, you can use ModelClient to send requests to a PyTorch model that performs linear regression:
 
-<!--pytest.mark.skip-->
+<!-- This readme is for testing code snippets with pytest. It has codeblocks marked with pytest-codeblocks:cont to combine them into one test. -->
+
+<!-- First test -->
+<!--
+```python
+
+import torch
+
+model = torch.nn.Linear(2, 3).eval()
+
+import numpy as np
+from pytriton.decorators import batch
+
+
+@batch
+def infer_fn(**inputs: np.ndarray):
+    (input1_batch,) = inputs.values()
+    input1_batch_tensor = torch.from_numpy(input1_batch)
+    output1_batch_tensor = model(input1_batch_tensor)  # Calling the Python model inference
+    output1_batch = output1_batch_tensor.detach().numpy()
+    return [output1_batch]
+
+
+from pytriton.model_config import ModelConfig, Tensor
+from pytriton.triton import Triton
+
+# Connecting inference callable with Triton Inference Server
+triton = Triton()
+# Load model into Triton Inference Server
+triton.bind(
+    model_name="Linear",
+    infer_func=infer_fn,
+    inputs=[
+        Tensor(dtype=np.float32, shape=(-1,)),
+    ],
+    outputs=[
+        Tensor(dtype=np.float32, shape=(-1,)),
+    ],
+    config=ModelConfig(max_batch_size=128)
+)
+
+
+triton.run()
+```
+-->
+
+
+<!--pytest-codeblocks:cont-->
+
 ```python
 import torch
 from pytriton.client import ModelClient
@@ -36,13 +84,27 @@ from pytriton.client import ModelClient
 input1_data = torch.randn(128, 2).cpu().detach().numpy()
 
 # Create a ModelClient object with the server address and model name
-with ModelClient("localhost:8000", "Linear") as client:
-    # Call the infer_batch method with the input data
-    result_dict = client.infer_batch(input1_data)
+client = ModelClient("localhost:8000", "Linear")
+# Call the infer_batch method with the input data
+result_dict = client.infer_batch(input1_data)
+# Close the client to release the resources
+client.close()
 
 # Print the result dictionary
 print(result_dict)
 ```
+
+<!--pytest-codeblocks:cont-->
+<!--
+```python
+# Stop the Triton server to free up resources
+triton.stop()
+# End of the first test
+
+assert result_dict["OUTPUT_1"].shape == (128, 3)
+```
+-->
+
 
 You can also use ModelClient to send requests to a model that performs image classification. The example assumes that a model takes in an image and returns the top 5 predicted classes. This model is not included in the PyTriton library.
 
@@ -60,9 +122,11 @@ img = img.resize((224, 224))
 input_data = np.array(img)
 
 # Create a ModelClient object with the server address and model name
-with ModelClient("localhost:8000", "ImageNet") as client:
-    # Call the infer_batch method with the input data
-    result_dict = client.infer_sample(input_data)
+client = ModelClient("localhost:8000", "ImageNet")
+# Call the infer_sample method with the input data
+result_dict = client.infer_sample(input_data)
+# Close the client to release the resources
+client.close()
 
 # Print the result dictionary
 print(result_dict)
@@ -176,9 +240,11 @@ from pytriton.client import AsyncioModelClient
 input1_data = torch.randn(2).cpu().detach().numpy()
 
 # Create an AsyncioModelClient object with the server address and model name
-async with AsyncioModelClient("localhost:8000", "Linear") as client:
-    # Call the infer_sample method with the input data
-    result_dict = await client.infer_sample(input1_data)
+client = AsyncioModelClient("localhost:8000", "Linear")
+# Call the infer_sample method with the input data
+result_dict = await client.infer_sample(input1_data)
+# Close the client to release the resources
+client.close()
 
 # Print the result dictionary
 print(result_dict)
@@ -219,6 +285,9 @@ from fastapi import FastAPI
 import torch
 from pytriton.client import AsyncioModelClient
 
+# Create an AsyncioModelClient object with the server address and model name
+config_client = AsyncioModelClient("localhost:8000", "Linear")
+
 app = FastAPI()
 
 @app.get("/predict")
@@ -226,13 +295,18 @@ async def predict():
     # Create some input data as a numpy array
     input1_data = torch.randn(2).cpu().detach().numpy()
 
-    # Create an AsyncioModelClient object with the server address and model name
-    async with AsyncioModelClient("localhost:8000", "Linear") as client:
+    # Create an AsyncioModelClient object from existing client to avoid pulling config from server
+    async with AsyncioModelClient.from_existing_client(config_client) as request_client:
         # Call the infer_sample method with the input data
-        result_dict = await client.infer_sample(input1_data)
+        result_dict = await request_client.infer_sample(input1_data)
 
     # Return the result dictionary as JSON
     return result_dict
+
+@app.on_event("shutdown")
+async def shutdown():
+    # Close the client to release the resources
+    await config_client.close()
 ```
 
 Save this file as `main.py`.

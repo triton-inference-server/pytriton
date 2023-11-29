@@ -16,13 +16,18 @@
 
 Typical usage example:
 
-    with ModelClient("localhost", "MyModel") as client:
-        result_dict = client.infer_sample(input_a=a, input_b=b)
+```python
+client = ModelClient("localhost", "MyModel")
+result_dict = client.infer_sample(input_a=a, input_b=b)
+client.close()
+```
 
 Inference inputs can be provided either as positional or keyword arguments:
 
-    result_dict = client.infer_sample(input1, input2)
-    result_dict = client.infer_sample(a=input1, b=input2)
+```python
+result_dict = client.infer_sample(input1, input2)
+result_dict = client.infer_sample(a=input1, b=input2)
+```
 
 Mixing of argument passing conventions is not supported and will raise PyTritonClientValueError.
 """
@@ -35,7 +40,7 @@ import socket
 import time
 from concurrent.futures import Future
 from queue import Full, Queue
-from threading import Thread
+from threading import Lock, Thread
 from typing import Dict, Optional, Tuple, Union
 
 import gevent
@@ -106,15 +111,18 @@ class BaseModelClient:
         lazy_init: bool = True,
         init_timeout_s: Optional[float] = None,
         inference_timeout_s: Optional[float] = None,
+        model_config: Optional[TritonModelConfig] = None,
+        ensure_model_is_ready: bool = True,
     ):
         """Inits BaseModelClient for given model deployed on the Triton Inference Server.
 
         Common usage:
 
-            ```
-            with ModelClient("localhost", "BERT") as client
-                result_dict = client.infer_sample(input1_sample, input2_sample)
-            ```
+        ```python
+        client = ModelClient("localhost", "BERT")
+        result_dict = client.infer_sample(input1_sample, input2_sample)
+        client.close()
+        ```
 
         Args:
             url: The Triton Inference Server url, e.g. `grpc://localhost:8001`.
@@ -128,6 +136,8 @@ class BaseModelClient:
             lazy_init: if initialization should be performed just before sending first request to inference server.
             init_timeout_s: timeout in seconds for the server and model to be ready. If not passed, the default timeout of 300 seconds will be used.
             inference_timeout_s: timeout in seconds for a single model inference request. If not passed, the default timeout of 60 seconds will be used.
+            model_config: model configuration. If not passed, it will be read from inference server during initialization.
+            ensure_model_is_ready: if model should be checked if it is ready before first inference request.
 
         Raises:
             PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
@@ -152,11 +162,48 @@ class BaseModelClient:
         # (InferenceClient uses gevent library which does not support closing twice from different threads)
         self._monkey_patch_client()
 
-        self._model_config = None
-        self._model_ready = None
+        if model_config is not None:
+            self._model_config = model_config
+            self._model_ready = None if ensure_model_is_ready else True
+
+        else:
+            self._model_config = None
+            self._model_ready = None
         self._lazy_init: bool = lazy_init
 
         self._handle_lazy_init()
+
+    @classmethod
+    def from_existing_client(cls, existing_client: "BaseModelClient"):
+        """Create a new instance from an existing client using the same class.
+
+        Common usage:
+        ```python
+        client = BaseModelClient.from_existing_client(existing_client)
+        ```
+
+        Args:
+            existing_client: An instance of an already initialized subclass.
+
+        Returns:
+            A new instance of the same subclass with shared configuration and readiness state.
+        """
+        kwargs = {}
+        # Copy model configuration and readiness state if present
+        if hasattr(existing_client, "_model_config"):
+            kwargs["model_config"] = existing_client._model_config
+            kwargs["ensure_model_is_ready"] = False
+
+        new_client = cls(
+            url=existing_client._url,
+            model_name=existing_client._model_name,
+            model_version=existing_client._model_version,
+            init_timeout_s=existing_client._init_timeout_s,
+            inference_timeout_s=existing_client._inference_timeout_s,
+            **kwargs,
+        )
+
+        return new_client
 
     def create_client_from_url(self, url: str, network_timeout_s: Optional[float] = None):
         """Create Triton Inference Server client.
@@ -254,6 +301,8 @@ class ModelClient(BaseModelClient):
         lazy_init: bool = True,
         init_timeout_s: Optional[float] = None,
         inference_timeout_s: Optional[float] = None,
+        model_config: Optional[TritonModelConfig] = None,
+        ensure_model_is_ready: bool = True,
     ):
         """Inits ModelClient for given model deployed on the Triton Inference Server.
 
@@ -261,9 +310,24 @@ class ModelClient(BaseModelClient):
         from inference server during initialization.
 
         Common usage:
+
+        ```python
+        client = ModelClient("localhost", "BERT")
+        result_dict = client.infer_sample(input1_sample, input2_sample)
+        client.close()
         ```
-        with ModelClient("localhost", "BERT") as client
+
+        Client supports also context manager protocol:
+
+        ```python
+        with ModelClient("localhost", "BERT") as client:
             result_dict = client.infer_sample(input1_sample, input2_sample)
+        ```
+
+        The creation of client requires connection to the server and downloading model configuration. You can create client from existing client using the same class:
+
+        ```python
+        client = ModelClient.from_existing_client(existing_client)
         ```
 
         Args:
@@ -281,6 +345,8 @@ class ModelClient(BaseModelClient):
                 If non passed default 60 seconds timeout will be used.
                 For HTTP client it is not only inference timeout but any client request timeout
                 - get model config, is model loaded. For GRPC client it is only inference timeout.
+            model_config: model configuration. If not passed, it will be read from inference server during initialization.
+            ensure_model_is_ready: if model should be checked if it is ready before first inference request.
 
         Raises:
             PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
@@ -295,6 +361,8 @@ class ModelClient(BaseModelClient):
             lazy_init=lazy_init,
             init_timeout_s=init_timeout_s,
             inference_timeout_s=inference_timeout_s,
+            model_config=model_config,
+            ensure_model_is_ready=ensure_model_is_ready,
         )
 
     def get_lib(self):
@@ -418,16 +486,18 @@ class ModelClient(BaseModelClient):
 
         Typical usage:
 
-            ```python
-            with ModelClient("localhost", "MyModel") as client:
-                result_dict = client.infer_sample(input1, input2)
-            ```
+        ```python
+        client = ModelClient("localhost", "MyModel")
+        result_dict = client.infer_sample(input1, input2)
+        client.close()
+        ```
+
         Inference inputs can be provided either as positional or keyword arguments:
 
-            ```python
-            result_dict = client.infer_sample(input1, input2)
-            result_dict = client.infer_sample(a=input1, b=input2)
-            ```
+        ```python
+        result_dict = client.infer_sample(input1, input2)
+        result_dict = client.infer_sample(a=input1, b=input2)
+        ```
 
         Args:
             *inputs: Inference inputs provided as positional arguments.
@@ -470,17 +540,18 @@ class ModelClient(BaseModelClient):
 
         Typical usage:
 
-            ```python
-            with ModelClient("localhost", "MyModel") as client:
-                result_dict = client.infer_batch(input1, input2)
-            ```
+        ```python
+        client = ModelClient("localhost", "MyModel")
+        result_dict = client.infer_batch(input1, input2)
+        client.close()
+        ```
 
         Inference inputs can be provided either as positional or keyword arguments:
 
-            ```python
-            result_dict = client.infer_batch(input1, input2)
-            result_dict = client.infer_batch(a=input1, b=input2)
-            ```
+        ```python
+        result_dict = client.infer_batch(input1, input2)
+        result_dict = client.infer_batch(a=input1, b=input2)
+        ```
 
         Args:
             *inputs: Inference inputs provided as positional arguments.
@@ -649,8 +720,41 @@ class DecoupledModelClient(ModelClient):
         lazy_init: bool = True,
         init_timeout_s: Optional[float] = None,
         inference_timeout_s: Optional[float] = None,
+        model_config: Optional[TritonModelConfig] = None,
+        ensure_model_is_ready: bool = True,
     ):
-        """Inits DecoupledModelClient for given model deployed on the Triton Inference Server."""
+        """Inits DecoupledModelClient for given decoupled model deployed on the Triton Inference Server.
+
+        Common usage:
+
+        ```python
+        client = DecoupledModelClient("localhost", "BERT")
+        for response in client.infer_sample(input1_sample, input2_sample):
+            print(response)
+        client.close()
+        ```
+
+        Args:
+            url: The Triton Inference Server url, e.g. `grpc://localhost:8001`.
+                In case no scheme is provided http scheme will be used as default.
+                In case no port is provided default port for given scheme will be used -
+                8001 for grpc scheme, 8000 for http scheme.
+            model_name: name of the model to interact with.
+            model_version: version of the model to interact with.
+                If model_version is None inference on latest model will be performed.
+                The latest versions of the model are numerically the greatest version numbers.
+            lazy_init: if initialization should be performed just before sending first request to inference server.
+            init_timeout_s: timeout in seconds for the server and model to be ready. If not passed, the default timeout of 300 seconds will be used.
+            inference_timeout_s: timeout in seconds for a single model inference request. If not passed, the default timeout of 60 seconds will be used.
+            model_config: model configuration. If not passed, it will be read from inference server during initialization.
+            ensure_model_is_ready: if model should be checked if it is ready before first inference request.
+
+        Raises:
+            PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
+            PyTritonClientTimeoutError:
+                if `lazy_init` argument is False and wait time for server and model being ready exceeds `init_timeout_s`.
+            PyTritonClientInvalidUrlError: If provided Triton Inference Server url is invalid.
+        """
         super().__init__(
             url,
             model_name,
@@ -658,6 +762,8 @@ class DecoupledModelClient(ModelClient):
             lazy_init=lazy_init,
             init_timeout_s=init_timeout_s,
             inference_timeout_s=inference_timeout_s,
+            model_config=model_config,
+            ensure_model_is_ready=ensure_model_is_ready,
         )
         if self._triton_url.scheme == "http":
             raise PyTritonClientValueError("DecoupledModelClient is only supported for grpc protocol")
@@ -750,13 +856,14 @@ class AsyncioModelClient(BaseModelClient):
     """Asyncio client for model deployed on the Triton Inference Server.
 
     This client is based on Triton Inference Server Python clients and GRPC library:
-    * ``tritonclient.http.aio.InferenceServerClient``
-    * ``tritonclient.grpc.aio.InferenceServerClient``
+     - ``tritonclient.http.aio.InferenceServerClient``
+     - ``tritonclient.grpc.aio.InferenceServerClient``
 
     It can wait for server to be ready with model loaded and then perform inference on it.
     ``AsyncioModelClient`` supports asyncio context manager protocol.
 
     Typical usage:
+
     ```python
     from pytriton.client import AsyncioModelClient
     import numpy as np
@@ -764,9 +871,10 @@ class AsyncioModelClient(BaseModelClient):
     input1_sample = np.random.rand(1, 3, 224, 224).astype(np.float32)
     input2_sample = np.random.rand(1, 3, 224, 224).astype(np.float32)
 
-    async with AsyncioModelClient("localhost", "MyModel") as client:
-        result_dict = await client.infer_sample(input1_sample, input2_sample)
-        print(result_dict["output_name"])
+    client = AsyncioModelClient("localhost", "MyModel")
+    result_dict = await client.infer_sample(input1_sample, input2_sample)
+    print(result_dict["output_name"])
+    await client.close()
     ```
     """
 
@@ -779,6 +887,8 @@ class AsyncioModelClient(BaseModelClient):
         lazy_init: bool = True,
         init_timeout_s: Optional[float] = None,
         inference_timeout_s: Optional[float] = None,
+        model_config: Optional[TritonModelConfig] = None,
+        ensure_model_is_ready: bool = True,
     ):
         """Inits ModelClient for given model deployed on the Triton Inference Server.
 
@@ -796,6 +906,8 @@ class AsyncioModelClient(BaseModelClient):
                 The latest versions of the model are numerically the greatest version numbers.
             lazy_init: if initialization should be performed just before sending first request to inference server.
             init_timeout_s: timeout for server and model being ready.
+            model_config: model configuration. If not passed, it will be read from inference server during initialization.
+            ensure_model_is_ready: if model should be checked if it is ready before first inference request.
 
         Raises:
             PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
@@ -809,6 +921,8 @@ class AsyncioModelClient(BaseModelClient):
             lazy_init=lazy_init,
             init_timeout_s=init_timeout_s,
             inference_timeout_s=inference_timeout_s,
+            model_config=model_config,
+            ensure_model_is_ready=ensure_model_is_ready,
         )
 
     def get_lib(self):
@@ -905,8 +1019,9 @@ class AsyncioModelClient(BaseModelClient):
         Typical usage:
 
         ```python
-        async with AsyncioModelClient("localhost", "MyModel") as client:
-            result_dict = await client.infer_sample(input1, input2)
+        client = AsyncioModelClient("localhost", "MyModel")
+        result_dict = await client.infer_sample(input1, input2)
+        await client.close()
         ```
 
         Inference inputs can be provided either as positional or keyword arguments:
@@ -971,8 +1086,9 @@ class AsyncioModelClient(BaseModelClient):
         Typical usage:
 
         ```python
-        async with AsyncioModelClient("localhost", "MyModel") as client:
-            result_dict = await client.infer_batch(input1, input2)
+        client = AsyncioModelClient("localhost", "MyModel")
+        result_dict = await client.infer_batch(input1, input2)
+        await client.close()
         ```
 
         Inference inputs can be provided either as positional or keyword arguments:
@@ -1192,14 +1308,24 @@ class FuturesModelClient:
     on a model by providing input data and receiving the corresponding output data. The client can be used in a `with`
     statement to ensure proper resource management.
 
-    Example usage:
+    Example usage with context manager:
 
-        ```python
-        with FuturesModelClient("localhost", "MyModel") as client:
-            result_future = client.infer_sample(input1=input1_data, input2=input2_data)
-            # do something else
-            print(result_future.result())
-        ```
+    ```python
+    with FuturesModelClient("localhost", "MyModel") as client:
+        result_future = client.infer_sample(input1=input1_data, input2=input2_data)
+        # do something else
+        print(result_future.result())
+    ```
+
+    Usage without context manager:
+
+    ```python
+    client = FuturesModelClient("localhost", "MyModel")
+    result_future = client.infer_sample(input1=input1_data, input2=input2_data)
+    # do something else
+    print(result_future.result())
+    client.close()
+    ```
     """
 
     def __init__(
@@ -1247,6 +1373,8 @@ class FuturesModelClient:
         self._init_timeout_s = _DEFAULT_FUTURES_INIT_TIMEOUT_S if init_timeout_s is None else init_timeout_s
         self._inference_timeout_s = inference_timeout_s
         self._closed = False
+        self._lock = Lock()
+        self._existing_client = None
 
     def __enter__(self):
         """Create context for using FuturesModelClient as a context manager."""
@@ -1284,14 +1412,14 @@ class FuturesModelClient:
 
         Typical usage:
 
-            ```python
-            with FuturesModelClient("localhost", "BERT") as client
-                future = client.wait_for_model(300.)
-                # do something else
-                future.result()   # wait rest of timeout_s time
-                                  # till return None if model is ready
-                                  # or raise PyTritonClientTimeutError
-            ```
+        ```python
+        with FuturesModelClient("localhost", "BERT") as client
+            future = client.wait_for_model(300.)
+            # do something else
+            future.result()   # wait rest of timeout_s time
+                                # till return None if model is ready
+                                # or raise PyTritonClientTimeutError
+        ```
 
         Args:
             timeout_s: The maximum amount of time to wait for the model to be ready, in seconds.
@@ -1332,19 +1460,19 @@ class FuturesModelClient:
 
         Example usage:
 
-            ```python
-            with FuturesModelClient("localhost", "BERT") as client:
-                result_future = client.infer_sample(input1=input1_data, input2=input2_data)
-                # do something else
-                print(result_future.result())
-            ```
+        ```python
+        with FuturesModelClient("localhost", "BERT") as client:
+            result_future = client.infer_sample(input1=input1_data, input2=input2_data)
+            # do something else
+            print(result_future.result())
+        ```
 
         Inference inputs can be provided either as positional or keyword arguments:
 
-            ```python
-            future = client.infer_sample(input1, input2)
-            future = client.infer_sample(a=input1, b=input2)
-            ```
+        ```python
+        future = client.infer_sample(input1, input2)
+        future = client.infer_sample(a=input1, b=input2)
+        ```
 
         Args:
             *inputs: Inference inputs provided as positional arguments.
@@ -1377,19 +1505,19 @@ class FuturesModelClient:
 
         Example usage:
 
-            ```python
-            with FuturesModelClient("localhost", "BERT") as client:
-                future = client.infer_batch(input1_sample, input2_sample)
-                # do something else
-                print(future.result())
-            ```
+        ```python
+        with FuturesModelClient("localhost", "BERT") as client:
+            future = client.infer_batch(input1_sample, input2_sample)
+            # do something else
+            print(future.result())
+        ```
 
         Inference inputs can be provided either as positional or keyword arguments:
 
-            ```python
-            future = client.infer_batch(input1, input2)
-            future = client.infer_batch(a=input1, b=input2)
-            ```
+        ```python
+        future = client.infer_batch(input1, input2)
+        future = client.infer_batch(a=input1, b=input2)
+        ```
 
         Mixing of argument passing conventions is not supported and will raise PyTritonClientValueError.
 
@@ -1430,19 +1558,21 @@ class FuturesModelClient:
     def _extend_thread_pool(self):
         if self._closed:
             return
-        if not self._queue.empty() and (self._max_workers is None or len(self._threads) < self._max_workers):
-            _LOGGER.debug("Create new thread")
-            thread = Thread(target=self._worker)
-            self._threads.append(thread)
-            thread.start()
-        else:
-            _LOGGER.debug("No need to create new thread")
+
+        with self._lock:
+            if not self._queue.empty() and (self._max_workers is None or len(self._threads) < self._max_workers):
+                _LOGGER.debug("Create new thread")
+                thread = Thread(target=self._worker)
+                self._threads.append(thread)
+                thread.start()
+            else:
+                _LOGGER.debug("No need to create new thread")
 
     def _client_request_executor(self, client, request, name):
         _LOGGER.debug(f"Running {name} for {self._model_name}")
         if name == _INFER_SAMPLE:
             inputs, parameters, headers, named_inputs = request
-            return client.infer_sample(
+            result = client.infer_sample(
                 *inputs,
                 parameters=parameters,
                 headers=headers,
@@ -1450,19 +1580,21 @@ class FuturesModelClient:
             )
         elif name == _INFER_BATCH:
             inputs, parameters, headers, named_inputs = request
-            return client.infer_batch(
+            result = client.infer_batch(
                 *inputs,
                 parameters=parameters,
                 headers=headers,
                 **named_inputs,
             )
         elif name == _MODEL_CONFIG:
-            return client.model_config
+            result = client.model_config
         elif name == _WAIT_FOR_MODEL:
             timeout_s = request
-            return client.wait_for_model(timeout_s)
+            result = client.wait_for_model(timeout_s)
         else:
             raise PyTritonClientValueError(f"Unknown request name {name}")
+        self._set_existing_client(client)
+        return result
 
     def _create_client(self, lazy_init):
         _LOGGER.debug(f"Creating ModelClient lazy_init={lazy_init}")
@@ -1475,8 +1607,24 @@ class FuturesModelClient:
             inference_timeout_s=self._inference_timeout_s,
         )
 
+    def _set_existing_client(self, client):
+        if client._model_config is not None:
+            with self._lock:
+                if self._existing_client is None:
+                    _LOGGER.debug("Setting existing client")
+                    self._existing_client = client
+
+    def _remove_existing_client(self, client):
+        if client is not None:
+            with self._lock:
+                if self._existing_client is not None:
+                    if self._existing_client is client:
+                        _LOGGER.debug("Resetting existing client")
+                        self._existing_client = None
+
     def _worker(self):
         _LOGGER.debug("Starting worker thread")
+        client = None
         # Work around for AttributeError: '_Threadlocal' object has no attribute 'hub'
         # gevent/_hub_local.py", line 77, in gevent._gevent_c_hub_local.get_hub_noargs
         with _hub_context():
@@ -1487,10 +1635,27 @@ class FuturesModelClient:
                     self._queue.task_done()
                     break
                 if future == _INIT:
+                    with self._lock:
+                        if self._existing_client is None:
+                            try:
+                                _LOGGER.debug("Initial client creation")
+                                client = self._create_client(False)
+                                _LOGGER.debug("Setting existing client")
+                                self._existing_client = client
+                            except Exception as e:
+                                _LOGGER.warning(f"Error {e} occurred during init for {self._model_name}")
                     continue
                 try:
-                    client = self._create_client(name == _WAIT_FOR_MODEL)
+                    if client is None:
+                        with self._lock:
+                            if self._existing_client is not None:
+                                _LOGGER.debug("Creating new client from existing client")
+                                client = ModelClient.from_existing_client(self._existing_client)
+                    if client is None:
+                        _LOGGER.debug("Creating new client")
+                        client = self._create_client(name == _WAIT_FOR_MODEL)
                     with client:
+                        self._set_existing_client(client)
                         while True:
                             try:
                                 result = self._client_request_executor(client, request, name)
@@ -1511,4 +1676,7 @@ class FuturesModelClient:
                     _LOGGER.error(f"Error {e} occurred during {name} for {self._model_name}")
                     future.set_exception(e)
                     self._queue.task_done()
+                finally:
+                    self._remove_existing_client(client)
+                    client = None
         _LOGGER.debug("Finishing worker thread")

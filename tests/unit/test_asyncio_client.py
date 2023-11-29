@@ -238,6 +238,45 @@ async def test_async_http_client_infer_sample_returns_expected_result_when_infer
 
 
 @pytest.mark.async_timeout(_MAX_TEST_TIME)
+async def test_async_http_client_infer_sample_returns_expected_result_when_infer_on_model_with_batching_created_from_existing(
+    mocker,
+):
+    patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
+    patch_http_client__model_up_and_ready(mocker, ADD_SUB_WITH_BATCHING_MODEL_CONFIG, AsyncioHttpInferenceServerClient)
+
+    a = np.array([1], dtype=np.float32)
+    b = np.array([1], dtype=np.float32)
+    expected_result = {"add": a + b, "sub": a - b}
+    # server will return data with additional axis
+    server_result = {name: data[np.newaxis, ...] for name, data in expected_result.items()}
+
+    async with AsyncioModelClient(HTTP_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
+        mock_infer = mocker.patch.object(client._infer_client, "infer")
+        mock_infer.return_value = wrap_to_http_infer_result(ADD_SUB_WITH_BATCHING_MODEL_CONFIG, "0", server_result)
+        await client.infer_sample(a, b)
+
+        async with AsyncioModelClient.from_existing_client(client) as client_from_existing:
+            mock_infer_from_existing = mocker.patch.object(client_from_existing._infer_client, "infer")
+            mock_infer_from_existing.return_value = wrap_to_http_infer_result(
+                ADD_SUB_WITH_BATCHING_MODEL_CONFIG, "0", server_result
+            )
+            result = await client.infer_sample(a, b)
+            verify_equalness_of_dicts_with_ndarray(expected_result, result)
+        async with AsyncioModelClient(
+            HTTP_LOCALHOST_URL,
+            ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
+            model_config=await client.model_config,
+            ensure_model_is_ready=False,
+        ) as client_from_existing:
+            mock_infer_from_existing = mocker.patch.object(client_from_existing._infer_client, "infer")
+            mock_infer_from_existing.return_value = wrap_to_http_infer_result(
+                ADD_SUB_WITH_BATCHING_MODEL_CONFIG, "0", server_result
+            )
+            result = await client.infer_sample(a, b)
+            verify_equalness_of_dicts_with_ndarray(expected_result, result)
+
+
+@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_http_client_infer_sample_returns_expected_result_when_positional_args_are_used(mocker):
     patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
     patch_http_client__model_up_and_ready(
