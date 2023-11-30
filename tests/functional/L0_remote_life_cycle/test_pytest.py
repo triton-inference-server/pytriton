@@ -24,6 +24,7 @@ import pytest
 
 from pytriton.client import FuturesModelClient, ModelClient
 from pytriton.client.exceptions import PyTritonClientInferenceServerError, PyTritonClientTimeoutError
+from pytriton.client.utils import create_client_from_url
 from pytriton.decorators import batch
 from pytriton.model_config import ModelConfig, Tensor
 from pytriton.triton import RemoteTriton, Triton, TritonConfig
@@ -209,6 +210,9 @@ def test_remote_triton_connect():
 
         rt2.stop()
 
+        with create_client_from_url("localhost:8000") as tr_client:
+            assert not tr_client.is_model_ready("m2")
+
 
 def test_bind_multiple_models():
     _LOGGER.debug("Testing Triton bind multiple models.")
@@ -354,6 +358,8 @@ def test_local_and_remote_models_survive_remote_close(triton_server, http_client
                 assert result["OUTPUT_1"] == input_sleep_smallest
         result = local_client.infer_sample(input_sleep_smallest)
         assert result["OUTPUT_1"] == input_sleep_smallest
+        with create_client_from_url(triton_server.http_url) as tr_client:
+            assert not tr_client.is_model_ready(remote_model)
 
 
 def test_local_and_remote_models_closes_client(triton_server, http_client, input_sleep_smallest):
@@ -361,7 +367,7 @@ def test_local_and_remote_models_closes_client(triton_server, http_client, input
     remote_client = None
     with http_client as local_client:
         result = local_client.infer_sample(input_sleep_smallest)
-    assert result["OUTPUT_1"] == input_sleep_smallest
+        assert result["OUTPUT_1"] == input_sleep_smallest
 
     @batch
     def _infer_fn(**inputs):  # noqa: N803
@@ -396,18 +402,28 @@ def test_local_and_remote_models_closes_client(triton_server, http_client, input
         result = remote_client.infer_sample(input_sleep_smallest)
         assert result["OUTPUT_1"] == input_sleep_smallest
 
+    with create_client_from_url(triton_server.http_url) as tr_client:
+        assert not tr_client.is_model_ready(remote_model)
+
     with pytest.raises(PyTritonClientInferenceServerError):
         remote_client.infer_sample(input_sleep_smallest)
 
-    remote_client_for_dead_model = ModelClient(
+    with pytest.raises(PyTritonClientTimeoutError):
+        remote_client_for_dead_model = ModelClient(
+            url=triton_server.http_url,
+            model_name=remote_model,
+            init_timeout_s=_GARGANTUAN_TIMEOUT,
+            inference_timeout_s=_GARGANTUAN_TIMEOUT,
+            lazy_init=False,
+        )
+
+    with ModelClient(
         url=triton_server.http_url,
         model_name=remote_model,
         init_timeout_s=_GARGANTUAN_TIMEOUT,
         inference_timeout_s=_GARGANTUAN_TIMEOUT,
-        lazy_init=False,
-    )
-    with remote_client_for_dead_model:
-        with pytest.raises(PyTritonClientInferenceServerError):
+    ) as remote_client_for_dead_model:
+        with pytest.raises(PyTritonClientTimeoutError):
             remote_client_for_dead_model.infer_sample(input_sleep_smallest)
 
 
@@ -454,10 +470,18 @@ def test_local_and_remote_models_inflight_requests(triton_server, http_client, i
             )
             result_future = futures_client.infer_sample(input_sleep_smallest)
 
+            result = local_client.infer_sample(input_sleep_smallest)
+            assert result["OUTPUT_1"] == input_sleep_smallest
+
+            # model waits until all requests are handled
+            result = result_future.result()
+            assert result["OUTPUT_1"] == input_sleep_smallest
+
         result = local_client.infer_sample(input_sleep_smallest)
         assert result["OUTPUT_1"] == input_sleep_smallest
-    with pytest.raises(PyTritonClientInferenceServerError):
-        result_future.result()
+        with create_client_from_url(triton_server.http_url) as tr_client:
+            assert not tr_client.is_model_ready(remote_model)
+
     if futures_client:
         futures_client.close()
 
@@ -502,6 +526,9 @@ def test_local_and_remote_models_name_clash(triton_server, http_client, input_sl
             assert result["OUTPUT_1"] == input_sleep_smallest
     assert i_was_called
 
+    with create_client_from_url(triton_server.http_url) as tr_client:
+        assert not tr_client.is_model_ready(remote_model)
+
     with http_client as local_client:
-        with pytest.raises(PyTritonClientInferenceServerError):
+        with pytest.raises(PyTritonClientTimeoutError):
             local_client.infer_sample(input_sleep_smallest)

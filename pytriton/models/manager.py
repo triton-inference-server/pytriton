@@ -21,12 +21,15 @@ The ModelManager is responsible for maintaining the models that has to be server
 
         manager.create_models()
 """
+import contextlib
 import json
 import logging
+import socket
 from typing import Dict, Iterable, Tuple
 
 from pytriton.client import ModelClient
-from pytriton.constants import DEFAULT_TRITON_STARTUP_TIMEOUT_S
+from pytriton.client.utils import create_client_from_url, wait_for_server_ready
+from pytriton.constants import CREATE_TRITON_CLIENT_TIMEOUT_S, DEFAULT_TRITON_STARTUP_TIMEOUT_S
 from pytriton.exceptions import PyTritonInvalidOperationError
 from pytriton.models.model import Model
 
@@ -82,9 +85,23 @@ class ModelManager:
 
     def clean(self) -> None:
         """Clean the model and internal registry."""
-        for name, model in self._models.items():
-            LOGGER.debug(f"Clean model {name}.")
-            model.clean()
+        with contextlib.closing(
+            create_client_from_url(self._triton_url, network_timeout_s=CREATE_TRITON_CLIENT_TIMEOUT_S)
+        ) as client:
+            server_live = False
+            try:
+                server_live = client.is_server_live()
+            except (TimeoutError, ConnectionRefusedError, socket.timeout):
+                pass
+
+            for name, model in self._models.items():
+                LOGGER.debug(f"Clean model {name}.")
+                model.clean()
+                if server_live:
+                    client.unload_model(model.model_name)
+
+            if server_live:
+                wait_for_server_ready(client, timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S)
 
         self._models.clear()
 

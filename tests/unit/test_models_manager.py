@@ -80,7 +80,7 @@ def test_clean_call_clean_on_each_model_and_remove_models_from_registry_when_mod
     model1 = Mock(model_name="Test1", model_version=1)
     model2 = Mock(model_name="Test2", model_version=1)
 
-    model_manager = ModelManager(triton_url="")
+    model_manager = ModelManager(triton_url="localhost")
 
     model_manager.add_model(model1)
     model_manager.add_model(model2)

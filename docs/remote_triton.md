@@ -26,7 +26,8 @@ Only difference of using `RemoteTriton` is that it requires the triton `url` arg
 Example below assumes that the Triton Inference Server is running on the same machine (launched with PyTriton
 in separate python script).
 
-RemoteTriton binds remote model to existing Triton Inference Server.
+`RemoteTriton` binds remote model to existing Triton Inference Server.
+When `RemoteTriton` is closed, the model is unloaded from the server.
 
 <!--pytest.mark.skip-->
 ```python
