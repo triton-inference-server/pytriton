@@ -148,10 +148,13 @@ async def test_async_http_client_init_obtain_expected_model_config_when_lazy_ini
     spy_client_init = mocker.spy(AsyncioHttpInferenceServerClient, AsyncioHttpInferenceServerClient.__init__.__name__)
     client = AsyncioModelClient("http://localhost:8000", ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name, lazy_init=False)
     await client.__aenter__()
+    # Exit sets some clients to none
+    general_client = client._general_client
+    infer_client = client._infer_client
     await client.__aexit__(None, None, None)
     assert spy_client_init.mock_calls == [
-        unittest.mock.call(client._general_client, "localhost:8000", conn_timeout=60.0),
-        unittest.mock.call(client._infer_client, "localhost:8000", conn_timeout=60.0),
+        unittest.mock.call(general_client, "localhost:8000", conn_timeout=60.0),
+        unittest.mock.call(infer_client, "localhost:8000", conn_timeout=60.0),
     ]
     assert await client.model_config == ADD_SUB_WITH_BATCHING_MODEL_CONFIG
 

@@ -320,6 +320,40 @@ def test_decoupled_infer_sample_fast_failure_iter_grpc(grpc_decoupled_client_ser
             list(client.infer_sample(np.array([_WRONG_TIMEOUT]), np.array([_CORRECT_REPEAT])))
 
 
+def test_decoupled_infer_sample_double_infer_grpc(grpc_decoupled_client_server):
+    with grpc_decoupled_client_server as client:
+        with pytest.raises(PyTritonClientInferenceServerError):
+            client.infer_sample(np.array([_SMALL_TIMEOUT]), np.array([_CORRECT_REPEAT]))
+            client.infer_sample(np.array([_SMALL_TIMEOUT]), np.array([_CORRECT_REPEAT]))
+
+
+def test_decoupled_infer_batch_fine_after_failure(grpc_decoupled_client_server):
+    with grpc_decoupled_client_server as client:
+        with pytest.raises(PyTritonClientInferenceServerError):
+            list(client.infer_batch(np.array([_WRONG_TIMEOUT]), np.array([_CORRECT_REPEAT])))
+        responses = list(client.infer_batch(np.array([[_SMALL_TIMEOUT]]), np.array([[_CORRECT_REPEAT]])))
+        assert len(responses) == 2
+        assert responses[0]["OUTPUT_1"] == _SMALL_TIMEOUT
+        assert responses[0]["OUTPUT_2"] == _CORRECT_REPEAT
+        assert responses[1]["OUTPUT_1"] == _SMALL_TIMEOUT
+        assert responses[1]["OUTPUT_2"] == _CORRECT_REPEAT
+
+
+def test_decoupled_infer_sample_close_before_stream_ends(grpc_decoupled_client_server):
+    grpc_decoupled_client_server.infer_sample(np.array([_SMALL_TIMEOUT]), np.array([_CORRECT_REPEAT]))
+    grpc_decoupled_client_server.close()
+
+
+def test_decoupled_infer_sample_close_before_stream_fails_instantly(grpc_decoupled_client_server):
+    grpc_decoupled_client_server.infer_sample(np.array([_WRONG_TIMEOUT]), np.array([_CORRECT_REPEAT]))
+    grpc_decoupled_client_server.close()
+
+
+def test_decoupled_infer_sample_close_before_stream_fails_in_stream(grpc_decoupled_client_server):
+    grpc_decoupled_client_server.infer_sample(np.array([_SMALL_TIMEOUT]), np.array([_WRONG_REPEAT]))
+    grpc_decoupled_client_server.close()
+
+
 def test_decoupled_infer_sample_slow_failure_iter_grpc(grpc_decoupled_client_server):
     with grpc_decoupled_client_server as client:
         iterator = client.infer_sample(np.array([_SMALL_TIMEOUT]), np.array([_WRONG_REPEAT]))
