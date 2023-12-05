@@ -91,8 +91,13 @@ class ModelManager:
             server_live = False
             try:
                 server_live = client.is_server_live()
-            except (TimeoutError, ConnectionRefusedError, socket.timeout):
+            # TimeoutError and ConnectionRefusedError are derived from OSError so they are redundant here
+            # OSError is raised from gevent/_socketcommon.py:590 sometimes, when server is not ready
+            except (socket.timeout, OSError):
                 pass
+            except Exception as ex:
+                LOGGER.error(f"Unexpected exception during server live check: {ex}")
+                raise ex
 
             for name, model in self._models.items():
                 LOGGER.debug(f"Clean model {name}.")
