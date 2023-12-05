@@ -16,7 +16,7 @@ limitations under the License.
 
 # Changelog
 
-## Unreleased
+## 0.4.2 (2023-12-05)
 
 - New: You can create client from existing client instance or model configuration to avoid loading model configuration from server.
 - New: Introduced warning system using the `warnings` module.
