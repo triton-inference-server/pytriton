@@ -18,7 +18,7 @@ limitations under the License.
 
 ## 0.4.2 (2023-12-05)
 
-- New: You can create client from existing client instance or model configuration to avoid loading model configuration from server.
+- New: You can create a client from an existing client instance or model configuration to avoid loading model configuration from the server.
 - New: Introduced warning system using the `warnings` module.
 - Fix: Experimental client for decoupled models prevents sending another request, when responses from previous request are not consumed, blocks close until stream is stopped.
 - Fix: Leak of ModelClient during Triton creation
