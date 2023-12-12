@@ -21,6 +21,11 @@ theme:
       primary: black
   features:
     - navigation.top
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.expand
+    - navigation.indexes
+    - navigation.sections
 extra_css:
   - assets/styles.css
 repo_url: https://github.com/triton-inference-server/pytriton
@@ -66,27 +71,31 @@ markdown_extensions:
   - pymdownx.snippets
   - pymdownx.superfences
 nav:
-  - Home: README.md
-  - Installation and Packaging:
+  - Learn:
+    - Home:
+      - README.md
+      - Quick Start: quick_start.md
     - Installation: installation.md
-    - Building binary package: building.md
-  - Quick Start: quick_start.md
-  - Deploying Models:
-      - Triton Initialization: initialization.md
-      - Binding Model to Triton: binding_models.md
-      - Binding Configuration: binding_configuration.md
-      - Deploying in Clusters: deploying_in_clusters.md
-      - Triton Remote Mode: remote_triton.md
-  - Inference Handling:
-      - Inference Callable: inference_callable.md
-      - Decorators: decorators.md
-      - Custom parameters/headers: custom_params.md
-      - Example with downloaded input data: downloaded_input_data.md
-      - Chunking and batching: chunking_guide.md
-  - Clients: clients.md
-  - Examples: examples.md
-  - API Reference: api.md
-  - Changelog: CHANGELOG.md
-  - Known Issues: known_issues.md
-  - Contributing: CONTRIBUTING.md
-  - License: LICENSE.md
+    - Deploying Models:
+        - Triton Initialization: initialization.md
+        - Binding Model to Triton: binding_models.md
+        - Binding Configuration: binding_configuration.md
+        - Triton Remote Mode: remote_triton.md
+    - Inference Callables:
+        - inference_callables/README.md
+        - Decorators: inference_callables/decorators.md
+        - Custom parameters/headers: inference_callables/custom_params.md
+    - Clients: clients.md
+  - Guides:
+    - Building binary package: guides/building.md
+    - Deploying in Clusters: guides/deploying_in_clusters.md
+    - Chunking and batching: guides/chunking.md
+    - Downloaded input data: guides/downloaded_input_data.md
+    - Examples: examples.md
+  - Reference:
+    - API: api.md
+  - Resources:
+    - Changelog: CHANGELOG.md
+    - Known Issues: known_issues.md
+    - Contributing: CONTRIBUTING.md
+    - License: LICENSE.md
