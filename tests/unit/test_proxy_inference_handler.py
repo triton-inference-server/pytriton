@@ -11,181 +11,233 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import dataclasses
-import functools
-import json
 import logging
-import time
 
-import numpy as np
 import pytest
-import zmq
 
-from pytriton.exceptions import PyTritonRuntimeError
-from pytriton.model_config.triton_model_config import TensorSpec, TritonModelConfig
-from pytriton.proxy.communication import InferenceHandlerRequests, MetaRequestResponse, TensorStore
-from pytriton.proxy.inference_handler import InferenceHandler, _ResponsesIterator
-from pytriton.proxy.types import Request
-from pytriton.proxy.validators import TritonResultsValidator
-from tests.unit.utils import verify_equalness_of_dicts_with_ndarray
+from pytriton.proxy.inference import InferenceHandler, PyTritonResponseFlags, _AsyncGenForCallableAdapter
+from tests.unit.conftest import CallableType, _TestInferenceError
+from tests.unit.utils import check_all_expected_calls_made, verify_equalness_of_dicts_with_ndarray
 
-LOGGER = logging.getLogger("tests.unit.test_proxy_inference_handler")
+LOGGER = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s: %(message)s")
 
 
-MODEL_CONFIG = TritonModelConfig(
-    model_name="Foo",
-    inputs=[
-        TensorSpec(name="input1", dtype=np.int32, shape=(3,)),
-        TensorSpec(name="input2", dtype=np.int32, shape=(3,)),
-    ],
-    outputs=[
-        TensorSpec(name="output1", dtype=np.int32, shape=(3,)),
-        TensorSpec(name="output2", dtype=np.int32, shape=(3,)),
-    ],
-)
-
-DECOUPLED_MODEL_CONFIG = dataclasses.replace(MODEL_CONFIG, decoupled=True)
+INFERENCE_CALLABLE_TYPES = [
+    CallableType.FUNCTION,
+    CallableType.CALLABLE,
+    CallableType.COROUTINE,
+    CallableType.CALLABLE_COROUTINE,
+]
 
 
-def _infer_fn(*_, **__):
-    return [
-        {"output1": np.array([1, 2, 3]), "output2": np.array([1, 2, 3])},
-        {"output1": np.array([1, 2, 3]), "output2": np.array([1, 2, 3])},
-    ]
+@pytest.mark.parametrize("callable_type", INFERENCE_CALLABLE_TYPES)
+@pytest.mark.parametrize("streaming", [False, True])
+@pytest.mark.parametrize("raise_error", [False])
+async def test_async_gen_for_callable_adapter(
+    passthrough_requests_generator_factory,
+    make_passthrough_callable,
+    callable_type,
+    streaming,
+    raise_error,
+):
+    infer_callable = make_passthrough_callable(callable_type, streaming=streaming, raise_error=raise_error)
+    async_gen = _AsyncGenForCallableAdapter(infer_callable)
+    requests_generator = passthrough_requests_generator_factory(n=8, max_batch_size=32)
+    for requests in requests_generator:
+        async for responses in async_gen(requests):
+            assert len(requests) == len(responses)
+            for request, response in zip(requests, responses):
+                verify_equalness_of_dicts_with_ndarray(request, response)
 
 
-def _infer_gen_fn(*_, **__):
-    yield [
-        {"output1": np.array([1]), "output2": np.array([1])},
-        {"output1": np.array([1]), "output2": np.array([1])},
-    ]
-    yield [
-        {"output1": np.array([2]), "output2": np.array([2])},
-        {"output1": np.array([2]), "output2": np.array([2])},
-    ]
-    yield [
-        {"output1": np.array([3]), "output2": np.array([3])},
-        {"output1": np.array([3]), "output2": np.array([3])},
-    ]
+@pytest.mark.parametrize("callable_type", INFERENCE_CALLABLE_TYPES)
+@pytest.mark.parametrize("streaming", [False, True])
+@pytest.mark.parametrize("raise_error", [True])
+async def test_async_gen_for_callable_adapter_passes_error(
+    passthrough_requests_generator_factory,
+    make_passthrough_callable,
+    callable_type,
+    streaming,
+    raise_error,
+):
+    infer_callable = make_passthrough_callable(callable_type, streaming=streaming, raise_error=raise_error)
+    async_gen = _AsyncGenForCallableAdapter(infer_callable)
+    requests_generator = passthrough_requests_generator_factory(n=8, max_batch_size=32)
+
+    with pytest.raises(_TestInferenceError, match="Inference error"):
+        for requests in requests_generator:
+            async for responses in async_gen(requests):
+                assert len(requests) == len(responses)
+                for request, response in zip(requests, responses):
+                    verify_equalness_of_dicts_with_ndarray(request, response)
 
 
-def _get_meta_requests_payload(_data_store_socket):
-    tensor_store = TensorStore(_data_store_socket)
-    LOGGER.debug(f"Connecting to tensor store {_data_store_socket} ...")
-    tensor_store.connect()  # to already started tensor store
-    requests = [
-        Request({"input1": np.ones((128, 4), dtype="float32"), "input2": np.ones((128, 4), dtype="float32")}),
-        Request({"input1": np.ones((128, 4), dtype="float32"), "input2": np.ones((128, 4), dtype="float32")}),
-    ]
-    input_arrays_with_coords = [
-        (request_idx, input_name, tensor)
-        for request_idx, request in enumerate(requests)
-        for input_name, tensor in request.items()
-    ]
-    LOGGER.debug("Putting tensors to tensor store ...")
-    tensor_ids = tensor_store.put([tensor for _, _, tensor in input_arrays_with_coords])
-    requests_with_ids = [{}] * len(requests)
-    for (request_idx, input_name, _), tensor_id in zip(input_arrays_with_coords, tensor_ids):
-        requests_with_ids[request_idx][input_name] = tensor_id
+@pytest.mark.parametrize("callable_type", INFERENCE_CALLABLE_TYPES)
+@pytest.mark.parametrize("streaming", [False, True])
+@pytest.mark.parametrize("raise_error", [False])
+def test_inference_handler_fast_start_stop(
+    make_passthrough_callable,
+    callable_type,
+    streaming,
+    raise_error,
+    mocker,
+):
+    infer_callable = make_passthrough_callable(callable_type, streaming=streaming, raise_error=raise_error)
 
-    meta_requests = InferenceHandlerRequests(
-        requests=[
-            MetaRequestResponse(idx, data=request_with_ids, parameters=request.parameters)
-            for idx, (request, request_with_ids) in enumerate(zip(requests, requests_with_ids))
-        ]
-    )
-    LOGGER.debug(f"Return meta requests: {meta_requests}")
-    return meta_requests.as_bytes()
+    requests_responses_connector = mocker.Mock()
+    validator = mocker.Mock()
+    inference_handler = None
+    try:
+        inference_handler = InferenceHandler(infer_callable, requests_responses_connector, validator)
+        inference_handler.start()
+    finally:
+        if inference_handler is not None:
+            inference_handler.stop()
+            inference_handler.join(timeout=5)
+            assert not inference_handler.is_alive()
 
-
-@pytest.mark.parametrize(
-    "infer_fn,expected_response_lists,decoupled",
-    [
-        (_infer_fn, [_infer_fn()], False),
-        (_infer_fn, [_infer_fn()], True),  # non-generator output should be also handled in decoupled mode
-        (_infer_gen_fn, _infer_gen_fn(), True),
-    ],
-)
-def test_responses_iterator(infer_fn, expected_response_lists, decoupled):
-    responses = list(_ResponsesIterator(infer_fn(), decoupled=decoupled))
-    for responses_list, expected_response_list in zip(responses, expected_response_lists):
-        assert len(responses_list) == len(expected_response_list)
-        for response, expected_response in zip(responses_list, expected_response_list):
-            verify_equalness_of_dicts_with_ndarray(response, expected_response)
+            requests_responses_connector.register_inference_hook.assert_called_once_with(
+                inference_handler.run_inference
+            )
+            requests_responses_connector.unregister_inference_hook.assert_called_once_with(
+                inference_handler.run_inference
+            )
 
 
-def test_responses_iterator_should_raise_error_when_generator_is_returned_for_nondecoupled_models():
-    with pytest.raises(PyTritonRuntimeError, match="Results generator is not supported for non-decoupled models."):
-        list(_ResponsesIterator(_infer_gen_fn(), decoupled=False))
+@pytest.mark.parametrize("callable_type", INFERENCE_CALLABLE_TYPES)
+@pytest.mark.parametrize("streaming", [False, True])
+@pytest.mark.parametrize("raise_error", [False, True])
+async def test_inference_handler_inference(
+    passthrough_requests_generator_factory,
+    make_passthrough_callable,
+    callable_type,
+    streaming,
+    raise_error,
+    mocker,
+):
+    infer_callable = make_passthrough_callable(callable_type, streaming=streaming, raise_error=raise_error)
+    requests_iterator = iter(passthrough_requests_generator_factory(n=8, max_batch_size=32))
 
-
-def test_responses_iterator_could_iterate_only_once_on_non_generator_data():
-    # it is usable to ensure that results are not consumed twice
-
-    iterator = _ResponsesIterator(_infer_fn())
-    responses1 = list(iterator)
-    responses2 = list(iterator)
-
-    assert len(responses1) == 1
-    assert len(responses2) == 0
-
-
-@pytest.mark.parametrize(
-    "triton_model_config,infer_fn",
-    [
-        (MODEL_CONFIG, _infer_fn),
-        (DECOUPLED_MODEL_CONFIG, _infer_gen_fn),
-    ],
-)
-def test_proxy_throws_exception_when_validate_outputs_raise_an_error(tmp_path, mocker, triton_model_config, infer_fn):
-    zmq_context = None
+    requests_responses_connector = mocker.Mock()
+    validator = mocker.Mock()
     inference_handler = None
 
-    # simulate tensor store started by proxy backend
-    data_store_socket = (tmp_path / "data_store.socket").as_posix()
-    tensor_store = TensorStore(data_store_socket)  # authkey will be taken from current process
+    expected_connector_calls = []
+    futures_to_check = []
     try:
-        tensor_store.start()  # start tensor store side process - this way InferenceHandler will create client for it
-        mocker.patch(
-            "pytriton.proxy.validators.TritonResultsValidator.validate_responses",
-            side_effect=ValueError("Validate outputs error."),
-        )
-        zmq_context = zmq.Context()
-        validator = TritonResultsValidator(triton_model_config, strict=False)
-        inference_handler = InferenceHandler(
-            infer_fn,
-            triton_model_config,
-            shared_memory_socket=f"ipc://{tmp_path}/my",
-            data_store_socket=data_store_socket,
-            zmq_context=zmq_context,
-            validator=validator,
-        )
-
-        mock_recv = mocker.patch.object(inference_handler.zmq_context._socket_class, "recv")
-        mock_recv.side_effect = functools.partial(_get_meta_requests_payload, data_store_socket)
-
-        mocker.patch.object(inference_handler.zmq_context._socket_class, "send")  # do not send anything
-        spy_send = mocker.spy(inference_handler.zmq_context._socket_class, "send")
-
+        inference_handler = InferenceHandler(infer_callable, requests_responses_connector, validator)
         inference_handler.start()
+        expected_connector_calls.append(mocker.call.register_inference_hook(inference_handler.run_inference))
 
-        timeout_s = 1.0
-        start_s = time.time()
-        while not spy_send.called and time.time() - start_s < timeout_s:
-            time.sleep(0.1)
+        idx = 0
+        while True:
+            try:
+                scope = {"requests_id": idx.to_bytes(4, "big")}
+                requests = next(requests_iterator)
+                inference_future = inference_handler.run_inference(scope, requests)
+                futures_to_check.append(inference_future)
 
-        spy_send.assert_called()
-        last_call = spy_send.mock_calls[-1]
-        response_payload = last_call.args[0]
-        response = json.loads(response_payload)
-        error = response.get("error")
-        assert error is not None and "Validate outputs error." in error
+                async_gen = _AsyncGenForCallableAdapter(infer_callable)
+                try:
+                    async for expected_responses in async_gen(requests):
+                        expected_connector_calls.append(mocker.call.send(scope, 0, expected_responses))
+                    expected_connector_calls.append(mocker.call.send(scope, PyTritonResponseFlags.EOS, None))
+                except _TestInferenceError as e:
+                    expected_connector_calls.append(
+                        mocker.call.send(scope, PyTritonResponseFlags.EOS | PyTritonResponseFlags.ERROR, e)
+                    )
+
+                idx += 1
+            except StopIteration:
+                break
+
     finally:
-        if inference_handler:
-            inference_handler.stop()
-            if inference_handler.is_alive():
-                inference_handler.join(timeout=1)
-        tensor_store.close()
-        if zmq_context:
-            zmq_context.term()
+        if inference_handler is not None:
+            inference_handler.stop()  # all inference requests done till now should be finished
+            expected_connector_calls.append(mocker.call.unregister_inference_hook(inference_handler.run_inference))
+            inference_handler.join(timeout=5)
+
+            assert not inference_handler.is_alive()
+            assert all(inference_future.result() is None for inference_future in futures_to_check)
+
+            # ignore order, as we don't know which inference calls coroutines
+            # are run before stop() is called and which are run after
+            check_all_expected_calls_made(
+                expected_connector_calls, list(requests_responses_connector.mock_calls), any_order=True
+            )
+
+
+@pytest.mark.parametrize("callable_type", INFERENCE_CALLABLE_TYPES)
+@pytest.mark.parametrize("streaming", [False, True])
+@pytest.mark.parametrize("raise_error", [False])
+async def test_inference_handler_propagates_validaton_error(
+    passthrough_requests_generator_factory,
+    make_passthrough_callable,
+    callable_type,
+    streaming,
+    raise_error,
+    mocker,
+):
+    infer_callable = make_passthrough_callable(callable_type, streaming=streaming, raise_error=raise_error)
+    requests_iterator = iter(passthrough_requests_generator_factory(n=8, max_batch_size=32))
+
+    requests_responses_connector = mocker.Mock()
+
+    validator = mocker.Mock()
+    validator.validate_responses.side_effect = _TestInferenceError("Validation error")
+
+    inference_handler = None
+
+    expected_connector_calls = []
+    expected_validator_calls = []
+    futures_to_check = []
+    try:
+        inference_handler = InferenceHandler(infer_callable, requests_responses_connector, validator)
+        inference_handler.start()
+        expected_connector_calls.append(mocker.call.register_inference_hook(inference_handler.run_inference))
+
+        idx = 0
+        while True:
+            try:
+                scope = {"requests_id": idx.to_bytes(4, "big")}
+                requests = next(requests_iterator)
+                inference_future = inference_handler.run_inference(scope, requests)
+                futures_to_check.append(inference_future)
+
+                async_gen = _AsyncGenForCallableAdapter(infer_callable)
+                async for expected_responses in async_gen(requests):
+                    expected_validator_calls.append(mocker.call.validate_responses(requests, expected_responses))
+                    break
+
+                expected_connector_calls.append(
+                    mocker.call.send(
+                        scope,
+                        PyTritonResponseFlags.EOS | PyTritonResponseFlags.ERROR,
+                        _TestInferenceError("Validation error"),
+                    )
+                )
+
+                idx += 1
+            except StopIteration:
+                break
+
+    finally:
+        if inference_handler is not None:
+            inference_handler.stop()  # all inference requests done till now should be finished
+            expected_connector_calls.append(mocker.call.unregister_inference_hook(inference_handler.run_inference))
+            inference_handler.join(timeout=5)
+
+            assert not inference_handler.is_alive()
+            assert all(inference_future.result() is None for inference_future in futures_to_check)
+
+            check_all_expected_calls_made(expected_validator_calls, list(validator.mock_calls))
+
+            # ignore order, as we don't know which inference calls coroutines
+            # are run before stop() is called and which are run after
+            check_all_expected_calls_made(
+                expected_connector_calls, list(requests_responses_connector.mock_calls), any_order=True
+            )
+
+
+# cancel scheduled tasks

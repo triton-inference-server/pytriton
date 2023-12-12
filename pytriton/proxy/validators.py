@@ -65,7 +65,7 @@ def _validate_outputs(model_config, model_outputs, outputs, strict: bool, reques
     if not isinstance(outputs, list):
         raise ValueError(
             f"Outputs returned by `{model_config.model_name}` model callable "
-            "must be list of response dicts with numpy arrays"
+            f"must be list of response dicts with numpy arrays. Got outputs={outputs} instead."
         )
     if len(outputs) != requests_number:
         raise ValueError(
@@ -73,16 +73,16 @@ def _validate_outputs(model_config, model_outputs, outputs, strict: bool, reques
             f"({len(outputs)}) does not match number of requests ({requests_number}) received from Triton."
         )
 
-    LOGGER.debug(f"Outputs: {outputs}")
-    for response in outputs:
-        LOGGER.debug(f"Response: {response}")
+    LOGGER.debug(f"Number of responses: {len(outputs)}")
+    for response_idx, response in enumerate(outputs):
+        LOGGER.debug(f"Response #{response_idx}")
         if not isinstance(response, dict):
             raise ValueError(
                 f"Outputs returned by `{model_config.model_name}` model callable "
-                "must be list of response dicts with numpy arrays"
+                f"must be list of response dicts with numpy arrays. Got response={response} instead."
             )
         for name, value in response.items():
-            LOGGER.debug(f"{name}: {value}")
+            LOGGER.debug(f"    {name}: {value} shape={value.shape} dtype={value.dtype}")
             _validate_output_data(model_config, name, value)
             if strict:
                 _validate_output_dtype_and_shape(model_config, model_outputs, name, value)
@@ -154,10 +154,6 @@ def _validate_output_dtype_and_shape(model_config, model_outputs, name, value):
         )
 
     batch_shape = 1 if model_config.batching else 0
-    LOGGER.debug(
-        f"Current output `{name}` for model `{model_config.model_name}` has shape: {value.shape[batch_shape:]}"
-    )
-    LOGGER.debug(f"Expected output `{name}` for model `{model_config.model_name}` has shape: {output_config.shape}")
     if len(value.shape[batch_shape:]) != len(output_config.shape):
         raise ValueError(
             f"Returned output `{name}` for model `{model_config.model_name}` has invalid shapes. "

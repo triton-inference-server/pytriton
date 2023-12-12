@@ -14,7 +14,7 @@
 """Common data structures and type used by proxy model and inference handler."""
 
 import dataclasses
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 
@@ -102,3 +102,7 @@ class Response:
 
 
 Responses = List[Response]
+ResponsesOrError = Union[Responses, Exception]
+ResponsesNoneOrError = Union[Responses, None, Exception]
+
+Scope = Dict[str, Any]

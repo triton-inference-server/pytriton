@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import multiprocessing
+import os.path
 import pathlib
 import unittest.mock
 
@@ -19,7 +21,7 @@ import numpy as np
 import psutil
 import pytest
 
-from pytriton.proxy.communication import TensorStore, _DataBlocksServer, serialize_numpy_with_struct_header
+from pytriton.proxy.data import TensorStore, _DataBlocksServer, get_debug_status, serialize_numpy_with_struct_header
 
 
 @pytest.fixture(scope="function")
@@ -68,6 +70,8 @@ def test_tensor_store_unregisters_shm_from_resource_tracker(tmp_path, mocker):
         shm._name for shm, tensor_ref in tensor_store._handled_blocks.values()  # pytype: disable=attribute-error
     }
 
+    debug_status = get_debug_status(tensor_store)
+    assert any(len(segment["used_blocks"]) > 0 for segment in debug_status["segments"])
     tensor_store.close()
 
     expected_unregister_calls = [unittest.mock.call(shm_name, "shared_memory") for shm_name in shm_names]
@@ -93,6 +97,8 @@ def test_tensor_store_shared_memory_unlinked_on_tensor_store_close(tmp_path):
         shm_path = pathlib.Path("/dev/shm") / shm_name[1:]
         assert shm_path.exists()  # shared memory should be present
 
+    debug_status = get_debug_status(tensor_store)
+    assert any(len(segment["used_blocks"]) > 0 for segment in debug_status["segments"])
     tensor_store.close()
 
     for shm_name in shm_names:
@@ -176,3 +182,63 @@ def test_tensor_store_get_put_equal(tensor_store, tensors, n_times):
         finally:
             for tensor_id in tensors_ids:
                 tensor_store.release_block(tensor_id)
+
+            debug_status = get_debug_status(tensor_store)
+            assert all(len(segment["used_blocks"]) == 0 for segment in debug_status["segments"])
+
+
+def test_tensor_store_get_debug_status(tensor_store):
+    status = get_debug_status(tensor_store)
+    assert "server_id" in status
+    assert "host_pid" in status
+    assert "segments" in status
+    assert len(status["segments"]) == 0  # pristine state
+
+
+def _helper_process_for_test_tensor_store_is_started(data_socket_path: str, result_path: str):
+    from pytriton.proxy.data import TensorStore
+
+    connected_tensor_store = None
+    try:
+        connected_tensor_store = TensorStore(data_socket_path)
+        connected_tensor_store.connect()
+        with pathlib.Path(result_path).open("w") as result_file:
+            result_file.write(str(connected_tensor_store.is_started()))
+    except Exception:
+        import traceback
+
+        traceback.print_exc()
+    finally:
+        if connected_tensor_store is not None:
+            connected_tensor_store.close()
+
+
+def test_tensor_store_is_started(tensor_store, tmp_path):
+    assert tensor_store.is_started()
+
+    result_path = os.path.join(tmp_path, "result.txt")
+
+    process = None
+    try:
+        # due to the fact that tensor_store is singleton, we need to create new instance
+        # in a separate process (run in spawn context) to check if it is started
+        ctx = multiprocessing.get_context("spawn")
+        process = ctx.Process(
+            target=_helper_process_for_test_tensor_store_is_started,
+            args=(tensor_store.address, result_path),
+            daemon=True,
+        )
+        process.start()
+        process.join()
+        assert process.exitcode == 0
+        process = None
+    finally:
+        if process is not None:
+            process.terminate()
+            process.join()
+            assert process.exitcode == 0
+
+    with pathlib.Path(result_path).open("r") as result_file:
+        assert result_file.read() == "False"
+
+    assert tensor_store.is_started()

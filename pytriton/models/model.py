@@ -17,14 +17,12 @@ import copy
 import enum
 import json
 import logging
-import multiprocessing
 import pathlib
 import shutil
 import threading
+import time
 import typing
 from typing import Callable, Optional, Sequence, Union
-
-import zmq
 
 from pytriton.decorators import TritonContext
 from pytriton.exceptions import PyTritonValidationError
@@ -32,7 +30,8 @@ from pytriton.model_config.generator import ModelConfigGenerator
 from pytriton.model_config.model_config import ModelConfig
 from pytriton.model_config.tensor import Tensor
 from pytriton.model_config.triton_model_config import DeviceKind, ResponseCache, TensorSpec, TritonModelConfig
-from pytriton.proxy.inference_handler import InferenceHandler, InferenceHandlerEvent
+from pytriton.proxy.data import TensorStoreSerializerDeserializer
+from pytriton.proxy.inference import InferenceHandler, InferenceHandlerEvent, RequestsResponsesConnector
 from pytriton.proxy.validators import TritonResultsValidator
 from pytriton.utils.workspace import Workspace
 
@@ -69,7 +68,7 @@ def _inject_triton_context(triton_context: TritonContext, model_callable: Callab
 class Model:
     """Model definition."""
 
-    SCRIPT_FILES_TO_COPY = ["model.py", "communication.py", "types.py"]
+    SCRIPT_FILES_TO_COPY = ["communication.py", "data.py", "model.py", "types.py"]
 
     def __init__(
         self,
@@ -101,10 +100,10 @@ class Model:
         self.triton_context = triton_context
         self.model_name = model_name
         self.model_version = model_version
-        self._inference_handlers = []
-        self.zmq_context = zmq.Context()
-        self._observers_lock = threading.Lock()
         self._inference_handlers_lock = threading.Lock()
+        self._inference_handlers = []
+        self._requests_respones_connectors = []
+        self._observers_lock = threading.Lock()
         self._strict = strict
 
         self.infer_functions = [inference_fn] if isinstance(inference_fn, Callable) else inference_fn
@@ -119,11 +118,7 @@ class Model:
 
         self.config = config
         self._workspace = workspace
-        ipc_socket_path = self._workspace.path / f"ipc_proxy_backend_{model_name}"
-        self._shared_memory_socket = f"ipc://{ipc_socket_path.as_posix()}"
-        self._data_store_socket = self._workspace.path / "data_store.sock"
-        self._handshake_thread: Optional[threading.Thread] = None
-        self._shutdown_event = threading.Event()
+        self._serializer_deserializer = TensorStoreSerializerDeserializer()
         self._triton_model_config: Optional[TritonModelConfig] = None
         self._model_events_observers: typing.List[ModelEventsHandler] = []
 
@@ -193,43 +188,62 @@ class Model:
         with self._inference_handlers_lock:
             if not self._inference_handlers:
                 triton_model_config = self._get_triton_model_config()
+                workspace_path = pathlib.Path(triton_model_config.backend_parameters["workspace-path"])
                 validator = TritonResultsValidator(triton_model_config, self._strict)
+
+                # TODO: obtain data socket from msg from backend
+                inference_handler_config_path = workspace_path / f"{self.model_name}-config.json"
+                while not inference_handler_config_path.exists():
+                    time.sleep(0.1)
+                with inference_handler_config_path.open("r") as config_file:
+                    inference_handler_config = json.load(config_file)
+
+                data_socket = pathlib.Path(inference_handler_config["data_socket"])
+                authkey = base64.decodebytes(inference_handler_config["authkey"].encode("ascii"))
+                self._serializer_deserializer.connect(data_socket.as_posix(), authkey)
+
                 for i, infer_function in enumerate(self.infer_functions):
                     self.triton_context.model_configs[infer_function] = copy.deepcopy(triton_model_config)
                     _inject_triton_context(self.triton_context, infer_function)
+                    model_instance_name = f"{self.model_name}_0_{i}"  # TODO: sometimes it is _0_{idx}, sometimes is _{idx}; 0 is instance_group_id
+                    # TODO: do not hardcode this - better put template into model config
+                    shared_memory_socket = workspace_path / f"{model_instance_name}-server.sock"
+                    shared_memory_socket = f"ipc://{shared_memory_socket.as_posix()}"
+
+                    requests_respones_connector = RequestsResponsesConnector(
+                        url=shared_memory_socket,
+                        serializer_deserializer=self._serializer_deserializer,
+                    )
+                    requests_respones_connector.start()
+                    self._requests_respones_connectors.append(requests_respones_connector)
                     inference_handler = InferenceHandler(
                         model_callable=infer_function,
-                        model_config=triton_model_config,
-                        shared_memory_socket=f"{self._shared_memory_socket}_{i}",
-                        data_store_socket=self._data_store_socket.as_posix(),
-                        zmq_context=self.zmq_context,
+                        requests_responses_connector=requests_respones_connector,
                         validator=validator,
+                        name=f"inference_handler-{i}",
                     )
-                    inference_handler.on_proxy_backend_event(self._on_proxy_backend_event)
+                    inference_handler.on_inference_handler_event(self._on_inference_handler_event)
                     inference_handler.start()
                     self._inference_handlers.append(inference_handler)
-                self._handshake_thread = threading.Thread(target=self._model_proxy_handshake, daemon=True)
-                self._handshake_thread.start()
 
     def clean(self) -> None:
         """Post unload actions to perform on model."""
-        self._shutdown_event.set()
-        if self._handshake_thread is not None:
-            self._handshake_thread.join()
-            self._handshake_thread = None
-
         with self._observers_lock:
             LOGGER.debug("Clearing model events observers")
             self._model_events_observers.clear()
-        LOGGER.debug("Closing socket if needed")
-        if self.zmq_context is not None:
-            self.zmq_context.term()
-        LOGGER.debug("Socket closed. Waiting for proxy backend to shut down")
+        LOGGER.debug("Socket closed. Waiting for inference handler and communication threads to shut down")
         with self._inference_handlers_lock:
             for inference_handler in self._inference_handlers:
                 inference_handler.stop()
-            LOGGER.debug("All backends ")
+            for inference_handler in self._inference_handlers:
+                inference_handler.join()
             self._inference_handlers.clear()
+            for requests_responses_connector in self._requests_respones_connectors:
+                requests_responses_connector.close()
+            for requests_responses_connector in self._requests_respones_connectors:
+                requests_responses_connector.join()
+            self._requests_respones_connectors.clear()
+        self._serializer_deserializer.close()
 
     def is_alive(self) -> bool:
         """Validate if model is working on Triton.
@@ -240,14 +254,15 @@ class Model:
             True if model is working, False otherwise
         """
         with self._inference_handlers_lock:
-            if not self._inference_handlers:
-                return False
-
-            for inference_handler in self._inference_handlers:
-                if not inference_handler.is_alive():
-                    return False
-
-        return True
+            return (
+                bool(self._inference_handlers)
+                and bool(self._requests_respones_connectors)
+                and all(inference_handler.is_alive() for inference_handler in self._inference_handlers)
+                and all(
+                    requests_responses_connector.is_alive()
+                    for requests_responses_connector in self._requests_respones_connectors
+                )
+            )
 
     def _get_triton_model_config(self) -> TritonModelConfig:
         """Generate ModelConfig from descriptor and custom arguments for Python model.
@@ -263,7 +278,7 @@ class Model:
                 batcher=self.config.batcher,
                 max_batch_size=self.config.max_batch_size,
                 decoupled=self.config.decoupled,
-                backend_parameters={"shared-memory-socket": self._shared_memory_socket},
+                backend_parameters={"workspace-path": self._workspace.path.as_posix()},
                 instance_group={DeviceKind.KIND_CPU: len(self.infer_functions)},
             )
             inputs = []
@@ -290,34 +305,6 @@ class Model:
 
         return self._triton_model_config
 
-    def _model_proxy_handshake(self) -> None:
-        socket = self.zmq_context.socket(zmq.REP)
-        socket.bind(self._shared_memory_socket)
-        try:
-            for i in range(len(self.infer_functions)):
-                while not self._shutdown_event.is_set():
-                    ready_to_read, _, _ = zmq.select([socket], [], [], 0.1)
-                    if not ready_to_read:
-                        continue
-
-                    socket.recv()
-                    authkey = multiprocessing.current_process().authkey
-                    instance_data = {
-                        "shared-memory-socket": f"{self._shared_memory_socket}_{i}",
-                        "data-store-socket": self._data_store_socket.as_posix(),
-                        "auth-key": base64.b64encode(authkey).decode("utf-8"),
-                    }
-                    json_payload = json.dumps(instance_data)
-                    socket.send_string(json_payload)
-                    break
-        except Exception as exception:
-            LOGGER.error("Internal proxy backend error. It will be closed.")
-            LOGGER.exception(exception)
-        finally:
-            LOGGER.debug("Closing handshake socket")
-            socket_close_timeout_s = 0
-            socket.close(linger=socket_close_timeout_s)
-
     def on_model_event(self, model_event_handle_fn: ModelEventsHandler):
         """Register ModelEventsHandler callable.
 
@@ -332,10 +319,10 @@ class Model:
             for model_event_handle_fn in self._model_events_observers:
                 model_event_handle_fn(self, event, context)
 
-    def _on_proxy_backend_event(
+    def _on_inference_handler_event(
         self, proxy_backend: InferenceHandler, event: InferenceHandlerEvent, context: typing.Optional[typing.Any] = None
     ):
-        if event == InferenceHandlerEvent.UNRECOVERABLE_ERROR:
+        if event in [InferenceHandlerEvent.CLOSING, InferenceHandlerEvent.UNRECOVERABLE_ERROR]:
             self._notify_model_events_observers(ModelEvent.RUNTIME_TERMINATING, context)
-        elif event == InferenceHandlerEvent.FINISHED:
+        elif event == InferenceHandlerEvent.CLOSED:
             self._notify_model_events_observers(ModelEvent.RUNTIME_TERMINATED, context)

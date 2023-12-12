@@ -11,35 +11,37 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Model definition for Python Backend.
+"""Model definition for Python Backend for PyTriton.
 
-This file is automatically copied during deployment on Triton.
+This file is automatically copied during deployment on Triton and should not be modified.
 """
+import asyncio
 import base64
-import itertools
 import json
 import logging
 import multiprocessing
+import pathlib
+import threading
+import time
 import traceback
 import typing
 
 import triton_python_backend_utils as pb_utils  # pytype: disable=import-error
-import zmq  # pytype: disable=import-error
 
-from . import communication
-from .communication import InferenceHandlerRequests, InferenceHandlerResponses, MetaRequestResponse, TensorStore
-from .types import Request
+from . import communication, data
+from .communication import HandleResponsesCoro, PyTritonResponseFlags, RequestsServer  # pytype: disable=import-error
+from .data import PROTOCOL_VERSION, TensorStoreSerializerDeserializer  # pytype: disable=import-error
+from .types import Request, Response, ResponsesOrError  # pytype: disable=import-error
 
 LOGGER = logging.getLogger(__name__)
-
-
-_ACK = b""
 
 
 def _update_loggers():
     def get_triton_backend_logger():
         try:
             # https://github.com/triton-inference-server/python_backend/blob/main/src/pb_stub.cc#L1501
+            import triton_python_backend_utils as pb_utils  # pytype: disable=import-error
+
             logger = pb_utils.Logger  # pytype: disable=module-attr
             logger.error = logger.log_error
             logger.warning = logger.log_warn
@@ -56,98 +58,285 @@ def _update_loggers():
     logger = get_triton_backend_logger()
     global LOGGER
     LOGGER = logger
+    data.LOGGER = logger
     communication.LOGGER = logger
+    communication.SERVER_LOGGER = logger
 
 
-class _ResponsesIterator:
-    def __init__(self, socket, requests_number: int) -> None:
-        self._socket = socket
-        self._requests_eos = [False] * requests_number
+class TritonRequestsServer:
+    """Class for handling communication between Triton and Inference Callable."""
 
-    def __iter__(self):
-        return self
+    def __init__(
+        self,
+        url: str,
+        responses_handle_fn: HandleResponsesCoro,
+        serializer_deserializer,
+        model_config: typing.Dict[str, typing.Any],
+    ):
+        """Create TritonRequestsServer object.
 
-    def __next__(self):
-        responses_payload = self._socket.recv()
+        Args:
+            url: url to the socket
+            responses_handle_fn: coroutine that handles responses from InferenceHandler
+            serializer_deserializer: object that serializes and deserializes requests and responses
+            model_config: Triton model config
+        """
+        self._model_config = model_config
+        self._model_inputs_names = [model_input["name"] for model_input in model_config["input"]]
+        self._server = RequestsServer(url, responses_handle_fn)
+        self._serializer_deserializer = serializer_deserializer
 
-        meta_responses = InferenceHandlerResponses.from_bytes(responses_payload)
-        if meta_responses.error:
-            raise pb_utils.TritonModelException(meta_responses.error)  # pytype: disable=module-attr
+    def run(self):
+        """Run requests server.
 
-        for meta_response in meta_responses.responses:
-            self._requests_eos[meta_response.idx] |= meta_response.eos
+        This method should be called in separate thread.
+        """
+        self._server.run()
 
-        if all(self._requests_eos):
-            raise StopIteration()
-        else:
-            self._socket.send(_ACK)  # send ack to receive further results
+    def shutdown(self):
+        """Shutdown requests server.
 
-        return meta_responses
+        Doesn't wait for server to stop. Should wait till thread running TritonRequestsServer is finished.
+        """
+        self._server.shutdown()
+
+    def push(self, requests_id: bytes, triton_requests):
+        """Push requests to TritonRequestsServer queue.
+
+        Args:
+            requests_id: id of requests
+            triton_requests: list of Triton requests
+        """
+        self._server.wait_till_running()  # wait until loop is up and running, raise RuntimeError if server is stopping or not launched yet
+        return asyncio.run_coroutine_threadsafe(self._infer(requests_id, triton_requests), self._server.server_loop)
+
+    def _wrap_request(self, triton_request, inputs) -> Request:
+        request = {}
+        for input_name in inputs:
+            input_tensor = pb_utils.get_input_tensor_by_name(triton_request, input_name)
+            if input_tensor is not None:
+                request[input_name] = input_tensor.as_numpy()
+        return Request(data=request, parameters=json.loads(triton_request.parameters()))
+
+    async def _infer(self, requests_id: bytes, triton_requests) -> asyncio.Task:
+        wrap_tasks = [
+            self._server._server_loop.run_in_executor(
+                None, self._wrap_request, triton_request, self._model_inputs_names
+            )
+            for triton_request in triton_requests
+        ]
+        requests = await asyncio.gather(*wrap_tasks)
+        requests_payload = await self._server.server_loop.run_in_executor(
+            None, self._serializer_deserializer.serialize_requests, requests
+        )
+        # will return when socket.send_multipart returns
+        handle_responses_task = await self._server.send_requests(requests_id, requests_payload)
+        return handle_responses_task
 
 
-class _ResponsesSender:
-    def __init__(self, requests: typing.List):
-        self._requests = requests
-        self._responses = []  # typing.List[pb_utils.InferenceResponse]
-
-    def send(self, responses: typing.List, eos: typing.Optional[typing.Sequence[bool]] = None):
-        assert len(responses) == len(self._requests)
-        # here all responses should be not None
-        self._responses.extend(responses)
-
-    def finish(self):
-        to_send = self._responses
-        self._responses = []
-        return to_send
-
-
-class _DecoupledResponsesSender:
-    def __init__(self, requests: typing.List):
-        self._senders = [request.get_response_sender() for request in requests]
-        self._eos = [False] * len(requests)
-
-    def send(self, responses: typing.List, eos: typing.Optional[typing.Sequence[typing.Optional[bool]]] = None):
-        assert len(responses) == len(self._senders)
-        eos = eos or [None] * len(self._senders)
-        for response_idx, (response, response_eos) in enumerate(zip(responses, eos)):
-            if response is None and not response_eos:
-                continue
-
-            sender = self._senders[response_idx]
-            self._eos[response_idx] |= response_eos
-            flags = 0
-            if response_eos:
-                flags |= pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL
-            if response is not None:
-                sender.send(response, flags=flags)
-            elif response_eos:
-                sender.send(flags=flags)
-
-    def finish(self):
-        for idx, sender in enumerate(self._senders):
-            if not self._eos[idx]:
-                sender.send(flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+def _wrap_response(response: Response, requested_outputs_names, model_outputs_dict):
+    if response.data is not None:
+        only_requested = {key: value for key, value in response.data.items() if key in requested_outputs_names}
+        casted = {
+            key: value.astype(pb_utils.triton_string_to_numpy(model_outputs_dict[key]["data_type"]))
+            for key, value in only_requested.items()
+        }
+        return pb_utils.InferenceResponse(  # pytype: disable=module-attr
+            output_tensors=[
+                pb_utils.Tensor(name, value) for name, value in casted.items()  # pytype: disable=module-attr
+            ]
+        )
+    else:
         return None
+
+
+class BatchResponsesHandler:
+    """Class for handling responses from InferenceHandler."""
+
+    def __init__(self, requests_map, serializer_deserializer, model_outputs_dict):
+        """Init BatchResponsesHandler object."""
+        self._requests_map = requests_map
+        self._serializer_deserializer = serializer_deserializer
+        self._model_outputs_dict = model_outputs_dict
+
+    async def handle_responses(self, scope: typing.Dict[str, typing.Any], responses_queue: asyncio.Queue):
+        """Handle responses from InferenceHandler.
+
+        Args:
+            requests_id: id of requests
+            responses_queue: queue with responses payload from InferenceHandler
+
+        Returns:
+            Triton Responses or TritonModelException
+        """
+        requests_id: bytes = scope["requests_id"]
+        loop = asyncio.get_running_loop()
+        triton_requests = self._requests_map[requests_id]
+
+        eos = False
+        triton_responses_or_error = None
+        while not eos:
+            try:
+                flags, responses_payload = await responses_queue.get()
+                eos = flags & PyTritonResponseFlags.EOS
+                error = flags & PyTritonResponseFlags.ERROR
+
+                if error:
+                    assert eos
+                    triton_responses_or_error = pb_utils.TritonModelException(  # pytype: disable=module-attr
+                        responses_payload.decode("utf-8")
+                    )
+                elif responses_payload:
+                    # inference handler should send all responses in payload
+                    assert triton_responses_or_error is None
+                    responses = await loop.run_in_executor(
+                        None, self._serializer_deserializer.deserialize_responses, responses_payload
+                    )
+                    wrap_tasks = [
+                        loop.run_in_executor(
+                            None, _wrap_response, response, request.requested_output_names(), self._model_outputs_dict
+                        )
+                        for request, response in zip(triton_requests, responses)
+                    ]
+                    triton_responses_or_error = await asyncio.gather(*wrap_tasks)
+            except asyncio.CancelledError:
+                LOGGER.warning(f"Cancelled responses handler for requests={requests_id.hex()}")
+                triton_responses_or_error = pb_utils.TritonModelException(  # pytype: disable=module-attr
+                    "Cancelled responses handler"
+                )
+                eos = True
+            finally:
+                if not error:
+                    await loop.run_in_executor(
+                        None, self._serializer_deserializer.free_responses_resources, responses_payload
+                    )
+                responses_queue.task_done()
+
+        self._requests_map.pop(requests_id)
+        return triton_responses_or_error
+
+
+class DecoupledResponsesHandler:
+    """Class for handling responses for decoupled model."""
+
+    def __init__(self, requests_map, serializer_deserializer, model_outputs_dict):
+        """Create DecoupledResponsesHandler object."""
+        self._requests_map = requests_map
+        self._serializer_deserializer = serializer_deserializer
+        self._model_outputs_dict = model_outputs_dict
+
+    async def handle_responses(
+        self, scope: typing.Dict[str, typing.Any], responses_queue: asyncio.Queue
+    ) -> typing.Optional[ResponsesOrError]:
+        """Handle responses from InferenceHandler.
+
+        Args:
+            requests_id: id of requests
+            responses_queue: queue with responses from InferenceHandler
+
+        Returns:
+            Responses or None if responses were sent to client
+        """
+        requests_id: bytes = scope["requests_id"]
+        loop = asyncio.get_running_loop()
+        triton_requests = self._requests_map[requests_id]
+        triton_senders = [request.get_response_sender() for request in triton_requests]
+
+        eos = False
+        while not eos:
+            try:
+                flags, responses_payload = await responses_queue.get()
+                LOGGER.debug(f"Got {flags} {responses_payload}")
+
+                eos = flags & PyTritonResponseFlags.EOS
+                error = flags & PyTritonResponseFlags.ERROR
+
+                triton_responses = None
+                if error:
+                    triton_responses = [
+                        pb_utils.InferenceResponse(  # pytype: disable=module-attr
+                            error=pb_utils.TritonError(responses_payload.decode("utf-8"))  # pytype: disable=module-attr
+                        )
+                        for _ in triton_senders
+                    ]
+                else:
+                    responses = await loop.run_in_executor(
+                        None, self._serializer_deserializer.deserialize_responses, responses_payload
+                    )
+                    triton_responses = [
+                        _wrap_response(response, request.requested_output_names(), self._model_outputs_dict)
+                        for request, response in zip(triton_requests, responses)
+                    ]
+
+                triton_flags = 0
+                if eos:
+                    triton_flags = pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL
+                    triton_responses = triton_responses or [None] * len(triton_senders)
+
+                # run sender.send in parallel in executor
+                assert len(triton_responses) == len(triton_senders)
+                send_responses_futures = [
+                    loop.run_in_executor(None, sender.send, response, triton_flags)
+                    for sender, response in zip(triton_senders, triton_responses)
+                ]
+                await asyncio.gather(*send_responses_futures)
+            except asyncio.CancelledError:
+                LOGGER.warning(f"Cancelled responses handler for requests={requests_id.hex()}")
+                triton_flags = pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL
+                triton_response = pb_utils.InferenceResponse(  # pytype: disable=module-attr
+                    error=pb_utils.TritonError(error="Cancelled responses handler")  # pytype: disable=module-attr
+                )
+                send_responses_futures = [
+                    loop.run_in_executor(None, sender.send, triton_response, triton_flags) for sender in triton_senders
+                ]
+                await asyncio.gather(*send_responses_futures)
+            finally:
+                if not error:
+                    await loop.run_in_executor(
+                        None, self._serializer_deserializer.free_responses_resources, responses_payload
+                    )
+                responses_queue.task_done()
+
+        self._requests_map.pop(requests_id)
+
+
+class TritonInferenceHandlerConfigGenerator:
+    """PyTriton Inference handler config generator for Triton PythonBackend."""
+
+    def __init__(self, data_socket: typing.Union[str, pathlib.Path]):
+        """Initialize the config generator.
+
+        Args:
+            data_socket: path to the data socket
+        """
+        self._data_socket = pathlib.Path(data_socket)
+
+    def get_config(self) -> typing.Dict[str, typing.Any]:
+        """Return the config for the inference handler."""
+        return {
+            "protocol_version": PROTOCOL_VERSION,
+            "data_socket": self._data_socket.as_posix(),
+            "authkey": base64.encodebytes(multiprocessing.current_process().authkey).decode("ascii"),
+        }
 
 
 class TritonPythonModel:
     """Triton PythonBackend model implementation for proxy."""
 
     def __init__(self):
-        """Create TritonPythonModel object."""
-        self.model_config = None
-        self.context = zmq.Context()
-        self.socket = self.context.socket(zmq.REQ)
-
-        self.model_config = None
-        self.model_inputs = []
-        self.model_outputs = []
-        self.model_outputs_dict = {}
-
-        self._tensor_store = None
-        self._last_response_ids = []
-
-        self._sender_cls = None
+        """Dummy inititializer."""
+        self._model_config = None
+        self._model_inputs_names = None
+        self._model_outputs = None
+        self._model_instance_name = None
+        self._decoupled_model = None
+        self._serializer_deserializer = None
+        self._requests_server = None
+        self._requests_server_thread = None
+        self._loop = None
+        self._frontend = None
+        self._requests = None
+        self._id_counter = 0
 
     def initialize(self, args):
         """Triton Inference Server Python Backend API called only once when the model is being loaded.
@@ -159,40 +348,78 @@ class TritonPythonModel:
                 * model_config: A JSON string containing the model configuration
                 * model_instance_kind: A string containing model instance kind
                 * model_instance_device_id: A string containing model instance device ID
+                * model_instance_name: A string containing model instance name in form of <model_name>_<instance_group_id>_<instance_id>
                 * model_repository: Model repository path
                 * model_version: Model version
                 * model_name: Model name
         """
-        _update_loggers()
+        _update_loggers()  # Triton backend logger is available from this point on
+
         try:
-            LOGGER.debug("Reading model config")
-            self.model_config = json.loads(args["model_config"])
-            shared_memory_socket = self.model_config["parameters"]["shared-memory-socket"]["string_value"]
-            LOGGER.debug(f"Connecting to IPC socket at {shared_memory_socket}")
+            # parse config and args
+            model_name = args["model_name"]
 
-            instance_data = self._get_instance_data(shared_memory_socket)
-            self.socket.connect(instance_data["shared-memory-socket"])
-            LOGGER.debug(f"Connected to socket {shared_memory_socket}.")
+            model_config_dict = json.loads(args["model_config"])
+            self._model_config = model_config_dict
+            model_inputs = {model_input["name"] for model_input in model_config_dict["input"]}
+            self._model_outputs = {model_output["name"]: model_output for model_output in model_config_dict["output"]}
+            self._model_inputs_names = list(model_inputs)
+            self._decoupled_model = model_config_dict.get("model_transaction_policy", {}).get("decoupled", False)
+            self._model_instance_name = args.get("model_instance_name")
 
-            self.model_inputs = self.model_config["input"]
-            self.model_outputs = self.model_config["output"]
-            self.model_outputs_dict = {output_def["name"]: output_def for output_def in self.model_outputs}
+            workspace_path = pathlib.Path(model_config_dict["parameters"]["workspace-path"]["string_value"])
 
-            LOGGER.debug(f"Model inputs: {self.model_inputs}")
-            LOGGER.debug(f"Model outputs: {self.model_outputs}")
+            LOGGER.debug(f"Model instance name: {self._model_instance_name}")
+            LOGGER.debug(f"Decoupled model: {self._decoupled_model}")
+            LOGGER.debug(f"Workspace path: {workspace_path}")
+            LOGGER.debug(f"Model inputs: {model_inputs}")
+            LOGGER.debug(f"Model outputs: {self._model_outputs}")
 
-            data_store_socket = instance_data["data-store-socket"]
-            auth_key = base64.b64decode(instance_data["auth-key"])
+            # init serializer/deserializer
+            data_socket = workspace_path / f"{model_name}-data.sock"
+            self._serializer_deserializer = TensorStoreSerializerDeserializer()
 
-            self._tensor_store = TensorStore(data_store_socket, auth_key)
-            self._tensor_store.connect()
-            self._last_response_ids = []
+            config_path = workspace_path / f"{model_name}-config.json"
+            model_first_instance_name = "_".join(self._model_instance_name.split("_")[:-1] + ["0"])
+            if self._model_instance_name == model_first_instance_name:
+                self._serializer_deserializer.start(data_socket)
+                # TODO: temporary solution to avoid complication of communication code
+                with config_path.open("w") as config_file:
+                    inference_handler_config = TritonInferenceHandlerConfigGenerator(data_socket).get_config()
+                    json.dump(inference_handler_config, config_file)
+            else:
+                # wait for config from 1st instance
+                LOGGER.debug(f"Waiting for config file {config_path}")
+                while not config_path.exists():
+                    time.sleep(0.001)
 
-            self._sender_cls = {
-                False: _ResponsesSender,
-                True: _DecoupledResponsesSender,
-            }[self.model_config.get("model_transaction_policy", {}).get("decoupled", False)]
+                with config_path.open("r") as config_file:
+                    inference_handler_config = json.load(config_file)
+                LOGGER.debug(f"Loaded configuration from {config_path}")
+                authkey = base64.decodebytes(inference_handler_config["authkey"].encode("ascii"))
+                self._serializer_deserializer.connect(data_socket, authkey=authkey)
 
+            self._id_counter = 0
+            self._requests = {}
+
+            server_socket_path = workspace_path / f"{self._model_instance_name}-server.sock"
+            handler_class = DecoupledResponsesHandler if self._decoupled_model else BatchResponsesHandler
+            LOGGER.debug(f"Using {handler_class.__name__} for handling responses")
+            self._requests_server = TritonRequestsServer(
+                url=f"ipc://{server_socket_path.as_posix()}",
+                responses_handle_fn=handler_class(
+                    self._requests, self._serializer_deserializer, self._model_outputs
+                ).handle_responses,
+                serializer_deserializer=self._serializer_deserializer,
+                model_config=self._model_config,
+            )
+
+            def _run_server():
+                _update_loggers()
+                self._requests_server.run()
+
+            self._requests_server_thread = threading.Thread(target=_run_server, name="requests-server", daemon=True)
+            self._requests_server_thread.start()
         except Exception:
             msg = traceback.format_exc()
             raise pb_utils.TritonModelException(f"Model initialize error: {msg}")  # pytype: disable=module-attr
@@ -205,59 +432,54 @@ class TritonPythonModel:
 
         Returns:
             A list of pb_utils.InferenceResponse. The length of this list is the same as `triton_requests`
+
+        Raises:
+            pb_utils.TritonModelException: when model execution fails
         """
         try:
-            meta_requests = self._put_requests_to_buffer(triton_requests)
-            LOGGER.debug(f"Sending requests {meta_requests}.")
-            self.socket.send(meta_requests.as_bytes())
 
-            responses_iterator = _ResponsesIterator(self.socket, len(triton_requests))
-            responses_sender = self._sender_cls(triton_requests)
-            LOGGER.debug(f"using sender {responses_sender}")
-            for meta_responses in responses_iterator:
-                LOGGER.debug(f"Received response: {meta_responses}")
-                triton_responses = self._handle_responses_from_buffer(meta_responses, len(triton_requests))
-                responses_sender.send(
-                    triton_responses, eos=[meta_response.eos for meta_response in meta_responses.responses]
-                )
+            def _generate_id():
+                self._id_counter = (self._id_counter + 1) % 2**32
+                return self._id_counter.to_bytes(4, "big")
 
-                # TODO: fix leak on error
-                self._last_response_ids.extend(
-                    itertools.chain(
-                        *[
-                            meta_response.data.values()
-                            for meta_response in meta_responses.responses
-                            if meta_response.data is not None
-                        ]
-                    )
-                )
-            return responses_sender.finish()
-        except pb_utils.TritonModelException:  # pytype: disable=module-attr
-            raise
+            requests_id = _generate_id()
+            while requests_id in self._requests:
+                requests_id = _generate_id()
+            self._requests[requests_id] = triton_requests
+
+            # TODO: add this future to container to avoid garbage collection
+            handle_responses_task_future = self._requests_server.push(requests_id, triton_requests)
+
+            if not self._decoupled_model:
+                handle_responses_task = handle_responses_task_future.result()
+                check_interval_s = 0.001
+                while not handle_responses_task.done():
+                    time.sleep(check_interval_s)
+                triton_responses_or_error = handle_responses_task.result()
+
+                if triton_responses_or_error is not None and isinstance(triton_responses_or_error, Exception):
+                    raise triton_responses_or_error
+            else:
+                triton_responses_or_error = None
+
+            return triton_responses_or_error
         except Exception:
             msg = traceback.format_exc()
             raise pb_utils.TritonModelException(f"Model execute error: {msg}")  # pytype: disable=module-attr
 
     def finalize(self) -> None:
         """Finalize the model cleaning the buffers."""
-        LOGGER.debug("Finalizing backend instance.")
-        LOGGER.debug("Cleaning socket and context.")
-        socket_close_timeout_s = 0
-        if self.socket:
-            self.socket.close(linger=socket_close_timeout_s)
-        if self.context:
-            self.context.term()
-        self.socket = None
-        self.context = None
+        LOGGER.debug(f"[{self._model_instance_name}] Finalizing backend instance")
+        LOGGER.debug(f"[{self._model_instance_name}] Closing requests server")
+        self._requests_server.shutdown()
+        self._requests_server_thread.join()
 
-        LOGGER.debug("Removing allocated shared memory.")
-        for tensor_id in self._last_response_ids:
-            self._tensor_store.release_block(tensor_id)
-        self._last_response_ids = []
-        self._tensor_store.close()
-        self._tensor_store = None
+        LOGGER.debug(f"[{self._model_instance_name}] Closing requests/responses serializer/deserializer")
+        self._serializer_deserializer.close()
+        self._serializer_deserializer = None
 
-        LOGGER.debug("Finalized.")
+        LOGGER.debug(f"[{self._model_instance_name}] Finalized.")
+        self._model_instance_name = None
 
     @property
     def model_supports_batching(self) -> bool:
@@ -266,74 +488,4 @@ class TritonPythonModel:
         Returns:
             True if model support batching, False otherwise.
         """
-        return self.model_config["max_batch_size"] > 0
-
-    def _get_instance_data(self, shared_memory_socket) -> typing.Dict[str, str]:
-        handshake_socket = self.context.socket(zmq.REQ)
-        handshake_socket.connect(shared_memory_socket)
-        handshake_socket.send_string("get_instance_socket")
-        instance_data_payload = handshake_socket.recv()
-        handshake_socket.close()
-        instance_data = json.loads(instance_data_payload.decode("utf-8"))
-        instance_data_copy = instance_data.copy()
-        if "auth-key" in instance_data_copy:
-            instance_data_copy["auth-key"] = "***"
-        LOGGER.debug(f"Obtained instance data: {instance_data_copy}")
-        return instance_data
-
-    def _put_requests_to_buffer(self, triton_requests) -> InferenceHandlerRequests:
-        while self._last_response_ids:
-            tensor_id = self._last_response_ids.pop()
-            self._tensor_store.release_block(tensor_id)
-
-        LOGGER.debug("Collecting input data from request.")
-
-        requests = []
-        for triton_request in triton_requests:
-            request = {}
-            for model_input in self.model_inputs:
-                input_tensor = pb_utils.get_input_tensor_by_name(triton_request, model_input["name"])
-                if input_tensor is not None:
-                    request[model_input["name"]] = input_tensor.as_numpy()
-            requests.append(Request(data=request, parameters=json.loads(triton_request.parameters())))
-
-        input_arrays_with_coords = [
-            (request_idx, input_name, tensor)
-            for request_idx, request in enumerate(requests)
-            for input_name, tensor in request.items()
-        ]
-        tensor_ids = self._tensor_store.put([tensor for *_, tensor in input_arrays_with_coords])
-        requests_with_ids = [{} for _ in range(len(requests))]
-        for (request_idx, input_name, _), tensor_id in zip(input_arrays_with_coords, tensor_ids):
-            requests_with_ids[request_idx][input_name] = tensor_id
-
-        return InferenceHandlerRequests(
-            requests=[
-                MetaRequestResponse(idx=idx, data=request_with_ids, parameters=request.parameters)
-                for idx, (request, request_with_ids) in enumerate(zip(requests, requests_with_ids))
-            ]
-        )
-
-    def _handle_responses_from_buffer(
-        self, meta_response: InferenceHandlerResponses, requests_number: int
-    ) -> typing.List:
-        def _get_array_and_wrap(output_name, tensor_id: str) -> pb_utils.Tensor:  # pytype: disable=module-attr
-            output_array = self._tensor_store.get(tensor_id)
-            if output_name in self.model_outputs_dict:
-                dtype = pb_utils.triton_string_to_numpy(self.model_outputs_dict[output_name]["data_type"])
-                output_array = output_array.astype(dtype)
-            return pb_utils.Tensor(output_name, output_array)  # pytype: disable=module-attr
-
-        responses = meta_response.responses
-        if len(responses) != requests_number:
-            raise pb_utils.TritonModelException(  # pytype: disable=module-attr
-                f"Number of responses {len(responses)} does not match number of requests {requests_number}"
-            )
-        triton_inference_responses = [None] * requests_number
-        for response in responses:
-            if response.data is None:
-                continue
-            triton_inference_responses[response.idx] = pb_utils.InferenceResponse(  # pytype: disable=module-attr
-                [_get_array_and_wrap(output_name, tensor_id) for output_name, tensor_id in response.data.items()]
-            )
-        return triton_inference_responses
+        return self._model_config["max_batch_size"] > 0

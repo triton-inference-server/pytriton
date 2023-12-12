@@ -26,7 +26,7 @@ from .common import full_model_config
 common_model_config = {
     "backend": "python",
     "instance_group": [{"kind": "KIND_CPU"}],
-    "parameters": {"shared-memory-socket": {"string_value": "ipc:///tmp/proxy_backend.ipc"}},
+    "parameters": {"workspace-path": {"string_value": "/tmp"}},
 }
 
 invalid_model_config = {
@@ -271,7 +271,7 @@ def test_parse_from_dict_return_model_config_when_minimal_config_used():
 
     assert not model_config.decoupled
 
-    assert model_config.backend_parameters == {"shared-memory-socket": "ipc:///tmp/proxy_backend.ipc"}
+    assert model_config.backend_parameters == {"workspace-path": "/tmp"}
     assert model_config.inputs[0] == TensorSpec(name="INPUT_0", dtype=np.int32, shape=(-1,))
     assert model_config.outputs[0] == TensorSpec(name="OUTPUT_0", dtype=np.int32, shape=(-1,))
 
@@ -293,7 +293,7 @@ def test_parse_from_dict_return_model_config_when_simple_config_used():
 
     assert not model_config.decoupled
 
-    assert model_config.backend_parameters == {"shared-memory-socket": "ipc:///tmp/proxy_backend.ipc"}
+    assert model_config.backend_parameters == {"workspace-path": "/tmp"}
     assert model_config.inputs == [
         TensorSpec(name="INPUT_0", dtype=np.int32, shape=(-1,)),
         TensorSpec(name="INPUT_1", dtype=np.float32, shape=(-1,)),
@@ -318,7 +318,7 @@ def test_parse_from_dict_return_model_config_when_string_config_used():
 
     assert not model_config.decoupled
 
-    assert model_config.backend_parameters == {"shared-memory-socket": "ipc:///tmp/proxy_backend.ipc"}
+    assert model_config.backend_parameters == {"workspace-path": "/tmp"}
     assert model_config.inputs == [
         TensorSpec(name="INPUT_0", dtype=np.bytes_, shape=(-1,)),
     ]
@@ -342,7 +342,7 @@ def test_parse_from_dict_return_model_config_when_add_model_without_batching_use
 
     assert not model_config.decoupled
 
-    assert model_config.backend_parameters == {"shared-memory-socket": "ipc:///tmp/proxy_backend.ipc"}
+    assert model_config.backend_parameters == {"workspace-path": "/tmp"}
     assert model_config.inputs == [
         TensorSpec(name="INPUT_0", dtype=np.int32, shape=(1,)),
         TensorSpec(name="INPUT_1", dtype=np.int32, shape=(1,)),
@@ -391,7 +391,7 @@ def test_parse_from_dict_return_model_config_when_add_model_without_dynamic_batc
 
     assert not model_config.decoupled
 
-    assert model_config.backend_parameters == {"shared-memory-socket": "ipc:///tmp/proxy_backend.ipc"}
+    assert model_config.backend_parameters == {"workspace-path": "/tmp"}
     assert model_config.inputs == [
         TensorSpec(name="INPUT_0", dtype=np.int32, shape=(1,)),
         TensorSpec(name="INPUT_1", dtype=np.int32, shape=(1,)),
@@ -416,7 +416,7 @@ def test_parse_from_dict_return_model_config_when_add_model_with_simple_dynamic_
 
     assert not model_config.decoupled
 
-    assert model_config.backend_parameters == {"shared-memory-socket": "ipc:///tmp/proxy_backend.ipc"}
+    assert model_config.backend_parameters == {"workspace-path": "/tmp"}
     assert model_config.inputs == [
         TensorSpec(name="INPUT_0", dtype=np.int32, shape=(-1,)),
         TensorSpec(name="INPUT_1", dtype=np.int32, shape=(-1,)),
@@ -449,7 +449,7 @@ def test_parse_from_dict_return_model_config_when_add_model_with_advanced_batche
 
     assert not model_config.decoupled
 
-    assert model_config.backend_parameters == {"shared-memory-socket": "ipc:///tmp/proxy_backend.ipc"}
+    assert model_config.backend_parameters == {"workspace-path": "/tmp"}
     assert model_config.inputs == [
         TensorSpec(name="INPUT_0", dtype=np.int32, shape=(-1,)),
         TensorSpec(name="INPUT_1", dtype=np.int32, shape=(-1,)),
@@ -501,7 +501,7 @@ def test_parse_from_dict_return_model_config_when_response_cache_config_used():
 
     assert not model_config.decoupled
 
-    assert model_config.backend_parameters == {"shared-memory-socket": "ipc:///tmp/proxy_backend.ipc"}
+    assert model_config.backend_parameters == {"workspace-path": "/tmp"}
     assert model_config.inputs[0] == TensorSpec(name="INPUT_0", dtype=np.int32, shape=(-1,))
     assert model_config.outputs[0] == TensorSpec(name="OUTPUT_0", dtype=np.int32, shape=(-1,))
 

@@ -13,6 +13,7 @@
 # limitations under the License.
 import json
 import typing
+import unittest.mock
 
 import numpy as np
 import tritonclient.grpc
@@ -141,3 +142,17 @@ def patch_http_client__model_up_and_ready(mocker, model_config: TritonModelConfi
     model_config_dict = ModelConfigGenerator(model_config).get_config()
     mock_get_model_config = mocker.patch.object(tritonclient.http.InferenceServerClient, "get_model_config")
     mock_get_model_config.return_value = model_config_dict
+
+
+def check_all_expected_calls_made(
+    expected_calls: typing.List[unittest.mock._Call],
+    mock_calls: typing.List[unittest.mock._Call],
+    any_order: bool = False,
+):
+    if not any_order:
+        assert mock_calls == expected_calls
+    else:
+        for expected_call in expected_calls:
+            assert expected_call in mock_calls, f"Expected call not found: {expected_call}; mock_calls={mock_calls}"
+            mock_calls.remove(expected_call)
+        assert not mock_calls, f"Unexpected calls: {mock_calls}"

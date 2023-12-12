@@ -56,7 +56,6 @@ from pytriton.exceptions import PyTritonValidationError
 from pytriton.model_config.tensor import Tensor
 from pytriton.models.manager import ModelManager
 from pytriton.models.model import Model, ModelConfig, ModelEvent
-from pytriton.proxy.communication import TensorStore
 from pytriton.server.python_backend_config import PythonBackendConfig
 from pytriton.server.triton_server import TritonServer
 from pytriton.server.triton_server_config import TritonServerConfig
@@ -344,8 +343,6 @@ class TritonBase:
 
         atexit.register(self.stop)
 
-        self._tensor_store = None
-
     def bind(
         self,
         model_name: str,
@@ -400,10 +397,6 @@ class TritonBase:
                 return
 
             self._wait_for_server()
-            if self._tensor_store is None:
-                self._tensor_store = TensorStore(self._workspace.path / "data_store.sock")
-                self._tensor_store.start()
-
             self._model_manager.load_models()
             self._wait_for_models()
             self._connected = True
@@ -435,11 +428,7 @@ class TritonBase:
             self._connected = False
             atexit.unregister(self.stop)
         self._pre_stop_impl()
-        LOGGER.debug("Cleaning model manager, tensor store and workspace.")
         self._model_manager.clean()
-        if self._tensor_store is not None:
-            self._tensor_store.close()
-            self._tensor_store = None
         self._workspace.clean()
 
         with self._cv:

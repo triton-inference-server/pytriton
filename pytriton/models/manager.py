@@ -106,6 +106,7 @@ class ModelManager:
                     client.unload_model(model.model_name)
 
             if server_live:
+                # after unload there is a short period of time when server is not ready
                 wait_for_server_ready(client, timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S)
 
         self._models.clear()
@@ -116,8 +117,7 @@ class ModelManager:
 
     def _load_model(self, model: Model):
         """Prepare model config and required files dict and load model to Triton server."""
-        LOGGER.debug(f"Crating model {model.model_name} with version {model.model_version}.")
-        model.setup()
+        LOGGER.debug(f"Creating model {model.model_name} with version {model.model_version}.")
         config = json.dumps(model.get_model_config())
         files = model.get_proxy_model_files()
         with ModelClient(
@@ -125,4 +125,5 @@ class ModelManager:
         ) as client:
             client.wait_for_server(timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S)
             client.load_model(config=config, files=files)
+        model.setup()
         LOGGER.debug("Done.")

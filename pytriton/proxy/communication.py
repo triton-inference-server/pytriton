@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,814 +11,427 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Communication utility module.
-
-It is used for interaction between model and proxy_backend.
-"""
-
-import atexit
-import ctypes
-import ctypes.util
-import dataclasses
-import fcntl
-import gc
-import json
+"""Module handling communication between RequestsServer and RequestsServerClients."""
+import asyncio
+import enum
+import functools
 import logging
-import math
-import multiprocessing.managers
-import multiprocessing.popen_spawn_posix
-import multiprocessing.shared_memory
-import pathlib
-import signal
-import struct
 import threading
-import time
+import traceback
+import typing
 import uuid
-import weakref
-from typing import Dict, List, Literal, Optional, Sequence, Tuple, Union
 
-import numpy as np
+import zmq  # pytype: disable=import-error
+import zmq.asyncio  # pytype: disable=import-error
 
 LOGGER = logging.getLogger(__name__)
+SERVER_LOGGER = LOGGER.getChild("server")
+CLIENT_LOGGER = LOGGER.getChild("client")
+
+_STARTUP_TIMEOUT_S = 1.0
 
 
-# copy from
-# https://github.com/triton-inference-server/python_backend/blob/main/src/resources/triton_python_backend_utils.py
+class PyTritonResponseFlags(enum.IntFlag):
+    """Response flags for PyTritonInferenceHandler."""
+
+    EOS = enum.auto()  # End Of Stream
+    ERROR = enum.auto()
 
 
-def _serialize_byte_tensor(tensor) -> bytes:
-    """Serializes a bytes tensor into a flat numpy array of length prepended bytes.
-
-    The numpy array should use dtype of np.object_. For np.bytes_,
-    numpy will remove trailing zeros at the end of byte sequence and because
-    of this it should be avoided.
-
-    Args:
-        input_tensor: The bytes tensor to serialize.
-
-    Returns:
-    serialized array as bytes buffer.
-
-    Raises:
-        UnicodeEncodeErrors: raised when try to cast to string of non-bytes items fails
-    """
-    if tensor.size == 0:
-        return b""
-
-    # If the input is a tensor of string/bytes objects, then must flatten those
-    # into a 1-dimensional array containing the 4-byte byte size followed by the
-    # actual element bytes. All elements are concatenated together in "C" order.
-    assert (tensor.dtype == np.object_) or (tensor.dtype.type == np.bytes_)
-    flattened_ls = []
-    total_len = 0
-    for obj in np.nditer(tensor, flags=["refs_ok"], order="C"):
-        # If directly passing bytes to BYTES type,
-        # don't convert it to str as Python will encode the
-        # bytes which may distort the meaning
-        if tensor.dtype == np.object_ and type(obj.item()) != bytes:
-            s = str(obj.item()).encode("utf-8")
-        else:
-            s = obj.item()
-        item_len = len(s)
-        flattened_ls.append(struct.pack("<I", item_len))
-        flattened_ls.append(s)
-        total_len += struct.calcsize("<I") + item_len
-    flattened_ls.insert(0, struct.pack("<I", total_len))
-    flattened = b"".join(flattened_ls)
-    return flattened
+class _RequestsServerState(enum.Enum):
+    STOPPED = enum.auto()
+    STARTING = enum.auto()
+    STARTED = enum.auto()
+    STOPPING = enum.auto()
 
 
-# copy from
-# https://github.com/triton-inference-server/python_backend/blob/main/src/resources/triton_python_backend_utils.py
-def _deserialize_bytes_tensor(encoded_tensor, dtype, order: Literal["C", "F"] = "C") -> np.ndarray:
-    """Deserializes an encoded bytes tensor into an numpy array of dtype of python objects.
-
-    Args:
-        encoded_tensor : The encoded bytes tensor where each element has its length in
-        first 4 bytes followed by the content
-        dtype: The dtype of the numpy array to deserialize to.
-        order: The order of the numpy array to deserialize to.
-
-    Returns:
-    The 1-D numpy array of type object containing the deserialized bytes in 'C' order.
-    """
-    strs = []
-    offset = 0
-    val_buf = encoded_tensor
-    val_len = struct.unpack_from("<I", val_buf, offset)[0] + 4
-    offset += 4
-    while offset < val_len:
-        item_length = struct.unpack_from("<I", val_buf, offset)[0]
-        offset += 4
-        item = struct.unpack_from(f"<{item_length}s", val_buf, offset)[0]
-        offset += item_length
-        strs.append(item)
-    return np.array(strs, dtype=dtype, order=order)
+def _set_current_task_name(name: str):
+    current_task = asyncio.current_task()
+    if current_task is not None:
+        current_task.set_name(name)
 
 
-_MAX_DTYPE_DESCR = 16  # up to 16 chars in dtype descr; |S2147483647 (2^31-1) with margin
-_PARTIAL_HEADER_FORMAT = f"<{_MAX_DTYPE_DESCR}scH"
+_RequestScope = typing.Dict[str, typing.Any]
+_HandleRequestsCoro = typing.Callable[[_RequestScope, bytes, zmq.asyncio.Socket], typing.Awaitable[typing.Any]]
+HandleResponsesCoro = typing.Callable[[_RequestScope, asyncio.Queue], typing.Awaitable[typing.Any]]
 
 
-def _pack_header(shape: Tuple[int, ...], dtype: np.dtype, order: Literal["C", "F"] = "C") -> bytes:
-    header_format = _PARTIAL_HEADER_FORMAT + "Q" * len(shape)
-    dtype_descr = np.lib.format.dtype_to_descr(dtype)
-    assert (
-        len(dtype_descr) <= _MAX_DTYPE_DESCR
-    ), f"dtype descr is too long; dtype_descr={dtype_descr} max={_MAX_DTYPE_DESCR}"
-    return struct.pack(header_format, dtype_descr.encode("utf-8"), order.encode("ascii"), len(shape), *shape)
+class RequestsServer:
+    """Class for serving available inference requests and passing inference responses."""
 
-
-def _unpack_header(header: bytes) -> Tuple[Tuple[int, ...], np.dtype, Literal["C", "F"]]:
-    shape_offset = struct.calcsize(_PARTIAL_HEADER_FORMAT)
-    dtype_descr, order, ndim = struct.unpack_from(_PARTIAL_HEADER_FORMAT, header, offset=0)
-    shape = struct.unpack_from("Q" * ndim, header, offset=shape_offset)
-    dtype = np.lib.format.descr_to_dtype(dtype_descr.decode("utf-8").rstrip("\x00"))
-    order = order.decode("ascii")
-    return shape, dtype, order
-
-
-def serialize_numpy_with_struct_header(tensor: np.ndarray) -> List[Union[bytes, memoryview]]:
-    """Serialize numpy array to list of bytes and memoryviews.
-
-    Args:
-        tensor: numpy array to serialize
-
-    Returns:
-        List of data frames in form of bytes and memoryviews
-    """
-    if tensor.dtype.hasobject:
-        data = _serialize_byte_tensor(tensor.ravel())
-        order = "C"  # as _serialize_byte_tensor returns C-ordered array
-    else:
-        if not tensor.data.contiguous:
-            tensor = np.ascontiguousarray(tensor)
-        data = tensor.data
-        order = "C" if tensor.flags.c_contiguous else "F"
-
-    header = _pack_header(tensor.shape, tensor.dtype, order)
-    frames = [header, data]
-    return frames
-
-
-def deserialize_numpy_with_struct_header(frames: List[Union[bytes, memoryview]]) -> np.ndarray:
-    """Deserialize numpy array from list of bytes and memoryviews.
-
-    Args:
-        frames: List of data frames in form of bytes and memoryviews
-
-    Returns:
-        numpy array
-    """
-    header, data = frames
-    shape, dtype, order = _unpack_header(header)
-    if dtype.hasobject:
-        tensor = _deserialize_bytes_tensor(data, dtype).reshape(shape)
-    else:
-        tensor = np.ndarray(shape, dtype=dtype, buffer=data, order=order)
-    return tensor
-
-
-def calc_serialized_size_of_numpy_with_struct_header(tensor: np.ndarray) -> List[int]:
-    """Calculate size of serialized numpy array.
-
-    Args:
-        tensor: numpy array to serialize
-
-    Returns:
-        List of sizes of data frames
-    """
-    header_size = struct.calcsize(_PARTIAL_HEADER_FORMAT) + struct.calcsize("Q") * len(tensor.shape)
-    if tensor.dtype.hasobject:
-        items_sizes = []
-        order = "C" if tensor.flags.c_contiguous else "F"
-        for obj in np.nditer(tensor, flags=["refs_ok"], order=order):
-            if tensor.dtype == np.object_ and type(obj.item()) != bytes:
-                s = str(obj.item()).encode("utf-8")
-            else:
-                s = obj.item()
-            items_sizes.append(len(s))
-
-        # total_size + for size of each item + each item
-        data_size = struct.calcsize("<I") + struct.calcsize("<I") * len(items_sizes) + sum(items_sizes)
-    else:
-        data_size = tensor.nbytes
-
-    return [header_size, data_size]
-
-
-@dataclasses.dataclass
-class MetaRequestResponse:
-    """Data class for storing input/output data and parameters."""
-
-    idx: int
-    data: Optional[Dict[str, str]] = None
-    parameters: Optional[Dict[str, Union[str, int, bool]]] = None
-    eos: Optional[bool] = None
-
-
-@dataclasses.dataclass
-class InferenceHandlerRequests:
-    """Object transferred from proxy backend to callback handler containing input data."""
-
-    requests: List[MetaRequestResponse]
-
-    @classmethod
-    def from_bytes(cls, content: bytes) -> "InferenceHandlerRequests":
-        """Reconstruct InferenceHandlerRequests object from bytes.
+    def __init__(self, url: str, handle_responses_fn: HandleResponsesCoro):
+        """Initialize RequestsServer.
 
         Args:
-            content: bytes to parse
+            url: url to bind socket
+            handle_responses_fn: couroutine handling responses from InferenceHandler
         """
-        requests = json.loads(content)
-        return cls(
-            requests=[
-                MetaRequestResponse(
-                    idx=request.get("idx"),
-                    data=request.get("data", {}),
-                    parameters=request.get("parameters"),
-                )
-                for request in requests["requests"]
-            ]
-        )
+        self._url = url
+        self._handle_responses_fn = handle_responses_fn
+        self._state = _RequestsServerState.STOPPED
+        self._state_condition = threading.Condition()
+        self._shutdown_event = asyncio.Event()  # TODO: is it still required having condition?
+        self._server_loop = None
 
-    def as_bytes(self) -> bytes:
-        """Serializes InferenceHandlerRequests object to bytes."""
-        requests = {
-            "requests": [
-                {
-                    "idx": request.idx,
-                    "data": request.data,
-                    "parameters": request.parameters,
-                }
-                for request in self.requests
-            ]
-        }
-        return json.dumps(requests).encode("utf-8")
+        # requests_id -> results asyncio.Queue map
+        self._responses_queues: typing.Dict[bytes, asyncio.Queue] = {}
+        self._handle_responses_tasks: typing.Dict[bytes, asyncio.Task] = {}
 
+    def run(self):
+        """Run RequestsServer.
 
-@dataclasses.dataclass
-class InferenceHandlerResponses:
-    """Object transferred from callback handler containing output data."""
+        It stops when handle_messages coroutine finishes.
 
-    responses: Optional[List[MetaRequestResponse]] = None
-    error: Optional[str] = None
-
-    @classmethod
-    def from_bytes(cls, content: bytes) -> "InferenceHandlerResponses":
-        """Reconstruct InferenceHandlerResponses object from bytes.
-
-        Args:
-            content: bytes to parse
+        Raises:
+            RuntimeError: if RequestsServer is already running
         """
-        responses = json.loads(content)
-        return cls(
-            responses=[
-                MetaRequestResponse(idx=response.get("idx"), data=response.get("data", {}), eos=response.get("eos"))
-                for response in responses.get("responses", [])
-            ],
-            error=responses.get("error"),
-        )
+        with self._state_condition:
+            if self._state != _RequestsServerState.STOPPED:
+                raise RuntimeError(f"Cannot run {type(self).__name__} as it is already running")
 
-    def as_bytes(self) -> bytes:
-        """Serializes InferenceHandlerResponses object to bytes."""
-        result = {"error": self.error}
-        if self.responses:
-            result["responses"] = [
-                {"idx": response.idx, "data": response.data, "eos": response.eos} for response in self.responses
-            ]
-        return json.dumps(result).encode("utf-8")
+            self._state = _RequestsServerState.STARTING
+            self._state_condition.notify_all()
 
+        assert len(self._responses_queues) == 0
+        assert len(self._handle_responses_tasks) == 0
 
-@dataclasses.dataclass
-class BlockDescriptor:
-    """Descriptor of block in shared memory."""
-
-    shm_name: str
-    offset: int
-    size: Optional[int] = None
-
-    def __post_init__(self):
-        """Initialize other attributes."""
-        self.id = f"{self.shm_name}:{self.offset}"
-
-    @classmethod
-    def from_id(cls, tensor_id: str):
-        """Create BlockDescriptor from dict."""
-        shm_name, offset = tensor_id.split(":")
-        return cls(shm_name, int(offset))
-
-
-class _SharedMemorySegment:
-    def __init__(self, size):
-        self.shared_memory = multiprocessing.shared_memory.SharedMemory(create=True, size=size)
-        multiprocessing.util.debug(f"Created {self.shared_memory.name} of size {self.shared_memory.size}")
-        self.used_blocks: List[BlockDescriptor] = []
-        self.used_blocks_lock = threading.RLock()
-        self.free_blocks = [BlockDescriptor(self.shared_memory.name, offset=0, size=size)]
-        self.max_free_block_size = size
-
-    def _update_free_blocks(self):
-        total_size = self.shared_memory.size
-        free_blocks = []
-        offset = 0
-
-        with self.used_blocks_lock:
-            # find holes between used blocks
-            for used_block in self.used_blocks:
-                if used_block.offset > offset:
-                    free_blocks.append(
-                        BlockDescriptor(self.shared_memory.name, offset=offset, size=used_block.offset - offset)
-                    )
-                offset = used_block.offset + used_block.size
-        # if tail is free
-        if offset < total_size:
-            free_blocks.append(BlockDescriptor(self.shared_memory.name, offset=offset, size=total_size - offset))
-
-        self.free_blocks = free_blocks
-        self.max_free_block_size = max(block.size for block in self.free_blocks) if self.free_blocks else 0
-
-    def __contains__(self, block_id: str) -> bool:
-        with self.used_blocks_lock:
-            return any(block_id == block.id for block in self.used_blocks)  # pytype: disable=attribute-error
-
-    def __getitem__(self, block_id: str) -> BlockDescriptor:
-        with self.used_blocks_lock:
-            for block in self.used_blocks:
-                if block.id == block_id:  # pytype: disable=attribute-error
-                    return block
-        raise KeyError(f"Block with id {block_id} not found in segment {self.shared_memory.name}")
-
-    def allocate(self, offset, byte_size):
-        block = BlockDescriptor(self.shared_memory.name, offset=offset, size=byte_size)
-        with self.used_blocks_lock:
-            self.used_blocks.append(block)
-            self.used_blocks.sort(key=lambda block: block.offset)
-            self._update_free_blocks()
-        return block
-
-    def release(self, block: BlockDescriptor):
-        with self.used_blocks_lock:
-            self.used_blocks.remove(block)
-            self._update_free_blocks()
-
-
-class _DataBlocksServer:
-    _instance = None
-    _cnt = 0
-    _minimal_segment_size = 4096  # 4KB
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
-    def __init__(self):
-        # WAR: for some reason, the __init__ is called on each create of proxy object
-        if self._cnt == 1:
-            return
-        self._cnt += 1
-        self._id = uuid.uuid4()  # to verify that it is singleton across processes
-        self._segments = []
-        self._segments_lock = threading.RLock()
-        atexit.register(self.close)
-
-    def get_free_blocks(self, bytes_sizes: Sequence[int]) -> Sequence[str]:
-        tensors_ids = []
-        with self._segments_lock:
-            for byte_size in bytes_sizes:
-                for segment in self._segments:
-                    if segment.max_free_block_size >= byte_size:
-                        for free_block in segment.free_blocks:
-                            if free_block.size >= byte_size:
-                                block = self._allocate_block(segment, free_block.offset, byte_size)
-                                tensors_ids.append(block.id)  # pytype: disable=attribute-error
-                                break
-                    else:
-                        continue  # If no suitable block was found, try the next segment
-                    break  # If a suitable block was found, don't try any more segments
-                else:  # If no suitable block was found in any segment
-                    new_segment_size = int(
-                        max(self._minimal_segment_size, math.pow(2, math.ceil(math.log2(byte_size))))
-                    )
-                    block = self._allocate_block(
-                        self._create_new_segment(new_segment_size), offset=0, byte_size=byte_size
-                    )
-                    tensors_ids.append(block.id)  # pytype: disable=attribute-error
-        return tensors_ids
-
-    def release_block(self, block_id: str):
-        with self._segments_lock:
-            for segment in self._segments:
-                try:
-                    block = segment[block_id]
-                    segment.release(block)
-                    return
-                except KeyError:
-                    pass
-        raise KeyError(f"Block with id {block_id} not found in server")
-
-    def _allocate_block(self, segment: _SharedMemorySegment, offset: int, byte_size: int) -> BlockDescriptor:
-        return segment.allocate(offset, byte_size)
-
-    def _create_new_segment(self, segment_size):
-        segment = _SharedMemorySegment(segment_size)
-        self._segments.append(segment)
-        return segment
-
-    def _get_debug_status(self):
-        return {
-            "server_id": str(self._id),
-            "host_pid": multiprocessing.current_process().pid,
-            "segments": [
-                {
-                    "shared_memory": segment.shared_memory.name,
-                    "used_blocks": [str(block) for block in segment.used_blocks],
-                }
-                for segment in self._segments
-            ],
-        }
-
-    def close(self):
-        multiprocessing.util.debug(f"Closing server {self._id}")
-        with self._segments_lock:
-            while self._segments:
-                segment = self._segments.pop()
-                multiprocessing.util.debug(f"Closing and delete segment {segment.shared_memory.name}")
-                segment.shared_memory.close()
-                segment.shared_memory.unlink()
-
-
-class BlocksStoreManager(multiprocessing.managers.BaseManager):
-    """Remote block store for storing and retrieving numpy arrays in/from shared memory."""
-
-    @classmethod
-    def _run_server(cls, registry, address, authkey, serializer, writer, initializer=None, initargs=()):
-        PR_SET_PDEATHSIG = 1  # noqa
-        libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
-        libc.prctl(PR_SET_PDEATHSIG, signal.SIGTERM)  # terminate process when parent **thread** dies
-        super()._run_server(
-            registry, address, authkey, serializer, writer, initializer, initargs
-        )  # pytype: disable=attribute-error
-
-
-class _DataBlocksServerProxy(multiprocessing.managers.BaseProxy):
-    def release_block(self, /, *args, **kwargs):
-        return self._callmethod("release_block", args, kwargs)
-
-    def get_free_blocks(self, /, *args, **kwargs):
-        return self._callmethod("get_free_blocks", args, kwargs)
-
-    def _get_debug_status(self, /, *args, **kwargs):
-        return self._callmethod("_get_debug_status", args, kwargs)
-
-    def close(self, /, *args, **kwargs):
-        return self._callmethod("close", args, kwargs)
-
-
-BlocksStoreManager.register("blocks", _DataBlocksServer, proxytype=_DataBlocksServerProxy)
-
-
-class _FileLock:
-    _locks = {}
-
-    def __new__(cls, file_path):
-        if file_path not in cls._locks:
-            cls._locks[file_path] = super().__new__(cls)
-        return cls._locks[file_path]
-
-    def __init__(self, file_path):
-        if hasattr(self, "_file_path"):
-            return
-        self._file_path = pathlib.Path(file_path)
-        self._file_lock = None
-        self._lock = threading.RLock()
-        atexit.register(self._clean)
-
-    def __enter__(self):
-        self._file_lock = self._file_path.open("a")
-        fcntl.flock(self._file_lock.fileno(), fcntl.LOCK_EX)
-        self._lock.acquire()
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        fcntl.flock(self._file_lock.fileno(), fcntl.LOCK_UN)
-        self._lock.release()
-
-    def _clean(self):
-        if self._file_lock is not None:
-            self._file_lock.close()
-        try:
-            self._file_path.unlink(missing_ok=True)
-        except OSError as e:
-            LOGGER.warning(f"Could not remove lock file {self._file_path}; {e}")
-
-
-class _Popen(multiprocessing.popen_spawn_posix.Popen):
-    def _launch(self, process_obj):
-        # Modified version of multiprocessing.popen_spawn_posix.Popen._launch
-        import io
-        import os
-        from multiprocessing import context, resource_tracker, spawn, util
-
-        tracker_fd = resource_tracker.getfd()
-        self._fds.append(tracker_fd)  # pytype: disable=attribute-error
-
-        # get prep_data + remove init_main_from* as they are not required for TensorStore process
-        prep_data = spawn.get_preparation_data(process_obj._name)
-        prep_data.pop("init_main_from_module", None)
-        prep_data.pop("init_main_from_path", None)
-
-        fp = io.BytesIO()
-        context.set_spawning_popen(self)
-        try:
-            context.reduction.dump(prep_data, fp)  # pytype: disable=module-attr
-            context.reduction.dump(process_obj, fp)  # pytype: disable=module-attr
-        finally:
-            context.set_spawning_popen(None)
-
-        parent_r = child_w = child_r = parent_w = None
-        try:
-            parent_r, child_w = os.pipe()
-            child_r, parent_w = os.pipe()
-            cmd = spawn.get_command_line(tracker_fd=tracker_fd, pipe_handle=child_r)
-            self._fds.extend([child_r, child_w])  # pytype: disable=attribute-error
-            self.pid = util.spawnv_passfds(
-                spawn.get_executable(), cmd, self._fds  # pytype: disable=attribute-error,wrong-arg-types
-            )
-            self.sentinel = parent_r
-            with open(parent_w, "wb", closefd=False) as f:
-                f.write(fp.getbuffer())
-        finally:
-            fds_to_close = []
-            for fd in (parent_r, parent_w):
-                if fd is not None:
-                    fds_to_close.append(fd)
-            self.finalizer = util.Finalize(self, util.close_fds, fds_to_close)  # pytype: disable=module-attr
-
-            for fd in (child_r, child_w):
-                if fd is not None:
-                    os.close(fd)
-
-
-class _SpawnProcess(multiprocessing.process.BaseProcess):
-    _start_method = "spawn"
-
-    @staticmethod
-    def _Popen(process_obj):  # noqa N802
-        return _Popen(process_obj)
-
-
-class _SpawnContext(multiprocessing.context.BaseContext):
-    _name = "spawn"
-    Process = _SpawnProcess
-
-
-class TensorStore:
-    """Tensor store for storing and retrieving numpy arrays in/from shared memory."""
-
-    _SOCKET_EXISTANCE_CHECK_INTERVAL_S = 0.1
-    _instances = {}
-
-    def __new__(cls, *args, **kwargs):
-        """Create TensorStore object. If object with given address already exists, return it."""
-        if args:
-            address = args[0]
-        elif "address" in kwargs:
-            address = kwargs["address"]
-        else:
-            raise TypeError("TensorStore() missing 1 required positional argument: 'address'")
-
-        address = address.as_posix() if isinstance(address, pathlib.Path) else address
-
-        if address not in cls._instances:
-            cls._instances[address] = super().__new__(cls)
-
-        return cls._instances[address]
-
-    def __init__(self, address: Union[str, pathlib.Path], auth_key: Optional[bytes] = None):
-        """Initialize TensorStore object.
-
-        Args:
-            address: address of data store
-            auth_key: authentication key required to setup connection. If not provided, current process authkey will be used
-        """
-        if not hasattr(self, "_remote_blocks_store_manager"):
-            address = address.as_posix() if isinstance(address, pathlib.Path) else address
-            self._remote_blocks_store_manager = BlocksStoreManager(address, authkey=auth_key, ctx=_SpawnContext())
-            self._remote_blocks_store = None
-            self._manager_start_stop_filelock = _FileLock(f"{address}.lock")
-
-            # container for keeping map between tensor_id and numpy array weak ref
-            self._handled_blocks: Dict[str, weakref.ReferenceType] = {}
-            self._handled_blocks_lock = threading.RLock()
-
-            self._shm_segments: Dict[str, multiprocessing.shared_memory.SharedMemory] = {}
-            self._shm_segments_lock = threading.RLock()
-
-            self.serialize = serialize_numpy_with_struct_header
-            self.deserialize = deserialize_numpy_with_struct_header
-            self._calc_serialized_tensor_size = calc_serialized_size_of_numpy_with_struct_header
+        asyncio.run(self.handle_messages())
 
     @property
-    def address(self) -> str:
-        """Return address of remote block store."""
-        return self._remote_blocks_store_manager.address
-
-    def start(self):
-        """Start remote block store."""
-        with self._manager_start_stop_filelock:
-            if self._remote_blocks_store is not None:
-                raise RuntimeError("Remote block store is already started/connected")
-
-            self._remote_blocks_store_manager.start()
-            self._remote_blocks_store = self._remote_blocks_store_manager.blocks()  # pytype: disable=attribute-error
-
-            address = pathlib.Path(self._remote_blocks_store_manager.address)
-            self._wait_for_address(address)
-            LOGGER.debug(
-                f"Started remote block store at {address} (pid={self._remote_blocks_store_manager._process.pid})"  # pytype: disable=attribute-error
-            )
-
-    def connect(self, timeout_s: Optional[float] = None):
-        """Connect to remote block store."""
-        if self._remote_blocks_store is None:
-            address = pathlib.Path(self._remote_blocks_store_manager.address)
-
-            self._wait_for_address(address, timeout_s)
-            self._remote_blocks_store_manager.connect()
-            self._remote_blocks_store = self._remote_blocks_store_manager.blocks()  # pytype: disable=attribute-error
-            LOGGER.debug(f"Connected to remote block store at {address})")
-        else:
-            LOGGER.debug(f"Already connectd to remote block store at {self.address}")
-
-    def _wait_for_address(self, address, timeout_s: Optional[float] = None):
-        should_stop_at = time.time() + timeout_s if timeout_s is not None else None
-        if timeout_s is not None and self._SOCKET_EXISTANCE_CHECK_INTERVAL_S > timeout_s:
-            socket_existance_check_interval = timeout_s
-        else:
-            socket_existance_check_interval = self._SOCKET_EXISTANCE_CHECK_INTERVAL_S
-
-        while not address.exists():
-            if should_stop_at is not None and time.time() >= should_stop_at:
-                raise TimeoutError(f"Timeout while waiting for {address} to be created")
-            time.sleep(socket_existance_check_interval)
-
-    def _calc_serialized_size(self, tensor: np.ndarray) -> int:
-        # frames payload sum + total size + frames sizes
-        # assume 2 frames: header with tensor description + data
-        return sum(self._calc_serialized_tensor_size(tensor)) + struct.calcsize("<I") + 2 * struct.calcsize("<I")
-
-    def put(self, tensors: Sequence[np.ndarray]) -> Sequence[str]:
-        """Append tensor to shared memory buffer.
-
-        Args:
-            tensors: numpy arrays to store
+    def server_loop(self) -> typing.Optional[asyncio.AbstractEventLoop]:
+        """Get asyncio loop for RequestsServer.
 
         Returns:
-            List of ids of stored tensors
+            asyncio.AbstractEventLoop: asyncio loop for RequestsServer or None if server is not started yet
         """
-        byte_size_of_frames_containers = [self._calc_serialized_size(tensor) for tensor in tensors]
-        tensors_ids = self._remote_blocks_store.get_free_blocks(byte_size_of_frames_containers)
-        blocks = [BlockDescriptor.from_id(tensor_id) for tensor_id in tensors_ids]
+        return self._server_loop
 
-        for tensor, block in zip(tensors, blocks):
-            with self._shm_segments_lock:
-                shm = self._shm_segments.get(block.shm_name)
-                if shm is None:
-                    shm = multiprocessing.shared_memory.SharedMemory(block.shm_name, create=False)
-                    self._shm_segments[block.shm_name] = shm
+    def wait_till_running(self):
+        """Wait till RequestsServer is running.
 
-            frames = self.serialize(tensor)
-            self._copy_frames(frames, shm, block.offset)
+        Raises:
+            RuntimeError: if RequestsServer is shutting down or not launched yet
+        """
+        with self._state_condition:
+            if self._state == _RequestsServerState.STARTING:
+                self._state_condition.wait_for(
+                    lambda: self._state == _RequestsServerState.STARTED, timeout=_STARTUP_TIMEOUT_S
+                )
+            elif self._state == _RequestsServerState.STOPPED:
+                raise RuntimeError("Cannot push requests before RequestsServer is started")
+            elif self._state == _RequestsServerState.STOPPING:
+                raise RuntimeError(f"Cannot push requests while {type(self).__name__} is shutting down")
 
-        return tensors_ids
-
-    def get(self, tensor_id: str) -> np.ndarray:
-        """Get numpy array from tensor store.
+    def push(self, requests_id: bytes, requests_payload: bytes):
+        """Push requests to InferenceHandler.
 
         Args:
-            tensor_id: id of of tenosr to get
+            requests_id: id of requests
+            requests_payload: payload of requests
 
         Returns:
-            numpy array
+            asyncio.Task: task handling responses from InferenceHandler
+
+        Raises:
+            RuntimeError: if RequestsServer is shutting down or not launched yet
         """
-        tensor = None
-        # try to handle already handled tensor from weakref
-        with self._handled_blocks_lock:
-            tensor_ref = self._handled_blocks.get(tensor_id)
-            if tensor_ref is not None:
-                tensor = tensor_ref()
+        self.wait_till_running()
+        return asyncio.run_coroutine_threadsafe(self.send_requests(requests_id, requests_payload), self.server_loop)
 
-        if tensor is None:  # if tensor was not handled yet or weakref is already empty
-            block = BlockDescriptor.from_id(tensor_id)
+    async def handle_messages(self):
+        """Coroutine for handling messages from InferenceHandler."""
+        self._server_loop = asyncio.get_running_loop()
+        try:
+            SERVER_LOGGER.debug(f"Binding socket to url='{self._url}'")
+            self._zmq_context = zmq.asyncio.Context()
+            self._socket = self._zmq_context.socket(zmq.DEALER)
+            self._socket.bind(self._url)
+        except (TypeError, zmq.error.ZMQError) as e:
+            raise ValueError(
+                f"Error occurred during binding socket to url='{self._url}' (e: {e})." "RequestsServer will be closed."
+            ) from e
 
-            # check if shm segment is already opened
-            with self._shm_segments_lock:
-                shm = self._shm_segments.get(block.shm_name)
+        _set_current_task_name("handle_messages")
 
-            # if not open it and put into cache
-            if shm is None:
-                shm = multiprocessing.shared_memory.SharedMemory(block.shm_name, create=False)
-                with self._shm_segments_lock:
-                    shm = self._shm_segments.setdefault(block.shm_name, shm)  # in meantime other thread could create it
+        with self._state_condition:
+            if self._state != _RequestsServerState.STARTING:
+                self._state = _RequestsServerState.STOPPED
+                self._state_condition.notify_all()
+                raise RuntimeError(f"Cannot start {type(self).__name__} as it is not in STARTING state")
 
-            frames = self._handle_frames(shm, block.offset)
-            tensor = self.deserialize(frames)
+            self._state = _RequestsServerState.STARTED
+            self._state_condition.notify_all()
 
-            # store tensor in weakref to be able to release shared memory when tensor will be garbage collected
-            with self._handled_blocks_lock:
-                tensor_ref = self._handled_blocks.setdefault(tensor_id, weakref.ref(tensor))
-                tensor = tensor_ref()
-
-        return tensor  # pytype: disable=bad-return-type
-
-    def release_block(self, tensor_id: str):
-        """Release shared memory block.
-
-        Args:
-            tensor_id: id of tensor to release
-        """
-        LOGGER.debug(f"Releasing shared memory block for tensor {tensor_id}")
-
-        tensor_ref = None
-        with self._handled_blocks_lock:
-            tensor_ref = self._handled_blocks.pop(tensor_id, None)
+        def _all_responses_processed():
+            return not any([self._handle_responses_tasks, self._responses_queues])
 
         try:
-            if tensor_ref is not None:
-                self._remote_blocks_store.release_block(tensor_id)
-        except OSError:  # thrown when remote process is already closed
-            LOGGER.warning(
-                f"Failed to release block {tensor_id} on remote process at {self.address}. Probably remote process is already closed"
+            flag_check_interval_s = 1.0
+            # have to receive mssages untill all requestss to be processed, despite shutdown event is set
+            while not self._shutdown_event.is_set() or not _all_responses_processed():
+                requests_id = b"<unknown>"
+                try:
+                    requests_id, flags, responses_payload = await asyncio.wait_for(
+                        self._socket.recv_multipart(), flag_check_interval_s
+                    )
+                    SERVER_LOGGER.debug(f"Received response {requests_id.hex()} {flags.hex()} {responses_payload}")
+                    flags = int.from_bytes(flags, byteorder="big")
+                    responses_queue = self._responses_queues[requests_id]
+                    responses_queue.put_nowait((flags, responses_payload))  # queue have no max_size
+                except asyncio.TimeoutError:
+                    continue
+                except KeyError:
+                    SERVER_LOGGER.warning(f"Received response for unknown requests {requests_id.hex()}. Ignoring it.")
+                except asyncio.CancelledError:
+                    SERVER_LOGGER.info("Received CancelledError")
+                    self._shutdown_event.set()
+        finally:
+            # Received all responses, close socket
+            SERVER_LOGGER.debug("Closing socket")
+            try:
+                if self._socket is not None:
+                    self._socket.close(linger=0)
+                    self._socket = None
+            except zmq.error.ZMQError as e:
+                SERVER_LOGGER.error(f"Error occurred during closing socket (e: {e}).")
+
+            try:
+                if self._zmq_context is not None:
+                    self._zmq_context.term()
+                    self._zmq_context = None
+            except zmq.error.ZMQError as e:
+                SERVER_LOGGER.error(f"Error occurred during closing zmq context (e: {e}).")
+
+            self._server_loop = None
+
+            with self._state_condition:
+                self._state = _RequestsServerState.STOPPED
+                self._state_condition.notify_all()
+
+            SERVER_LOGGER.debug("Socket for handle_messages task closed")
+            self._shutdown_event.clear()
+            SERVER_LOGGER.debug(f"Leaving handle_messages task from {type(self).__name__}")
+
+    def shutdown(self):
+        """Close RequestsServer.
+
+        Don't wait for handle_messages coroutine to finish.
+        """
+        SERVER_LOGGER.debug("Closing RequestsServer")
+        with self._state_condition:
+            self._state = _RequestsServerState.STOPPING
+            self._state_condition.notify_all()
+        self._shutdown_event.set()
+
+    async def send_requests(self, requests_id: bytes, requests_payload: bytes) -> asyncio.Task:
+        """Send requests to InferenceHandler.
+
+        Args:
+            requests_id: id of requests
+            requests_payload: payload of requests
+
+        Returns:
+            asyncio.Task: task handling responses from InferenceHandler
+
+        Raises:
+            RuntimeError: if RequestsServer is shutting down or requests_id is already pending
+        """
+        if self._shutdown_event.is_set():
+            SERVER_LOGGER.debug(f"Cannot send requests while {type(self).__name__} is {self._state.name}")
+            raise RuntimeError(f"Cannot send requests while {type(self).__name__} is {self._state.name}")
+
+        if requests_id in self._responses_queues or requests_id in self._handle_responses_tasks:
+            SERVER_LOGGER.debug(f"Cannot send requests with id {requests_id.hex()} as such id is already pending")
+            raise RuntimeError(f"Cannot send requests with id {requests_id.hex()} as such id is already pending")
+
+        _set_current_task_name(f"send_requests-{requests_id.hex()}")
+
+        self._responses_queues[requests_id] = asyncio.Queue()
+        scope = {"requests_id": requests_id}
+        handle_responses_task = self._server_loop.create_task(
+            self._handle_responses(scope, self._responses_queues[requests_id]),
+            name=f"handle_responses-{requests_id.hex()}",
+        )
+        self._handle_responses_tasks[requests_id] = handle_responses_task
+
+        # FIXME: check if can not copy buffers; in case copy=False send_multipart returns MessageTracker
+        #       https://pyzmq.readthedocs.io/en/latest/api/zmq.html#zmq.Socket.send_multipart
+        #       consider send_pyobject|send_serialized (but it is not multipart)
+
+        # sending in same loop, thus thread as handle_messages
+        # send_multipart doesn't return anything, as it copies requests_payload
+        await self._socket.send_multipart([requests_id, requests_payload])
+        SERVER_LOGGER.debug(f"Sent requests {requests_id.hex()}")
+
+        return handle_responses_task
+
+    async def _handle_responses(self, scope, responses_queue: asyncio.Queue):
+        """Handle responses from InferenceHandler.
+
+        Args:
+            scope: scope for handling responses
+            responses_queue: queue with responses payload from InferenceHandler
+        """
+        requests_id = scope["requests_id"]
+        SERVER_LOGGER.debug(f"Started handling responses {requests_id.hex()}")
+        try:
+            return await self._handle_responses_fn(scope, responses_queue)
+        finally:
+            self._responses_queues.pop(requests_id)
+            self._handle_responses_tasks.pop(requests_id)
+            SERVER_LOGGER.debug(f"Finished handling responses {requests_id.hex()}")
+
+
+class RequestsServerClient:
+    """RequestsServer client for handling requests from RequestsServer and sending back responses."""
+
+    def __init__(self, url: str, handle_requests_fn: _HandleRequestsCoro, name: typing.Optional[str] = None):
+        """Initialize RequestsServerClient.
+
+        Args:
+            url: url to connect socket
+            handle_requests_fn: couroutine handling requests from InferenceHandler
+            name: name of RequestsServerClient
+        """
+        self._shutdown_event = asyncio.Event()
+        self._url = url
+        self._handle_requests_fn = handle_requests_fn
+        self._handle_requests_tasks: typing.Dict[bytes, asyncio.Task] = {}
+        self._handle_requests_tasks_condition = asyncio.Condition()
+        self._name = name or f"requests_server_client-{uuid.uuid4().hex[-4:]}"
+        self._loop = None
+
+    def run(self):
+        """Run RequestsServerClient.
+
+        It stops when handle_requests coroutine finishes.
+        """
+        asyncio.run(self.handle_requests())
+
+    def shutdown(self) -> None:
+        """Close RequestsServerClient.
+
+        Don't wait for handle_requests coroutine to finish.
+        """
+        CLIENT_LOGGER.debug(f"Closing {type(self).__name__} {self._name}")
+        self._shutdown_event.set()
+
+    async def handle_requests(self):
+        """Coroutine for handling requests from RequestsServer."""
+        name = self._name
+        _set_current_task_name(name)
+
+        zmq_context = None
+        socket = None
+        self._loop = asyncio.get_running_loop()
+        try:
+            CLIENT_LOGGER.debug(f"Connecting {name} to server listening on {self._url}")
+            zmq_context = zmq.asyncio.Context()
+            socket = zmq_context.socket(zmq.DEALER)
+            socket.connect(self._url)
+
+            send = functools.partial(self._send, socket)
+
+            flag_check_interval_s = 1.0
+            while True:
+                try:
+                    requests_id, requests_payloads = await asyncio.wait_for(
+                        socket.recv_multipart(), flag_check_interval_s
+                    )
+                    scope = {"requests_id": requests_id}
+                    CLIENT_LOGGER.debug(f"{requests_id.hex()} received requests")
+                    handle_requests_task = self._loop.create_task(self._handle_requests(scope, requests_payloads, send))
+                    self._handle_requests_tasks[requests_id] = handle_requests_task
+                    handle_requests_task.set_name(f"handle_requests-{requests_id.hex()}")
+                except asyncio.TimeoutError:
+                    if self._shutdown_event.is_set():
+                        break
+                    continue
+
+            CLIENT_LOGGER.debug("Waiting for handle_requests tasks to finish")
+            async with self._handle_requests_tasks_condition:
+                await self._handle_requests_tasks_condition.wait_for(lambda: len(self._handle_requests_tasks) == 0)
+            CLIENT_LOGGER.debug("All handle_requests tasks finished")
+
+        except zmq.error.ZMQError:
+            CLIENT_LOGGER.exception(
+                "Connection error occurred during reading requests. " f"{type(self).__name__} will be closed."
             )
+            self._shutdown_event.set()
+        except Exception:
+            CLIENT_LOGGER.exception(f"Internal {type(self).__name__}. " f"{type(self).__name__} will be closed.")
+            self._shutdown_event.set()
+        finally:
+            try:
+                socket_close_timeout_ms = 0  # immediate close (drop not sent messages)
+                if socket is not None:
+                    socket.close(linger=socket_close_timeout_ms)
+            except zmq.error.ZMQError as e:
+                CLIENT_LOGGER.error(f"Error occurred during closing socket (e: {e}).")
 
-    def _copy_frames(
-        self,
-        frames: List[Union[bytes, memoryview]],
-        shm: multiprocessing.shared_memory.SharedMemory,
-        offset: int,
-    ) -> int:
-        total_size = struct.calcsize("<I")  # start after total_size; max 4GB for all frames
-        for frame in frames:
-            if isinstance(frame, bytes):
-                frame = memoryview(frame)
+            try:
+                if zmq_context is not None:
+                    zmq_context.term()
+            except zmq.error.ZMQError as e:
+                CLIENT_LOGGER.error(f"Error occurred during closing zmq context (e: {e}).")
 
-            assert frame.contiguous, "Only contiguous arrays are supported"
-            struct.pack_into("<I", shm.buf, offset + total_size, frame.nbytes)  # pytype: disable=wrong-arg-types
-            total_size += struct.calcsize("<I")
-            shm.buf[offset + total_size : offset + total_size + frame.nbytes] = frame.cast("B")
+            CLIENT_LOGGER.debug(f"Socket for {name} closed")
+            self._shutdown_event.clear()
+            self._loop = None
+            CLIENT_LOGGER.debug(f"Leaving {name}")
 
-            total_size += frame.nbytes
+    @property
+    def name(self) -> str:
+        """Get name of RequestsServerClient.
 
-        struct.pack_into("<I", shm.buf, offset, total_size)  # pytype: disable=wrong-arg-types
-        return total_size
+        Returns:
+            name of RequestsServerClient
+        """
+        return self._name
 
-    def _handle_frames(self, shm: multiprocessing.shared_memory.SharedMemory, block_offset: int) -> List[memoryview]:
-        frames = []
-        (total_size,) = struct.unpack_from("<I", shm.buf, block_offset)  # pytype: disable=wrong-arg-types
-        offset = struct.calcsize("<I")
-        while offset < total_size:
-            (frame_size,) = struct.unpack_from("<I", shm.buf, block_offset + offset)  # pytype: disable=wrong-arg-types
-            offset += struct.calcsize("<I")
-            frame = shm.buf[block_offset + offset : block_offset + offset + frame_size]
-            offset += frame_size
-            frames.append(frame)
-        return frames
+    @property
+    def loop(self) -> asyncio.AbstractEventLoop:
+        """Get asyncio loop for RequestsServerClient.
 
-    def close(self):
-        """Free resources used by TensorStore object."""
-        from multiprocessing.resource_tracker import register, unregister
+        Returns:
+            asyncio.AbstractEventLoop: asyncio loop for RequestsServerClient
+        """
+        return self._loop
 
-        started_server = hasattr(self._remote_blocks_store_manager, "shutdown")
-        LOGGER.debug(f"TensorStore is being closed (started_server={started_server})")
+    async def _handle_requests(self, scope, requests_payload, send):
+        try:
+            await self._handle_requests_fn(scope, requests_payload, send)
+        # except PyTritonUnrecoverableError:
+        #     error = traceback.format_exc()
+        #     responses = InferenceHandlerResponses(error=error)
+        #     CLIENT_LOGGER.error(
+        #         "Unrecoverable error thrown during calling model callable. "
+        #         "Shutting down Triton Inference Server. "
+        #         f"{error}"
+        #     )
+        #     self.stopped = True
+        #     self._notify_proxy_backend_observers(InferenceHandlerEvent.UNRECOVERABLE_ERROR, error)
+        #     CLIENT_LOGGER.debug(f"Send response to proxy model for {model_name}.")
+        #     send(responses.as_bytes())
+        except Exception:
+            error = traceback.format_exc()
+            flags = PyTritonResponseFlags.ERROR | PyTritonResponseFlags.EOS
+            await send(scope, flags, error.encode())
+            CLIENT_LOGGER.error(f"Error occurred during handling requests {scope['requests_id'].hex()}\n{error}")
+        finally:
+            async with self._handle_requests_tasks_condition:
+                self._handle_requests_tasks.pop(scope["requests_id"], None)
+                self._handle_requests_tasks_condition.notify()
+            CLIENT_LOGGER.debug(f"Finished handling requests {scope['requests_id'].hex()}")
 
-        gc.collect()
-        with self._handled_blocks_lock:
-            tensors_ids = list(self._handled_blocks)
-            for tensor_id in tensors_ids:
-                self.release_block(tensor_id)
+    async def _send(self, socket, scope, flags, requests_payload):
+        """Send requests to RequestsServer.
 
-        with self._shm_segments_lock:
-            while self._shm_segments:
-                _, shm = self._shm_segments.popitem()
-                LOGGER.debug(f"Closing shared memory {shm.name}")
-                try:
-                    shm.close()
-                except Exception as e:
-                    LOGGER.warning(f"Failed to close shared memory {shm.name}: {e}")
-                finally:
-                    if not started_server:
-                        register(shm._name, "shared_memory")  # pytype: disable=attribute-error
-                        unregister(shm._name, "shared_memory")  # pytype: disable=attribute-error
-
-        if started_server:
-            if self._remote_blocks_store is not None:
-                LOGGER.debug(f"Releasing all resources on remote process at {self.address}")
-                try:
-                    self._remote_blocks_store.close()
-                except FileNotFoundError:  # thrown when remote process is already closed
-                    pass
-            self._remote_blocks_store = None
-            LOGGER.debug(f"Shutting down side process of data store at {self.address}")
-            self._remote_blocks_store_manager.shutdown()
-        LOGGER.debug(f"TensorStore at {self.address} closed")
+        Args:
+            socket: socket for sending requests
+            scope: scope for sending requests
+            flags: flags for sending requests
+            requests_payload: payload of requests
+        """
+        flags = flags.to_bytes(1, "big")
+        await socket.send_multipart([scope["requests_id"], flags, requests_payload])

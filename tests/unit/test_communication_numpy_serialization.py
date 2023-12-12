@@ -14,7 +14,7 @@
 import numpy as np
 import pytest
 
-from pytriton.proxy.communication import (
+from pytriton.proxy.data import (
     calc_serialized_size_of_numpy_with_struct_header,
     deserialize_numpy_with_struct_header,
     serialize_numpy_with_struct_header,

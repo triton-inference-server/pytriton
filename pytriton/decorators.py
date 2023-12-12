@@ -28,7 +28,7 @@ import wrapt
 from pytriton.constants import TRITON_CONTEXT_FIELD_NAME
 from pytriton.exceptions import PyTritonBadParameterError, PyTritonRuntimeError, PyTritonValidationError
 from pytriton.model_config.triton_model_config import TritonModelConfig
-from pytriton.proxy.communication import _serialize_byte_tensor
+from pytriton.proxy.data import _serialize_byte_tensor
 
 _WrappedWithWrapper = NamedTuple(
     "WrappedWithWrapper", [("wrapped", Optional[Callable]), ("wrapper", Optional[Callable])]
