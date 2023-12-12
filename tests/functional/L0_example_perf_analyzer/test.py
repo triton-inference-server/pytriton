@@ -14,6 +14,7 @@
 # limitations under the License.
 """Test of perf_analyzer example"""
 import argparse
+import contextlib
 import logging
 import re
 import signal
@@ -53,7 +54,7 @@ def verify_client_output(client_output):
 
 
 def main():
-    from pytriton.client import ModelClient
+    from pytriton.client.utils import create_client_from_url, wait_for_model_ready
 
     parser = argparse.ArgumentParser(description="short_description")
     parser.add_argument("--timeout-s", required=False, default=300, type=float, help="Timeout for test")
@@ -79,7 +80,10 @@ def main():
     client_cmd = ["bash", "examples/perf_analyzer/client.sh"]
 
     with ScriptThread(server_cmd, name="server") as server_thread:
-        ModelClient("localhost", "BART").wait_for_model(timeout_s=args.timeout_s)
+        url = "http://127.0.0.1:8000"
+        with contextlib.closing(create_client_from_url(url)) as client:
+            wait_for_model_ready(client, "BART", timeout_s=args.timeout_s)
+
         with ScriptThread(client_cmd, name="client") as client_thread:
             while server_thread.is_alive() and client_thread.is_alive() and elapsed_s < args.timeout_s:
                 client_thread.join(timeout=wait_time_s)
