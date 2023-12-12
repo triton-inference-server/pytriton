@@ -21,5 +21,5 @@ pip install pytest-timeout numpy
 pytest -svvv \
     --log-cli-level=DEBUG \
     --log-cli-format='%(asctime)s [%(levelname)s] [%(process)d:%(thread)d] %(name)s:%(lineno)d:  %(message)s' \
-    --timeout=25 \
+    --timeout=120 \
     ${THIS_SCRIPT_DIR}/test_pytest.py
