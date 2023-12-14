@@ -62,7 +62,14 @@ def main():
     wait_time_s = min(args.timeout_s, 1)
 
     server_cmd = ["python", "examples/nemo_megatron_gpt_multinode/server.py"]
-    client_cmd = ["python", "examples/nemo_megatron_gpt_multinode/client.py", "--prompts", "1 2 3"]
+    client_cmd = [
+        "python",
+        "examples/nemo_megatron_gpt_multinode/client.py",
+        "--prompts",
+        "1 2 3",
+        "--init-timeout-s",
+        "1800",
+    ]
 
     with ScriptThread(server_cmd, name="server") as server_thread:
         with ScriptThread(client_cmd, name="client") as client_thread:
