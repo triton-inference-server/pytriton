@@ -145,19 +145,19 @@ def second_triton_server():
 
 
 @pytest.fixture(scope="function")
-async def first_async_http_client(first_triton_server):
+def first_futures_http_client(first_triton_server):
     _LOGGER.debug(
         f"Preparing client for {first_triton_server.http_url} with init timeout {_GARGANTUAN_TIMEOUT} and inference timeout {_SMALL_TIMEOUT}."
     )
-    yield first_triton_server.get_model_futures_client()
+    return first_triton_server.get_model_futures_client()
 
 
 @pytest.fixture(scope="function")
-async def second_async_http_client(second_triton_server):
+def second_futures_http_client(second_triton_server):
     _LOGGER.debug(
         f"Preparing client for {second_triton_server.http_url} with init timeout {_GARGANTUAN_TIMEOUT} and inference timeout {_SMALL_TIMEOUT}."
     )
-    yield second_triton_server.get_model_futures_client()
+    return second_triton_server.get_model_futures_client()
 
 
 @pytest.fixture(scope="session")
@@ -166,10 +166,10 @@ def input_sleep_large():
     yield np.array([[_LARGE_TIMEOUT]], dtype=np.float64)
 
 
-def test_infer_sample_success_futures(first_async_http_client, second_async_http_client, input_sleep_large):
+def test_infer_sample_success_futures(first_futures_http_client, second_futures_http_client, input_sleep_large):
     _LOGGER.debug(f"Testing async grpc_client with input {input_sleep_large}.")
-    with first_async_http_client as first_client:
-        with second_async_http_client as second_client:
+    with first_futures_http_client as first_client:
+        with second_futures_http_client as second_client:
             first_future = first_client.infer_sample(input_sleep_large)
             second_future = second_client.infer_sample(input_sleep_large)
             done, _not_done = wait([first_future, second_future], timeout=_LARGE_TIMEOUT * 1.3)
