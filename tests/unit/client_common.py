@@ -43,6 +43,7 @@ ADD_SUB_WITH_BATCHING_MODEL_CONFIG = TritonModelConfig(
         TensorSpec(name="add", shape=(-1, 1), dtype=np.float32),
         TensorSpec(name="sub", shape=(-1, 1), dtype=np.float32),
     ],
+    decoupled=False,
     backend_parameters={"shared-memory-socket": "dummy/path"},
 )
 
@@ -59,8 +60,27 @@ ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG = TritonModelConfig(
         TensorSpec(name="add", shape=(1,), dtype=np.float32),
         TensorSpec(name="sub", shape=(1,), dtype=np.float32),
     ],
+    decoupled=False,
     backend_parameters={"shared-memory-socket": "dummy/path"},
 )
+
+ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG_DECOUPLED = TritonModelConfig(
+    model_name="AddSub",
+    model_version=1,
+    batching=False,
+    instance_group={DeviceKind.KIND_CPU: 1},
+    inputs=[
+        TensorSpec(name="a", shape=(1,), dtype=np.float32),
+        TensorSpec(name="b", shape=(1,), dtype=np.float32),
+    ],
+    outputs=[
+        TensorSpec(name="add", shape=(1,), dtype=np.float32),
+        TensorSpec(name="sub", shape=(1,), dtype=np.float32),
+    ],
+    decoupled=True,
+    backend_parameters={"shared-memory-socket": "dummy/path"},
+)
+
 
 GRPC_LOCALHOST_URL = "grpc://localhost:8001"
 HTTP_LOCALHOST_URL_NO_SCHEME = "localhost:8000"
