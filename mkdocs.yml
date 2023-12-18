@@ -73,26 +73,27 @@ markdown_extensions:
   - pymdownx.snippets
   - pymdownx.superfences
 nav:
-  - Overview:
-    - README.md
+  - Learn:
+    - Overview: README.md
     - Quick Start: quick_start.md
     - Installation: installation.md
+    - High-Level Design: high_level_design.md
     - Deploying Models:
       - Triton Initialization: initialization.md
       - Binding Model to Triton: binding_models.md
       - Binding Configuration: binding_configuration.md
       - Triton Remote Mode: remote_triton.md
-    - Inference Callables:
-        - inference_callables/README.md
-        - Decorators: inference_callables/decorators.md
-        - Custom parameters/headers: inference_callables/custom_params.md
-    - Clients: clients.md
+    - Inference Callable:
+      - inference_callables/README.md
+      - Decorators: inference_callables/decorators.md
+      - Custom parameters/headers: inference_callables/custom_params.md
+    - Model Clients: clients.md
   - Guides:
     - Building binary package: guides/building.md
     - Deploying in Clusters: guides/deploying_in_clusters.md
     - Chunking and batching: guides/chunking.md
     - Downloaded input data: guides/downloaded_input_data.md
-  - Examples: examples.md
+  - Tutorials: examples.md
   - Reference:
     - Triton: reference/triton.md
     - Triton Config: reference/triton_config.md

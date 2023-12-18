@@ -17,16 +17,3 @@ limitations under the License.
 .md-header__button.md-logo :is(img,svg)  {
     height: 1.8rem; !important;
 }
-
-nav.md-nav {
-    padding-left: 8px;
-}
-
-.md-nav__title {
-    font-size: 0.8rem;
-}
-
-.md-nav__item--section > .md-nav__link {
-    font-size: 0.8rem;
-    padding-top: 16px;
-}
