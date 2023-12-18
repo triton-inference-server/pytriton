@@ -69,7 +69,8 @@ doc = [
     "mike >= 2.0.0",
     "mkdocs-htmlproofer-plugin >= 0.8.0",
     "mkdocs-material >= 8.5.6",
-    "mkdocstrings[python] >= 0.19.0",
+    "mkdocstrings[python] >= 0.24.0",
+    "mkdocstrings-python >= 1.7.0"
 ]
 dev = [
     "nvidia-pytriton[test]",

@@ -14,21 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# API Reference
-
-::: pytriton.triton.TritonConfig
+# Decorators
 
 ::: pytriton.decorators
-
-::: pytriton.triton.Triton
-
-::: pytriton.triton.RemoteTriton
-
-::: pytriton.model_config.tensor.Tensor
-
-::: pytriton.model_config.common
-
-::: pytriton.model_config.model_config.ModelConfig
-
-::: pytriton.client.client
-

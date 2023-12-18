@@ -45,8 +45,10 @@ plugins:
             show_root_heading: true
             heading_level: 2
             line_length: 120
-            docstring_section_style: table
+            docstring_section_style: list
             merge_init_into_class: true
+            separate_signature: true
+            inherited_members: true
   - search
 watch:
   - pytriton
@@ -71,16 +73,15 @@ markdown_extensions:
   - pymdownx.snippets
   - pymdownx.superfences
 nav:
-  - Learn:
-    - Home:
-      - README.md
-      - Quick Start: quick_start.md
+  - Overview:
+    - README.md
+    - Quick Start: quick_start.md
     - Installation: installation.md
     - Deploying Models:
-        - Triton Initialization: initialization.md
-        - Binding Model to Triton: binding_models.md
-        - Binding Configuration: binding_configuration.md
-        - Triton Remote Mode: remote_triton.md
+      - Triton Initialization: initialization.md
+      - Binding Model to Triton: binding_models.md
+      - Binding Configuration: binding_configuration.md
+      - Triton Remote Mode: remote_triton.md
     - Inference Callables:
         - inference_callables/README.md
         - Decorators: inference_callables/decorators.md
@@ -91,9 +92,13 @@ nav:
     - Deploying in Clusters: guides/deploying_in_clusters.md
     - Chunking and batching: guides/chunking.md
     - Downloaded input data: guides/downloaded_input_data.md
-    - Examples: examples.md
+  - Examples: examples.md
   - Reference:
-    - API: api.md
+    - Triton: reference/triton.md
+    - Triton Config: reference/triton_config.md
+    - Model Config: reference/model_config.md
+    - Decorators: reference/decorators.md
+    - Model Clients: reference/clients.md
   - Resources:
     - Changelog: CHANGELOG.md
     - Known Issues: known_issues.md
