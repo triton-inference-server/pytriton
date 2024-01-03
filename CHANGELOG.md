@@ -16,6 +16,15 @@ limitations under the License.
 
 # Changelog
 
+## Unreleased stuff
+
+- New: AsyncioDecoupledModelClient, which works in async frameworks and decoupled Triton models like some Large Language Models.
+
+[//]: <> (put here on external component update with short summary what change or link to changelog)
+
+- Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.41.0](https://github.com/triton-inference-server/server/releases/tag/v2.41.0)
+
+
 ## 0.4.2 (2023-12-05)
 
 - New: You can create a client from an existing client instance or model configuration to avoid loading model configuration from the server.

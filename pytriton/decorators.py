@@ -249,24 +249,29 @@ def group_by_values(*keys, pad_fn: typing.Optional[typing.Callable[[InferenceReq
 
     For example, given an input of the form:
 
-        {"sentences": [b"Sentence1", b"Sentence2", b"Sentence3"], "param1": [1, 1, 2], "param2": [1, 1, 1]}
+    ```python
+    {"sentences": [b"Sentence1", b"Sentence2", b"Sentence3"], "param1": [1, 1, 2], "param2": [1, 1, 1]}
+    ```
 
     Using @group_by_values("param1", "param2") will split the batch into two sub-batches:
 
-        [
-            {"sentences": [b"Sentence1", b"Sentence2"], "param1": [1, 1], "param2": [1, 1]},
-            {"sentences": [b"Sentence3"], "param1": [2], "param2": [1]}
-        ]
+    ```python
+    [
+        {"sentences": [b"Sentence1", b"Sentence2"], "param1": [1, 1], "param2": [1, 1]},
+        {"sentences": [b"Sentence3"], "param1": [2], "param2": [1]}
+    ]
+    ```
 
     This decorator should be used after the @batch decorator.
 
     Example usage:
-
-        @batch
-        @group_by_values("param1", "param2")
-        def infer_fun(**inputs):
-            ...
-            return outputs
+    ```python
+    @batch
+    @group_by_values("param1", "param2")
+    def infer_fun(**inputs):
+        ...
+        return outputs
+    ```
 
     Args:
         *keys: List of keys to group by.
@@ -435,13 +440,14 @@ def fill_optionals(**defaults):
     The other decorators can then group requests into bigger batches resulting in a better model performance.
 
     Typical use:
-
-        @fill_optionals()
-        @group_by_keys()
-        @batch
-        def infer_fun(**inputs):
-            ...
-            return outputs
+    ```python
+    @fill_optionals()
+    @group_by_keys()
+    @batch
+    def infer_fun(**inputs):
+        ...
+        return outputs
+    ```
 
     Args:
         defaults: keyword arguments containing default values for missing inputs
@@ -572,17 +578,21 @@ def first_value(*keys: str, squeeze_single_values=True, strict: bool = True):
     It can be used in two ways:
 
     1. Wrapping a single request inference callable by chaining with @batch decorator:
+        ```python
         @batch
         @first_value("temperature")
         def infer_fn(**inputs):
             ...
             return result
+        ```
 
     2. Wrapping a multiple requests inference callable:
+        ```python
         @first_value("temperature")
         def infer_fn(requests):
             ...
             return results
+        ```
 
     By default, the decorator squeezes single value arrays to scalars.
     This behavior can be disabled by setting the `squeeze_single_values` flag to False.

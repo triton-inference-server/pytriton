@@ -21,6 +21,11 @@ theme:
       primary: black
   features:
     - navigation.top
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.expand
+    - navigation.indexes
+    - navigation.sections
 extra_css:
   - assets/styles.css
 repo_url: https://github.com/triton-inference-server/pytriton
@@ -40,8 +45,10 @@ plugins:
             show_root_heading: true
             heading_level: 2
             line_length: 120
-            docstring_section_style: table
+            docstring_section_style: list
             merge_init_into_class: true
+            separate_signature: true
+            inherited_members: true
   - search
 watch:
   - pytriton
@@ -66,27 +73,35 @@ markdown_extensions:
   - pymdownx.snippets
   - pymdownx.superfences
 nav:
-  - Home: README.md
-  - Installation and Packaging:
+  - Learn:
+    - Overview: README.md
+    - Quick Start: quick_start.md
     - Installation: installation.md
-    - Building binary package: building.md
-  - Quick Start: quick_start.md
-  - Deploying Models:
+    - High-Level Design: high_level_design.md
+    - Deploying Models:
       - Triton Initialization: initialization.md
       - Binding Model to Triton: binding_models.md
       - Binding Configuration: binding_configuration.md
-      - Deploying in Clusters: deploying_in_clusters.md
       - Triton Remote Mode: remote_triton.md
-  - Inference Handling:
-      - Inference Callable: inference_callable.md
-      - Decorators: decorators.md
-      - Custom parameters/headers: custom_params.md
-      - Example with downloaded input data: downloaded_input_data.md
-      - Chunking and batching: chunking_guide.md
-  - Clients: clients.md
-  - Examples: examples.md
-  - API Reference: api.md
-  - Changelog: CHANGELOG.md
-  - Known Issues: known_issues.md
-  - Contributing: CONTRIBUTING.md
-  - License: LICENSE.md
+    - Inference Callable:
+      - inference_callables/README.md
+      - Decorators: inference_callables/decorators.md
+      - Custom parameters/headers: inference_callables/custom_params.md
+    - Model Clients: clients.md
+  - Guides:
+    - Building binary package: guides/building.md
+    - Deploying in Clusters: guides/deploying_in_clusters.md
+    - Chunking and batching: guides/chunking.md
+    - Downloaded input data: guides/downloaded_input_data.md
+  - Tutorials: examples.md
+  - Reference:
+    - Triton: reference/triton.md
+    - Triton Config: reference/triton_config.md
+    - Model Config: reference/model_config.md
+    - Decorators: reference/decorators.md
+    - Model Clients: reference/clients.md
+  - Resources:
+    - Changelog: CHANGELOG.md
+    - Known Issues: known_issues.md
+    - Contributing: CONTRIBUTING.md
+    - License: LICENSE.md

@@ -24,9 +24,10 @@ import pytest
 from tritonclient.grpc.aio import InferenceServerClient as AsyncioGrpcInferenceServerClient
 from tritonclient.http.aio import InferenceServerClient as AsyncioHttpInferenceServerClient
 
-from pytriton.client import AsyncioModelClient
+from pytriton.client import AsyncioDecoupledModelClient, AsyncioModelClient
 from pytriton.client.asyncio_utils import asyncio_wait_for_model_ready
 from pytriton.client.exceptions import (
+    PyTritonClientInferenceServerError,
     PyTritonClientInvalidUrlError,
     PyTritonClientModelDoesntSupportBatchingError,
     PyTritonClientTimeoutError,
@@ -36,6 +37,7 @@ from pytriton.client.exceptions import (
 from .client_common import (
     ADD_SUB_WITH_BATCHING_MODEL_CONFIG,
     ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG,
+    ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG_DECOUPLED,
     EXPECTED_KWARGS_DEFAULT,
     GRPC_LOCALHOST_URL,
     HTTP_LOCALHOST_URL,
@@ -52,10 +54,7 @@ from .utils import (
 
 _LOGGER = logging.getLogger(__name__)
 
-_MAX_TEST_TIME = 10.0
 
-
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_utils_asyncio_wait_for_model_ready_http_client_not_ready_server(mocker):
     patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient, ready_server=False)
 
@@ -72,7 +71,6 @@ async def test_utils_asyncio_wait_for_model_ready_http_client_not_ready_server(m
         await triton_client.close()
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_utils_asyncio_wait_for_model_ready_http_client_not_live_server(mocker):
     patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient, live_server=False)
 
@@ -89,7 +87,6 @@ async def test_utils_asyncio_wait_for_model_ready_http_client_not_live_server(mo
         await triton_client.close()
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_utils_asyncio_wait_for_model_ready_http_client_model_not_ready(mocker):
     patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
     patch_http_client__model_up_and_ready(
@@ -109,7 +106,6 @@ async def test_utils_asyncio_wait_for_model_ready_http_client_model_not_ready(mo
         await triton_client.close()
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_utils_asyncio_wait_for_model_ready_http_client_success(mocker):
     patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
     patch_http_client__model_up_and_ready(
@@ -126,21 +122,18 @@ async def test_utils_asyncio_wait_for_model_ready_http_client_success(mocker):
     await triton_client.close()
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_client_init_raises_error_when_invalid_url_provided(mocker):
     with pytest.raises(PyTritonClientInvalidUrlError):
         async with AsyncioModelClient(["localhost:8001"], "dummy") as _:  # pytype: disable=wrong-arg-types
             pass
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_http_client_init_raises_error_when_use_non_lazy_init_on_non_responding_server():
     with pytest.raises(PyTritonClientTimeoutError):
         async with AsyncioModelClient("dummy:43299", "dummy", lazy_init=False, init_timeout_s=1) as _:
             pass
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_http_client_init_obtain_expected_model_config_when_lazy_init_is_disabled(mocker):
     patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
     patch_http_client__model_up_and_ready(mocker, ADD_SUB_WITH_BATCHING_MODEL_CONFIG, AsyncioHttpInferenceServerClient)
@@ -159,7 +152,6 @@ async def test_async_http_client_init_obtain_expected_model_config_when_lazy_ini
     assert await client.model_config == ADD_SUB_WITH_BATCHING_MODEL_CONFIG
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_http_client_model_config_raises_error_when_requested_unavailable_model(mocker):
     patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
 
@@ -176,7 +168,6 @@ async def test_async_http_client_model_config_raises_error_when_requested_unavai
             _ = await client.model_config
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_http_client_infer_raises_error_when_requested_unavailable_model(mocker):
     patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
     mocker.patch.object(
@@ -202,7 +193,6 @@ async def test_async_http_client_infer_raises_error_when_requested_unavailable_m
             _ = await client.infer_batch(a, b)
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_http_client_infer_sample_returns_expected_result_when_infer_on_model_with_batching(mocker):
     patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
     patch_http_client__model_up_and_ready(mocker, ADD_SUB_WITH_BATCHING_MODEL_CONFIG, AsyncioHttpInferenceServerClient)
@@ -240,7 +230,124 @@ async def test_async_http_client_infer_sample_returns_expected_result_when_infer
         verify_equalness_of_dicts_with_ndarray(expected_result, result)
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
+async def test_async_http_client_infer_sample_fails_for_decoupled_model(mocker):
+    patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
+    patch_http_client__model_up_and_ready(
+        mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG_DECOUPLED, AsyncioHttpInferenceServerClient
+    )
+
+    a = np.array([1], dtype=np.float32)
+    b = np.array([1], dtype=np.float32)
+
+    async with AsyncioModelClient(HTTP_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
+        with pytest.raises(PyTritonClientInferenceServerError):
+            await client.infer_sample(a, b)
+
+
+async def test_async_http_client_infer_sample_fails_for_http_decoupled(mocker):
+    patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
+    patch_http_client__model_up_and_ready(
+        mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG_DECOUPLED, AsyncioHttpInferenceServerClient
+    )
+
+    a = np.array([1], dtype=np.float32)
+    b = np.array([1], dtype=np.float32)
+
+    async with AsyncioDecoupledModelClient(HTTP_LOCALHOST_URL, ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name) as client:
+        with pytest.raises(PyTritonClientValueError):
+            # pytype: disable=attribute-error
+            # Pytype fails to deduct that this is asyncio iterator
+            async for _ in client.infer_sample(a, b):
+                pass
+            # pytype: enable=attribute-error
+
+
+async def test_async_grpc_client_infer_sample_returns_expected_result_decoupled(mocker):
+    a = np.array([1], dtype=np.float32)
+    b = np.array([1], dtype=np.float32)
+    expected_result = {"add": a + b, "sub": a - b}
+
+    model_config = ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG_DECOUPLED
+
+    _LOGGER.debug("Creating client")
+    client = AsyncioDecoupledModelClient(GRPC_LOCALHOST_URL, model_config.model_name)
+    _LOGGER.debug("Creating client")
+    patch_client__server_up_and_ready(mocker, AsyncioGrpcInferenceServerClient)
+    patch_grpc_client__model_up_and_ready(mocker, model_config, AsyncioGrpcInferenceServerClient)
+    mock_infer = mocker.patch.object(client._infer_client, "stream_infer")
+
+    async def result_generator():
+        yield (wrap_to_http_infer_result(model_config, "0", expected_result), None)
+
+    mock_infer.return_value = result_generator()
+    _LOGGER.debug("Entering client")
+    await client.__aenter__()
+    _LOGGER.debug("Entered client")
+    outside_result = None
+    async for result in client.infer_sample(a, b):
+        outside_result = result
+    _LOGGER.debug("Exiting client")
+    await client.__aexit__(None, None, None)
+    _LOGGER.debug("Exited client")
+
+    assert outside_result == expected_result
+
+
+async def test_async_grpc_client_infer_sample_raises_exception_decoupled(mocker):
+    a = np.array([1], dtype=np.float32)
+    b = np.array([1], dtype=np.float32)
+    expected_result = {"add": a + b, "sub": a - b}
+
+    model_config = ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG_DECOUPLED
+
+    _LOGGER.debug("Creating client")
+    client = AsyncioDecoupledModelClient(GRPC_LOCALHOST_URL, model_config.model_name)
+    _LOGGER.debug("Creating client")
+    patch_client__server_up_and_ready(mocker, AsyncioGrpcInferenceServerClient)
+    patch_grpc_client__model_up_and_ready(mocker, model_config, AsyncioGrpcInferenceServerClient)
+    mock_infer = mocker.patch.object(client._infer_client, "stream_infer")
+
+    async def result_generator():
+        yield (wrap_to_http_infer_result(model_config, "0", expected_result), None)
+        yield (None, PyTritonClientInferenceServerError("dummy"))
+
+    mock_infer.return_value = result_generator()
+    _LOGGER.debug("Entering client")
+    await client.__aenter__()
+    _LOGGER.debug("Entered client")
+    outside_result = None
+    with pytest.raises(PyTritonClientInferenceServerError):
+        async for result in client.infer_sample(a, b):
+            outside_result = result
+    _LOGGER.debug("Exiting client")
+    await client.__aexit__(None, None, None)
+    _LOGGER.debug("Exited client")
+
+    assert outside_result == expected_result
+
+
+async def test_async_grpc_client_infer_sample_raises_exception_wrong_coupled_decoupled(mocker):
+    a = np.array([1], dtype=np.float32)
+    b = np.array([1], dtype=np.float32)
+
+    model_config = ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG
+
+    _LOGGER.debug("Creating client")
+    client = AsyncioDecoupledModelClient(GRPC_LOCALHOST_URL, model_config.model_name)
+    _LOGGER.debug("Creating client")
+    patch_client__server_up_and_ready(mocker, AsyncioGrpcInferenceServerClient)
+    patch_grpc_client__model_up_and_ready(mocker, model_config, AsyncioGrpcInferenceServerClient)
+    _LOGGER.debug("Entering client")
+    await client.__aenter__()
+    _LOGGER.debug("Entered client")
+    with pytest.raises(PyTritonClientInferenceServerError):
+        async for result in client.infer_sample(a, b):
+            pass
+    _LOGGER.debug("Exiting client")
+    await client.__aexit__(None, None, None)
+    _LOGGER.debug("Exited client")
+
+
 async def test_async_http_client_infer_sample_returns_expected_result_when_infer_on_model_with_batching_created_from_existing(
     mocker,
 ):
@@ -279,7 +386,6 @@ async def test_async_http_client_infer_sample_returns_expected_result_when_infer
             verify_equalness_of_dicts_with_ndarray(expected_result, result)
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_http_client_infer_sample_returns_expected_result_when_positional_args_are_used(mocker):
     patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
     patch_http_client__model_up_and_ready(
@@ -318,7 +424,6 @@ async def test_async_http_client_infer_sample_returns_expected_result_when_posit
         verify_equalness_of_dicts_with_ndarray(expected_result, result)
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_http_client_infer_batch_returns_expected_result_when_positional_args_are_used(mocker):
     patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
     patch_http_client__model_up_and_ready(mocker, ADD_SUB_WITH_BATCHING_MODEL_CONFIG, AsyncioHttpInferenceServerClient)
@@ -354,7 +459,6 @@ async def test_async_http_client_infer_batch_returns_expected_result_when_positi
         verify_equalness_of_dicts_with_ndarray(expected_result, result)
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_http_client_infer_sample_returns_expected_result_when_named_args_are_used(mocker):
     patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
     patch_http_client__model_up_and_ready(
@@ -395,7 +499,6 @@ async def test_async_http_client_infer_sample_returns_expected_result_when_named
         verify_equalness_of_dicts_with_ndarray(expected_result, result)
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_http_client_infer_batch_returns_expected_result_when_named_args_are_used(mocker):
     patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
     patch_http_client__model_up_and_ready(mocker, ADD_SUB_WITH_BATCHING_MODEL_CONFIG, AsyncioHttpInferenceServerClient)
@@ -433,7 +536,6 @@ async def test_async_http_client_infer_batch_returns_expected_result_when_named_
         verify_equalness_of_dicts_with_ndarray(expected_result, result)
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_http_client_infer_batch_raises_error_when_model_doesnt_support_batching(mocker):
     patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
     patch_http_client__model_up_and_ready(
@@ -448,7 +550,6 @@ async def test_async_http_client_infer_batch_raises_error_when_model_doesnt_supp
             await client.infer_batch(a, b)
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_http_client_infer_raises_error_when_mixed_args_convention_used(mocker):
     patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
     patch_http_client__model_up_and_ready(
@@ -473,7 +574,6 @@ async def test_async_http_client_infer_raises_error_when_mixed_args_convention_u
             await client.infer_batch(a, b=b)
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_http_client_infer_raises_error_when_no_args_provided(mocker):
     patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
     patch_http_client__model_up_and_ready(
@@ -489,7 +589,6 @@ async def test_async_http_client_infer_raises_error_when_no_args_provided(mocker
             await client.infer_batch()
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 @pytest.mark.filterwarnings("error::pytest.PytestUnraisableExceptionWarning")
 async def test_asynciodel_of_inference_client_does_not_raise_error():
     def _del(client):
@@ -505,7 +604,6 @@ async def test_asynciodel_of_inference_client_does_not_raise_error():
     gc.collect()
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_grpc_client_infer_sample_returns_expected_result_when_infer_on_model_with_batching(mocker):
     a = np.array([1], dtype=np.float32)
     b = np.array([1], dtype=np.float32)
@@ -543,7 +641,6 @@ async def test_async_grpc_client_infer_sample_returns_expected_result_when_infer
     assert result == expected_result
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_grpc_client_non_lazy_aenter_failure_triton_non_ready(mocker):
     model_config = ADD_SUB_WITH_BATCHING_MODEL_CONFIG
 
@@ -558,7 +655,6 @@ async def test_async_grpc_client_non_lazy_aenter_failure_triton_non_ready(mocker
     _LOGGER.debug("Exited client with error")
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_grpc_client_non_lazy_aenter_failure_triton_non_live(mocker):
     model_config = ADD_SUB_WITH_BATCHING_MODEL_CONFIG
 
@@ -573,7 +669,6 @@ async def test_async_grpc_client_non_lazy_aenter_failure_triton_non_live(mocker)
     _LOGGER.debug("Exited client with error")
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_grpc_client_non_lazy_aenter_failure_model_non_ready(mocker):
     model_config = ADD_SUB_WITH_BATCHING_MODEL_CONFIG
 
@@ -589,7 +684,6 @@ async def test_async_grpc_client_non_lazy_aenter_failure_model_non_ready(mocker)
     _LOGGER.debug("Exited client with error")
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_grpc_client_non_lazy_aenter_failure_model_state_unavailable(mocker):
     model_config = ADD_SUB_WITH_BATCHING_MODEL_CONFIG
 
@@ -605,7 +699,6 @@ async def test_async_grpc_client_non_lazy_aenter_failure_model_state_unavailable
     _LOGGER.debug("Exited client with error")
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_grpc_client_non_lazy_aenter_failure_model_incorrect_name(mocker):
     model_config = ADD_SUB_WITH_BATCHING_MODEL_CONFIG
 
@@ -621,7 +714,6 @@ async def test_async_grpc_client_non_lazy_aenter_failure_model_incorrect_name(mo
     _LOGGER.debug("Exited client with error")
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_grpc_client_non_lazy_aenter_failure_model_incorrect_version(mocker):
     model_config = ADD_SUB_WITH_BATCHING_MODEL_CONFIG
 
@@ -639,7 +731,6 @@ async def test_async_grpc_client_non_lazy_aenter_failure_model_incorrect_version
     _LOGGER.debug("Exited client with error")
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_grpc_client_infer_sample_fails_on_model_with_batching(mocker):
     a = np.array([1], dtype=np.float32)
     b = np.array([1], dtype=np.float32)
@@ -670,7 +761,6 @@ async def test_async_grpc_client_infer_sample_fails_on_model_with_batching(mocke
     _LOGGER.debug("Exited client")
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_http_init_passes_timeout(mocker):
     async with AsyncioModelClient(
         "http://localhost:6669", "dummy", init_timeout_s=0.2, inference_timeout_s=0.1
@@ -679,7 +769,6 @@ async def test_async_http_init_passes_timeout(mocker):
             await client.wait_for_model(timeout_s=0.2)
 
 
-@pytest.mark.async_timeout(_MAX_TEST_TIME)
 async def test_async_grpc_init_passes_timeout(mocker):
     async with AsyncioModelClient(
         "grpc://localhost:6669", "dummy", init_timeout_s=0.2, inference_timeout_s=0.1

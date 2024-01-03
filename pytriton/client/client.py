@@ -42,7 +42,7 @@ import warnings
 from concurrent.futures import Future
 from queue import Empty, Full, Queue
 from threading import Lock, Thread
-from typing import Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 import gevent
 import numpy as np
@@ -1041,7 +1041,7 @@ class AsyncioModelClient(BaseModelClient):
         parameters: Optional[Dict[str, Union[str, int, bool]]] = None,
         headers: Optional[Dict[str, Union[str, int, bool]]] = None,
         **named_inputs,
-    ) -> Dict[str, np.ndarray]:
+    ):
         """Run asynchronous inference on single data sample.
 
         Typical usage:
@@ -1108,7 +1108,7 @@ class AsyncioModelClient(BaseModelClient):
         parameters: Optional[Dict[str, Union[str, int, bool]]] = None,
         headers: Optional[Dict[str, Union[str, int, bool]]] = None,
         **named_inputs,
-    ) -> Dict[str, np.ndarray]:
+    ):
         """Run asynchronous inference on batched data.
 
         Typical usage:
@@ -1212,7 +1212,7 @@ class AsyncioModelClient(BaseModelClient):
                 f"Encode numpy array for {input_name!r} input (ex. with np.char.encode(array, 'utf-8'))."
             )
 
-    async def _execute_infer(self, model_config, inputs_wrapped, outputs_wrapped, parameters, headers):
+    async def _execute_infer(self, model_config, inputs_wrapped, outputs_wrapped, parameters, headers) -> Any:
         try:
             _LOGGER.debug(f"Sending InferRequest for {self._model_name}")
             kwargs = self._get_infer_extra_args()
@@ -1244,7 +1244,7 @@ class AsyncioModelClient(BaseModelClient):
         outputs = {output_spec.name: response.as_numpy(output_spec.name) for output_spec in model_config.outputs}
         return outputs
 
-    async def _infer(self, inputs: _IOType, parameters, headers) -> Dict[str, np.ndarray]:
+    async def _infer(self, inputs: _IOType, parameters, headers):
         if self._model_ready:
             _LOGGER.debug(f"Waiting for model {self._model_name} config")
             await self._wait_and_init_model_config(self._init_timeout_s)
@@ -1253,6 +1253,10 @@ class AsyncioModelClient(BaseModelClient):
         _LOGGER.debug(f"Obtaining config for {self._model_name}")
         model_config = await self.model_config
         _LOGGER.debug(f"Model config for {self._model_name} obtained")
+        if model_config.decoupled:
+            raise PyTritonClientInferenceServerError(
+                "Model config is decoupled. Use DecouploedAsyncioModelClient instead."
+            )
 
         if isinstance(inputs, Tuple):
             inputs = {input_spec.name: input_data for input_spec, input_data in zip(model_config.inputs, inputs)}
@@ -1310,6 +1314,292 @@ class AsyncioModelClient(BaseModelClient):
         # However, it is not used here yet and planned for future release
         kwargs = {"client_timeout": self._inference_timeout_s}
         return kwargs
+
+
+class AsyncioDecoupledModelClient(AsyncioModelClient):
+    """Asyncio client for model deployed on the Triton Inference Server.
+
+    This client is based on Triton Inference Server Python clients and GRPC library:
+    * ``tritonclient.grpc.aio.InferenceServerClient``
+
+    It can wait for server to be ready with model loaded and then perform inference on it.
+    ``AsyncioDecoupledModelClient`` supports asyncio context manager protocol.
+
+    The client is intended to be used with decoupled models and will raise an error if model is coupled.
+
+    Typical usage:
+    ```python
+    from pytriton.client import AsyncioDecoupledModelClient
+    import numpy as np
+
+    input1_sample = np.random.rand(1, 3, 224, 224).astype(np.float32)
+    input2_sample = np.random.rand(1, 3, 224, 224).astype(np.float32)
+
+    async with AsyncioDecoupledModelClient("grpc://localhost", "MyModel") as client:
+        async for result_dict in client.infer_sample(input1_sample, input2_sample):
+            print(result_dict["output_name"])
+    ```
+    """
+
+    async def infer_sample(
+        self,
+        *inputs,
+        parameters: Optional[Dict[str, Union[str, int, bool]]] = None,
+        headers: Optional[Dict[str, Union[str, int, bool]]] = None,
+        **named_inputs,
+    ):
+        """Run asynchronous inference on single data sample.
+
+        Typical usage:
+
+        ```python
+        async with AsyncioDecoupledModelClient("grpc://localhost", "MyModel") as client:
+            async for result_dict in client.infer_sample(input1_sample, input2_sample):
+                print(result_dict["output_name"])
+        ```
+
+        Inference inputs can be provided either as positional or keyword arguments:
+
+        ```python
+        results_iterator = client.infer_sample(input1, input2)
+        results_iterator = client.infer_sample(a=input1, b=input2)
+        ```
+
+        Mixing of argument passing conventions is not supported and will raise PyTritonClientRuntimeError.
+
+        Args:
+            *inputs: inference inputs provided as positional arguments.
+            parameters: custom inference parameters.
+            headers: custom inference headers.
+            **named_inputs: inference inputs provided as named arguments.
+
+        Returns:
+            Asynchronous generator, which generates dictionaries with partial inference results, where dictionary keys are output names.
+
+        Raises:
+            PyTritonClientValueError: if mixing of positional and named arguments passing detected.
+            PyTritonClientTimeoutError:
+                in case of first method call, `lazy_init` argument is False
+                and wait time for server and model being ready exceeds `init_timeout_s`
+                or inference time exceeds `timeout_s`.
+            PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
+            PyTritonClientInferenceServerError: If error occurred on inference callable or Triton Inference Server side.
+        """
+        _verify_inputs_args(inputs, named_inputs)
+        _verify_parameters(parameters)
+        _verify_parameters(headers)
+
+        _LOGGER.debug(f"Running inference for {self._model_name}")
+        model_config = await self.model_config
+        _LOGGER.debug(f"Model config for {self._model_name} obtained")
+
+        model_supports_batching = model_config.max_batch_size > 0
+        if model_supports_batching:
+            if inputs:
+                inputs = tuple(data[np.newaxis, ...] for data in inputs)
+            elif named_inputs:
+                named_inputs = {name: data[np.newaxis, ...] for name, data in named_inputs.items()}
+
+        _LOGGER.debug(f"Running _infer for {self._model_name}")
+        result = self._infer(inputs or named_inputs, parameters, headers)
+        _LOGGER.debug(f"_infer for {self._model_name} finished")
+
+        async for item in result:
+            if model_supports_batching:
+                debatched_item = {name: data[0] for name, data in item.items()}
+                yield debatched_item
+            else:
+                yield item
+
+    async def infer_batch(
+        self,
+        *inputs,
+        parameters: Optional[Dict[str, Union[str, int, bool]]] = None,
+        headers: Optional[Dict[str, Union[str, int, bool]]] = None,
+        **named_inputs,
+    ):
+        """Run asynchronous inference on batched data.
+
+        Typical usage:
+
+        ```python
+        async with AsyncioDecoupledModelClient("grpc://localhost", "MyModel") as client:
+            async for result_dict in client.infer_batch(input1_sample, input2_sample):
+                print(result_dict["output_name"])
+        ```
+
+        Inference inputs can be provided either as positional or keyword arguments:
+
+        ```python
+        results_iterator = client.infer_batch(input1, input2)
+        results_iterator = client.infer_batch(a=input1, b=input2)
+        ```
+
+        Mixing of argument passing conventions is not supported and will raise PyTritonClientRuntimeError.
+
+        Args:
+            *inputs: inference inputs provided as positional arguments.
+            parameters: custom inference parameters.
+            headers: custom inference headers.
+            **named_inputs: inference inputs provided as named arguments.
+
+        Returns:
+            Asynchronous generator, which generates dictionaries with partial inference results, where dictionary keys are output names.
+
+        Raises:
+            PyTritonClientValueError: if mixing of positional and named arguments passing detected.
+            PyTritonClientTimeoutError:
+                in case of first method call, `lazy_init` argument is False
+                and wait time for server and model being ready exceeds `init_timeout_s`
+                or inference time exceeds `timeout_s`.
+            PyTritonClientModelDoesntSupportBatchingError: if model doesn't support batching.
+            PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
+            PyTritonClientInferenceServerError: If error occurred on inference callable or Triton Inference Server side.
+        """
+        _verify_inputs_args(inputs, named_inputs)
+        _verify_parameters(parameters)
+        _verify_parameters(headers)
+
+        _LOGGER.debug(f"Running inference for {self._model_name}")
+        model_config = await self.model_config
+        _LOGGER.debug(f"Model config for {self._model_name} obtained")
+
+        model_supports_batching = model_config.max_batch_size > 0
+        if not model_supports_batching:
+            _LOGGER.error(f"Model {model_config.model_name} doesn't support batching")
+            raise PyTritonClientModelDoesntSupportBatchingError(
+                f"Model {model_config.model_name} doesn't support batching - use infer_sample method instead"
+            )
+
+        _LOGGER.debug(f"Running _infer for {self._model_name}")
+        result = self._infer(inputs or named_inputs, parameters, headers)
+        _LOGGER.debug(f"_infer for {self._model_name} finished")
+        async for item in result:
+            yield item
+
+    async def _execute_infer(self, model_config, inputs_wrapped, outputs_wrapped, parameters, headers) -> Any:
+        # stream_infer siletly consumes all errors raised inside async_request_iterator and raises CancelledError
+        error_raised_inside_async_request_iterator = set()
+        try:
+            _LOGGER.debug(f"Sending InferRequest for {self._model_name}")
+            kwargs = self._get_infer_extra_args()
+
+            async def async_request_iterator(errors):
+                _LOGGER.debug(f"Begin creating InferRequestHeader for {self._model_name}")
+                try:
+                    yield {
+                        "model_name": self._model_name,
+                        "inputs": inputs_wrapped,
+                        "outputs": outputs_wrapped,
+                        "request_id": self._next_request_id,
+                        "sequence_id": 0,
+                        "sequence_start": True,
+                        "sequence_end": True,
+                    }
+                except Exception as e:
+                    _LOGGER.error(f"Error occurred while creating InferRequestHeader for {self._model_name}")
+                    errors.add(e)
+                    raise e
+                _LOGGER.debug(f"End creating InferRequestHeader for {self._model_name}")
+
+            response_iterator = self._infer_client.stream_infer(
+                inputs_iterator=async_request_iterator(error_raised_inside_async_request_iterator),
+                headers=headers,
+                **kwargs,
+            )
+            _LOGGER.debug(f"End preparing InferRequest for {self._model_name}")
+            while True:
+                try:
+                    try:
+                        response = await asyncio.wait_for(
+                            response_iterator.__anext__(),
+                            self._inference_timeout_s,
+                        )
+                    except asyncio.TimeoutError as e:
+                        message = f"Timeout while waiting for model {self._model_name} to return next response {self._inference_timeout_s}s"
+                        _LOGGER.error(message)
+                        raise PyTritonClientTimeoutError(message) from e
+                    result, error = response
+                    _LOGGER.debug(f"Received InferResponse for {self._model_name}")
+                    if error is not None:
+                        raise error
+                    else:
+                        partial_output = {
+                            output_spec.name: result.as_numpy(output_spec.name) for output_spec in model_config.outputs
+                        }
+                    yield partial_output
+                except StopAsyncIteration:
+                    break
+            _LOGGER.debug(f"End receiving InferResponse for {self._model_name}")
+
+        except asyncio.exceptions.TimeoutError as e:
+            # HTTP aio client raises asyncio.exceptions.TimeoutError for timeout errors
+            message = f"Timeout exceeded while running inference for {self._model_name}"
+            _LOGGER.error(message)
+            raise PyTritonClientTimeoutError(message) from e
+        except tritonclient.utils.InferenceServerException as e:
+            message = f"Error occurred on Triton Inference Server side:\n {e.message()}"
+            _LOGGER.error(message)
+            if "Deadline Exceeded" in e.message():
+                # GRPC aio client raises InferenceServerException with message "Deadline Exceeded"
+                # for timeout errors
+                raise PyTritonClientTimeoutError(message) from e
+            else:
+                raise PyTritonClientInferenceServerError(message) from e
+        except asyncio.exceptions.CancelledError as e:
+            _LOGGER.error(f"CancelledError occurred while streaming inference for {self._model_name}")
+            # stream_infer siletly consumes all errors raised inside async_request_iterator and raises CancelledError
+            if len(error_raised_inside_async_request_iterator) > 0:
+                _LOGGER.error(f"Re-raising error raised inside async_request_iterator for {self._model_name} ")
+                raise error_raised_inside_async_request_iterator.pop()
+            else:
+                raise e
+
+    async def _infer(self, inputs: _IOType, parameters, headers):
+        if self._model_ready:
+            _LOGGER.debug(f"Waiting for model {self._model_name} config")
+            await self._wait_and_init_model_config(self._init_timeout_s)
+            _LOGGER.debug(f"Model wait finished for {self._model_name}")
+
+        _LOGGER.debug(f"Obtaining config for {self._model_name}")
+        model_config = await self.model_config
+        _LOGGER.debug(f"Model config for {self._model_name} obtained")
+        if not model_config.decoupled:
+            raise PyTritonClientInferenceServerError("Model config is coupled. Use AsyncioModelClient instead.")
+
+        if isinstance(inputs, Tuple):
+            inputs = {input_spec.name: input_data for input_spec, input_data in zip(model_config.inputs, inputs)}
+
+        inputs_wrapped = []
+        for input_name, input_data in inputs.items():
+            if isinstance(input_data, np.ndarray):
+                self._validate_input(input_name, input_data)
+                triton_dtype = tritonclient.utils.np_to_triton_dtype(input_data.dtype)
+                infer_input = self._triton_client_lib.InferInput(input_name, input_data.shape, triton_dtype)
+                infer_input.set_data_from_numpy(input_data)
+                input_wrapped = infer_input
+                inputs_wrapped.append(input_wrapped)
+            else:
+                raise PyTritonClientValueError(
+                    f"Input {input_name} is not a numpy array. Got {type(input_data)} instead."
+                )
+
+        outputs_wrapped = [
+            self._triton_client_lib.InferRequestedOutput(output_spec.name) for output_spec in model_config.outputs
+        ]
+        result = self._execute_infer(model_config, inputs_wrapped, outputs_wrapped, parameters, headers)
+        async for item in result:
+            yield item
+
+    def _get_infer_extra_args(self):
+        if self._triton_url.scheme == "http":
+            raise PyTritonClientValueError("AsyncioDecoupledModelClient is only supported for grpc protocol")
+        warnings.warn(
+            f"tritonclient.aio.grpc doesn't support client_timeout parameter {self._inference_timeout_s} for infer_stream",
+            NotSupportedTimeoutWarning,
+            stacklevel=1,
+        )
+        return {}
 
 
 @contextlib.contextmanager

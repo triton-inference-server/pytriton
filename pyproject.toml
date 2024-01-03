@@ -40,7 +40,7 @@ dependencies = [
     "protobuf>=3.7.0",
     "pyzmq ~= 23.0",
     "sh ~= 1.14",
-    "tritonclient[all] ~= 2.39",
+    "tritonclient[all] ~= 2.41",
     "typing_inspect ~= 0.6.0",
     "wrapt >= 1.11.0",
 ]
@@ -55,8 +55,8 @@ test = [
     "pytest ~= 7.2",
     "pytest-codeblocks ~= 0.16",
     "pytest-mock ~= 3.8",
-    "pytest-timeout ~= 2.1",   # timeouts for non-asyncio tests
-    "alt-pytest-asyncio ~= 0.7",  # timeout for asyncio tests
+    "pytest-timeout ~= 2.1",
+    "pytest-asyncio ~= 0.23.2",
     "pytype!=2021.11.18,!=2022.2.17",
     "pre-commit >= 2.20.0",
     "tox >= 3.23.1",
@@ -69,7 +69,8 @@ doc = [
     "mike >= 2.0.0",
     "mkdocs-htmlproofer-plugin >= 0.8.0",
     "mkdocs-material >= 8.5.6",
-    "mkdocstrings[python] >= 0.19.0",
+    "mkdocstrings[python] >= 0.24.0",
+    "mkdocstrings-python >= 1.7.0"
 ]
 dev = [
     "nvidia-pytriton[test]",

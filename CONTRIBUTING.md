@@ -111,72 +111,72 @@ Ready to contribute? Here's how to set up the `PyTriton` for local development.
 1. Fork the `PyTriton` repo on GitHub.
 2. Clone your fork locally:
 
-```shell
-$ git clone git@github.com:your_name_here/pytriton.git
-```
+    ```shell
+    $ git clone git@github.com:your_name_here/pytriton.git
+    ```
 
 3. Install your local copy into a virtualenv. Assuming you have virtualenvwrapper installed, here's how you set up your fork for local development:
 
-```shell
-$ mkvirtualenv pytriton
-$ cd pytriton/
-```
+    ```shell
+    $ mkvirtualenv pytriton
+    $ cd pytriton/
+    ```
 
-If you do not use the virtualenvwrapper package, you can initialize a virtual environment using the pure Python command:
+    If you do not use the virtualenvwrapper package, you can initialize a virtual environment using the pure Python command:
 
-```shell
-$ python -m venv pytriton
-$ cd pytriton/
-$ source bin/activate
-```
+    ```shell
+    $ python -m venv pytriton
+    $ cd pytriton/
+    $ source bin/activate
+    ```
 
-Once the virtualenv is activated, install the development dependencies:
+    Once the virtualenv is activated, install the development dependencies:
 
-```shell
-$ make install-dev
-```
+    ```shell
+    $ make install-dev
+    ```
 
 4. Extract Triton Server to your environment so you can debug PyTriton while serving some models on Triton:
 
-```shell
-$ make extract-triton
-```
+    ```shell
+    $ make extract-triton
+    ```
 
 5. Install pre-commit hooks:
 
-```shell
-$ pre-commit install
-```
+    ```shell
+    $ pre-commit install
+    ```
 
 6. Create a branch for local development:
 
-```shell
-$ git checkout -b name-of-your-bugfix-or-feature
-```
+    ```shell
+    $ git checkout -b name-of-your-bugfix-or-feature
+    ```
 
-Now you can make your changes locally.
+    Now you can make your changes locally.
 
 7. When you're done making changes, check that your changes pass linters and the
    tests, including testing other Python versions with tox:
 
-```shell
-$ make lint  # will run, among others, flake8 and pytype linters
-$ make test  # will run a test on your current virtualenv
-```
+    ```shell
+    $ make lint  # will run, among others, flake8 and pytype linters
+    $ make test  # will run a test on your current virtualenv
+    ```
 
-  To run a subset of tests:
+      To run a subset of tests:
 
-```shell
-$ pytest tests.test_subset
-```
+    ```shell
+    $ pytest tests.test_subset
+    ```
 
 8. Commit your changes and push your branch to GitHub:
 
-```shell
-$ git add .
-$ git commit -s -m "Your detailed description of your changes."
-$ git push origin name-of-your-bugfix-or-feature
-```
+    ```shell
+    $ git add .
+    $ git commit -s -m "Your detailed description of your changes."
+    $ git push origin name-of-your-bugfix-or-feature
+    ```
 
 9. Submit a pull request through the GitHub website.
 

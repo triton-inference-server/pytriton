@@ -30,34 +30,6 @@ performance features of Triton Inference Server, such as dynamic batching or res
 environment. Thus, it improves the performance of running inference on GPU for models implemented in Python. The solution is
 framework-agnostic and can be used along with frameworks like PyTorch, TensorFlow, or JAX.
 
-## Architecture
-
-The diagram below presents the schema of how the Python models are served through Triton Inference Server using
-PyTriton. The solution consists of two main components:
-
-- Triton Inference Server: for exposing the HTTP/gRPC API and benefiting from performance features like dynamic batching
-or response cache.
-- Python Model Environment: your environment where the Python model is executed.
-
-
-The Triton Inference Server binaries are provided as part of the PyTriton installation. The Triton Server is
-installed in your current environment (system or container). The PyTriton controls the Triton Server process
-through the `Triton Controller`.
-
-Exposing the model through PyTriton requires the definition of an `Inference Callable` - a Python function that is
-connected to Triton Inference Server and executes the model or ensemble for predictions. The integration layer binds
-the `Inference Callable` to Triton Server and exposes it through the Triton HTTP/gRPC API under a provided `<model name>`. Once
-the integration is done, the defined `Inference Callable` receives data sent to the HTTP/gRPC API endpoint
-`v2/models/<model name>/infer`. Read more about HTTP/gRPC interface in Triton Inference Server
-[documentation](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#httprest-and-grpc-protocols).
-
-The HTTP/gRPC requests sent to `v2/models/<model name>/infer` are handled by Triton
-Inference Server. The server batches requests and passes them to the `Proxy Backend`, which sends the batched requests to the appropriate
-`Inference Callable`. The data is sent as a `numpy` array. Once the `Inference Callable` finishes execution of
-the model prediction, the result is returned to the `Proxy Backend`, and a response is created by Triton Server.
-
-![High Level Design](assets/hld.svg)
-
 ## Serving the models
 
 PyTriton provides an option to serve your Python model using Triton Inference Server to
