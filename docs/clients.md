@@ -311,12 +311,14 @@ In this case, you can use the infer_batch method to send a batch of images as in
 import numpy as np
 from PIL import Image
 
-# Create a new images with the same size as the input data
-test_img = Image.new("RGB", (224, 224))
-# Get the pixels object of the image
-pixels = test_img.load()
+# Define a list of colors as RGB tuples
+colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255), (128, 128, 128), (255, 255, 255), (0, 0, 0)]
+# Define a list of image names
 images_names = [["cat.jpg", "dog.jpg", "bird.jpg"], ["car.jpg", "bike.jpg", "bus.jpg"], ["apple.jpg", "banana.jpg", "orange.jpg"]]
-for batch in images_names:
+# Loop over the image names and colors
+for batch, color in zip(images_names, colors):
+    # Create a new image with the same size as the input data and the given color
+    test_img = Image.new("RGB", (224, 224), color)
     for image in batch:
         test_img.save(image)
 
@@ -324,15 +326,41 @@ for batch in images_names:
 import numpy as np
 from pytriton.decorators import batch
 
-# Set random seed for reproducibility
-np.random.seed(42)
+
+def average_color(image):
+    image = np.array(image)
+    # Compute the mean of each color channel
+    r = image[:,:,0].mean()
+    g = image[:,:,1].mean()
+    b = image[:,:,2].mean()
+    return (r, g, b)
+
+# Define a function to classify an image based on its average color
+def classify_image(image):
+    avg_color = average_color(image)
+    # Define the thresholds for each category
+    tench_threshold = 150
+    goldfish_threshold = 100
+    shark_threshold = 50
+    if avg_color[0] > tench_threshold:
+        label = 0
+    elif avg_color[1] > goldfish_threshold:
+        label = 1
+    elif avg_color[2] > shark_threshold:
+        label = 2
+    else:
+        assert False, f"Unexpected average color {avg_color}"
+    return label
 
 @batch
 def infer_fn(image):
-
     assert image.shape[1:] == (224, 224, 3), f"Expected image shape (224, 224, 3), got {image.shape}"
-    # This can implement actual inference logic for image classification
-    return [np.random.randint(0, 3, size=(image.shape[0],))]
+    labels = []
+    for img in image:
+        label = classify_image(img)
+        labels.append(label)
+    # Convert the list to a numpy array and return it
+    return [np.array(labels)]
 
 
 from pytriton.model_config import ModelConfig, Tensor
@@ -410,9 +438,9 @@ for batch in images_names:
     for image in batch:
         os.remove(image)
 
-expected_result = [["great white shark", "tench", "great white shark",],
-                   ["great white shark", "tench", "tench",],
-                   ["great white shark", "goldfish", "great white shark",],]
+expected_result = [["tench", "tench", "tench",],
+                   ["goldfish", "goldfish", "goldfish"],
+                   ["great white shark", "great white shark", "great white shark",],]
 
 # Test outputs
 for output, expected_output in zip(output_data_list, expected_result):
