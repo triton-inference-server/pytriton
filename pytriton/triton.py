@@ -308,12 +308,15 @@ class _LogLevelChecker:
 
         if self._log_settings is not None:
             log_settings = self._log_settings
+            log_verbose_level = 0
             if hasattr(log_settings, "settings"):  # grpc client
-                log_settings = log_settings.settings
-                log_settings = {key: value.string_param for key, value in log_settings.items()}
+                for key, value in log_settings.settings.items():
+                    if key == "log_verbose_level":
+                        log_verbose_level = value.uint32_param
+                        break
             else:  # http client
                 log_settings = {key: str(value) for key, value in log_settings.items()}
-            log_verbose_level = int(log_settings.get("log_verbose_level", 0)) if log_settings is not None else 0
+                log_verbose_level = int(log_settings.get("log_verbose_level", 0))
             if log_verbose_level > 0:
                 LOGGER.warning(
                     f"Triton Inference Server is running with enabled verbose logs (log_verbose_level={log_verbose_level}). "
