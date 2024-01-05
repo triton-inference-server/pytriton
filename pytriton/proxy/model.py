@@ -29,7 +29,13 @@ import typing
 import triton_python_backend_utils as pb_utils  # pytype: disable=import-error
 
 from . import communication, data
-from .communication import HandleResponsesCoro, PyTritonResponseFlags, RequestsServer  # pytype: disable=import-error
+from .communication import (  # pytype: disable=import-error
+    HandleResponsesCoro,
+    HandshakeServer,
+    PyTritonResponseFlags,
+    RequestsServer,
+    get_config_from_handshake_server,
+)
 from .data import PROTOCOL_VERSION, TensorStoreSerializerDeserializer  # pytype: disable=import-error
 from .types import Request, Response, ResponsesOrError  # pytype: disable=import-error
 
@@ -326,13 +332,15 @@ class TritonPythonModel:
     def __init__(self):
         """Dummy inititializer."""
         self._model_config = None
-        self._model_inputs_names = None
+        self._model_inputs = None
         self._model_outputs = None
+        self._model_inputs_names = None
         self._model_instance_name = None
         self._decoupled_model = None
         self._serializer_deserializer = None
         self._requests_server = None
         self._requests_server_thread = None
+        self._handshake_server = None
         self._loop = None
         self._frontend = None
         self._requests = None
@@ -356,14 +364,12 @@ class TritonPythonModel:
         _update_loggers()  # Triton backend logger is available from this point on
 
         try:
-            # parse config and args
             model_name = args["model_name"]
 
-            model_config_dict = json.loads(args["model_config"])
-            self._model_config = model_config_dict
-            model_inputs = {model_input["name"] for model_input in model_config_dict["input"]}
+            self._model_config = model_config_dict = json.loads(args["model_config"])
+            self._model_inputs = {model_input["name"] for model_input in model_config_dict["input"]}
             self._model_outputs = {model_output["name"]: model_output for model_output in model_config_dict["output"]}
-            self._model_inputs_names = list(model_inputs)
+            self._model_inputs_names = list(self._model_inputs)
             self._decoupled_model = model_config_dict.get("model_transaction_policy", {}).get("decoupled", False)
             self._model_instance_name = args.get("model_instance_name")
 
@@ -372,30 +378,25 @@ class TritonPythonModel:
             LOGGER.debug(f"Model instance name: {self._model_instance_name}")
             LOGGER.debug(f"Decoupled model: {self._decoupled_model}")
             LOGGER.debug(f"Workspace path: {workspace_path}")
-            LOGGER.debug(f"Model inputs: {model_inputs}")
+            LOGGER.debug(f"Model inputs: {self._model_inputs}")
             LOGGER.debug(f"Model outputs: {self._model_outputs}")
 
             # init serializer/deserializer
             data_socket = workspace_path / f"{model_name}-data.sock"
             self._serializer_deserializer = TensorStoreSerializerDeserializer()
 
-            config_path = workspace_path / f"{model_name}-config.json"
+            handshake_socket = workspace_path / f"{model_name}-config.sock"
             model_first_instance_name = "_".join(self._model_instance_name.split("_")[:-1] + ["0"])
             if self._model_instance_name == model_first_instance_name:
+                inference_handler_config = TritonInferenceHandlerConfigGenerator(data_socket).get_config()
                 self._serializer_deserializer.start(data_socket)
-                # TODO: temporary solution to avoid complication of communication code
-                with config_path.open("w") as config_file:
-                    inference_handler_config = TritonInferenceHandlerConfigGenerator(data_socket).get_config()
-                    json.dump(inference_handler_config, config_file)
-            else:
-                # wait for config from 1st instance
-                LOGGER.debug(f"Waiting for config file {config_path}")
-                while not config_path.exists():
-                    time.sleep(0.001)
 
-                with config_path.open("r") as config_file:
-                    inference_handler_config = json.load(config_file)
-                LOGGER.debug(f"Loaded configuration from {config_path}")
+                self._handshake_server = HandshakeServer(handshake_socket, inference_handler_config)
+                self._handshake_server.start()
+
+            else:
+                inference_handler_config = get_config_from_handshake_server(handshake_socket)
+                LOGGER.debug(f"Loaded configuration from {handshake_socket}")
                 authkey = base64.decodebytes(inference_handler_config["authkey"].encode("ascii"))
                 self._serializer_deserializer.connect(data_socket, authkey=authkey)
 
@@ -477,6 +478,11 @@ class TritonPythonModel:
         LOGGER.debug(f"[{self._model_instance_name}] Closing requests/responses serializer/deserializer")
         self._serializer_deserializer.close()
         self._serializer_deserializer = None
+
+        LOGGER.debug(f"[{self._model_instance_name}] Closing handshake server")
+        if self._handshake_server:
+            self._handshake_server.close()
+            self._handshake_server = None
 
         LOGGER.debug(f"[{self._model_instance_name}] Finalized.")
         self._model_instance_name = None

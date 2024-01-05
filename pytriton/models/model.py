@@ -15,12 +15,10 @@
 import base64
 import copy
 import enum
-import json
 import logging
 import pathlib
 import shutil
 import threading
-import time
 import typing
 from typing import Callable, Optional, Sequence, Union
 
@@ -30,6 +28,7 @@ from pytriton.model_config.generator import ModelConfigGenerator
 from pytriton.model_config.model_config import ModelConfig
 from pytriton.model_config.tensor import Tensor
 from pytriton.model_config.triton_model_config import DeviceKind, ResponseCache, TensorSpec, TritonModelConfig
+from pytriton.proxy.communication import get_config_from_handshake_server
 from pytriton.proxy.data import TensorStoreSerializerDeserializer
 from pytriton.proxy.inference import InferenceHandler, InferenceHandlerEvent, RequestsResponsesConnector
 from pytriton.proxy.validators import TritonResultsValidator
@@ -191,12 +190,8 @@ class Model:
                 workspace_path = pathlib.Path(triton_model_config.backend_parameters["workspace-path"])
                 validator = TritonResultsValidator(triton_model_config, self._strict)
 
-                # TODO: obtain data socket from msg from backend
-                inference_handler_config_path = workspace_path / f"{self.model_name}-config.json"
-                while not inference_handler_config_path.exists():
-                    time.sleep(0.1)
-                with inference_handler_config_path.open("r") as config_file:
-                    inference_handler_config = json.load(config_file)
+                inference_handler_config_path = workspace_path / f"{self.model_name}-config.sock"
+                inference_handler_config = get_config_from_handshake_server(inference_handler_config_path)
 
                 data_socket = pathlib.Path(inference_handler_config["data_socket"])
                 authkey = base64.decodebytes(inference_handler_config["authkey"].encode("ascii"))
@@ -205,13 +200,12 @@ class Model:
                 for i, infer_function in enumerate(self.infer_functions):
                     self.triton_context.model_configs[infer_function] = copy.deepcopy(triton_model_config)
                     _inject_triton_context(self.triton_context, infer_function)
-                    model_instance_name = f"{self.model_name}_0_{i}"  # TODO: sometimes it is _0_{idx}, sometimes is _{idx}; 0 is instance_group_id
-                    # TODO: do not hardcode this - better put template into model config
-                    shared_memory_socket = workspace_path / f"{model_instance_name}-server.sock"
-                    shared_memory_socket = f"ipc://{shared_memory_socket.as_posix()}"
+
+                    request_server_socket = workspace_path / f"{self.model_name}_0_{i}-server.sock"
+                    request_server_socket = f"ipc://{request_server_socket.as_posix()}"
 
                     requests_respones_connector = RequestsResponsesConnector(
-                        url=shared_memory_socket,
+                        url=request_server_socket,
                         serializer_deserializer=self._serializer_deserializer,
                     )
                     requests_respones_connector.start()

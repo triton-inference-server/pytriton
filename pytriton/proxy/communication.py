@@ -15,8 +15,12 @@
 import asyncio
 import enum
 import functools
+import json
 import logging
+import pathlib
+import socket
 import threading
+import time
 import traceback
 import typing
 import uuid
@@ -435,3 +439,130 @@ class RequestsServerClient:
         """
         flags = flags.to_bytes(1, "big")
         await socket.send_multipart([scope["requests_id"], flags, requests_payload])
+
+
+class HandshakeServer(threading.Thread):
+    """Handshake server for passing config."""
+
+    def __init__(self, socket_path: pathlib.Path, inference_handler_config) -> None:
+        """Initialize HandshakeServer.
+
+        Args:
+            socket_path: path to socket
+            inference_handler_config: config for InferenceHandler
+        """
+        super().__init__(daemon=True, name="handshake-server")
+        self._socket_path = socket_path
+        try:
+            self._config_payload = json.dumps(inference_handler_config).encode()
+        except TypeError:
+            raise ValueError(f"InferenceHandler config is not serializable: {inference_handler_config}")
+
+        self._server = None
+        self._error_from_thread = None
+
+    def start(self):
+        """Start HandshakeServer.
+
+        Raises:
+            RuntimeError: if HandshakeServer is already running or error occurred during starting
+        """
+        if self._server:
+            raise RuntimeError("HandshakeServer is already running")
+
+        super().start()
+        while self._server is None and not self._error_from_thread:
+            time.sleep(0.001)
+        if self._error_from_thread is not None:
+            raise self._error_from_thread
+
+    def run(self):
+        """Run HandshakeServer."""
+        asyncio.run(self._run())
+
+    async def _run(self):
+        try:
+            self._server = await asyncio.start_unix_server(self._handle_request, self._socket_path)
+            async with self._server:
+                try:
+                    await self._server.serve_forever()
+                except asyncio.CancelledError:
+                    pass
+        except Exception as e:
+            SERVER_LOGGER.error(f"Error occurred during running handshake server (e: {e})")
+            self._error_from_thread = e
+
+    def close(self):
+        """Close HandshakeServer."""
+        loop = self._server.get_loop()
+        loop_tasks = asyncio.all_tasks(loop=loop)
+        for task in loop_tasks:
+            loop.call_soon_threadsafe(task.cancel)
+
+        self.join()
+        SERVER_LOGGER.debug("Closed handshake server")
+
+    async def _handle_request(self, reader, writer):
+        peername = writer.get_extra_info("peername")
+        try:
+            request_name = await asyncio.wait_for(reader.readuntil(b"\n"), timeout=1.0)
+
+            if request_name == b"get_config\n":
+                writer.write(len(self._config_payload).to_bytes(4, "big"))
+                writer.write(self._config_payload)
+                await writer.drain()
+            else:
+                SERVER_LOGGER.warning(f"Unknown request {request_name} from {peername}")
+
+        except asyncio.TimeoutError:
+            SERVER_LOGGER.debug(f"Timeout occurred during handling request from {peername}")
+        except Exception as e:
+            SERVER_LOGGER.error(f"Error occurred during handling request from {peername} (e: {e})")
+        finally:
+            writer.close()
+            await writer.wait_closed()
+
+
+def get_config_from_handshake_server(socket_path: pathlib.Path, timeout_s: float = 1.0) -> dict:
+    """Get config from handshake server.
+
+    Args:
+        socket_path: path to socket
+
+    Returns:
+        config from handshake server
+
+    Raises:
+        TimeoutError: if timeout occurred while waiting for the response
+        ValueError: if invalid JSON response from the server
+    """
+    should_stop_before_s = time.time() + timeout_s
+    sock = None
+    try:
+        LOGGER.debug(f"Waiting for config file {socket_path}")
+        while not socket_path.exists() and time.time() < should_stop_before_s:
+            time.sleep(0.001)
+
+        if not socket_path.exists():
+            raise TimeoutError(f"Timeout occurred while waiting for config file {socket_path}")
+
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.settimeout(max(0.0, should_stop_before_s - time.time()))
+        sock.connect(socket_path.as_posix())
+        sock.sendall(b"get_config\n")
+
+        sock.settimeout(max(0.0, should_stop_before_s - time.time()))
+        payload_size = sock.recv(4)
+        payload_size = int.from_bytes(payload_size, "big")
+
+        sock.settimeout(max(0.0, should_stop_before_s - time.time()))
+        config_payload = sock.recv(payload_size)
+        config = json.loads(config_payload)
+        return config
+    except socket.timeout as e:
+        raise TimeoutError(f"Timeout occurred while waiting for config file {socket_path}") from e
+    except json.JSONDecodeError as e:
+        raise ValueError("Invalid JSON response from the server.") from e
+    finally:
+        if sock is not None:
+            sock.close()
