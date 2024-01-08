@@ -15,10 +15,21 @@
 import base64
 import json
 import logging
-import multiprocessing
+import pathlib
+import sys
 import time
+import traceback
+
+import numpy as np
+import pytest
 
 from pytriton.model_config.generator import ModelConfigGenerator
+from pytriton.model_config.triton_model_config import TensorSpec, TritonModelConfig
+from pytriton.proxy.communication import get_config_from_handshake_server
+from pytriton.proxy.data import TensorStoreSerializerDeserializer
+from pytriton.proxy.inference import RequestsResponsesConnector
+from pytriton.proxy.validators import TritonResultsValidator
+from pytriton.triton import TRITONSERVER_DIST_DIR
 
 LOGGER = logging.getLogger("tests.test_model_error_handling")
 logging.basicConfig(
@@ -68,21 +79,15 @@ def _error_infer_gen_fn(*_, **__):
     raise RuntimeError("division by zero")
 
 
-def _get_proxy_backend(mocker, model_config, workspace_path, data_store_socket):
+def _get_proxy_backend(model_config):
     from pytriton.proxy.model import TritonPythonModel
 
-    authkey = multiprocessing.current_process().authkey
-    authkey = base64.b64encode(authkey).decode("utf-8")
-    # instance_data = {
-    #     "workspace-path": workspace_path,
-    #     "data-store-socket": data_store_socket,
-    #     "auth-key": authkey,
-    # }
-
-    # mocker.patch.object(TritonPythonModel, "_get_instance_data", return_value=instance_data)
-
     model_config_json_payload = json.dumps(ModelConfigGenerator(model_config).get_config()).encode("utf-8")
-    backend_initialization_args = {"model_config": model_config_json_payload}
+    backend_initialization_args = {
+        "model_config": model_config_json_payload,
+        "model_name": model_config.model_name,
+        "model_instance_name": f"{model_config.model_name}_0_0",
+    }
 
     backend_model = None
     try:
@@ -95,97 +100,97 @@ def _get_proxy_backend(mocker, model_config, workspace_path, data_store_socket):
         raise
 
 
-# @pytest.mark.skip(reason="temporary disabled")
-# @pytest.mark.parametrize(
-#     "infer_fn,decoupled",
-#     [
-#         (_error_infer_fn, False),
-#         (_error_infer_gen_fn, True),
-#     ],
-# )
-# def test_model_throws_exception(tmp_path, mocker, infer_fn, decoupled):
+@pytest.mark.parametrize(
+    "infer_fn,decoupled",
+    [
+        (_error_infer_fn, False),
+    ],
+)
+def test_model_throws_exception(tmp_path, mocker, infer_fn, decoupled):
+    # add python backend folder to find triton_python_backend_utils from model.py
+    python_backend_path = TRITONSERVER_DIST_DIR / "backends" / "python"
+    sys.path.append(str(python_backend_path))
 
-#     # add python backend folder to find triton_python_backend_utils from model.py
-#     python_backend_path = TRITONSERVER_DIST_DIR / "backends" / "python"
-#     sys.path.append(str(python_backend_path))
+    print("sys.path updated")  # noqa: T201
+    for entry in sys.path:
+        print(f"  {entry}")  # noqa: T201
 
-#     print("sys.path updated")  # noqa: T201
-#     for entry in sys.path:
-#         print(f"  {entry}")  # noqa: T201
+    try:
+        import triton_python_backend_utils as pb_utils  # pytype: disable=import-error
 
-#     try:
-#         import triton_python_backend_utils as pb_utils  # pytype: disable=import-error
+        # add TritonModelException to pb_utils for test (python backend does this in C++ code)
+        pb_utils.TritonModelException = RuntimeError
+        pb_utils.Logger = mocker.Mock()
 
-#         # add TritonModelException to pb_utils for test (python backend does this in C++ code)
-#         pb_utils.TritonModelException = RuntimeError
-#         pb_utils.Logger = Mock()
+        from pytriton.proxy.inference import InferenceHandler
+        from pytriton.utils.workspace import Workspace
 
-#         from pytriton.proxy.inference_handler import InferenceHandler
-#         from pytriton.utils.workspace import Workspace
+        model_name = "model1"
+        workspace = Workspace(pathlib.Path(tmp_path) / "w")
 
-#         model_name = "model1"
-#         workspace = Workspace(pathlib.Path(tmp_path) / "w")
-#         ipc_socket_path = workspace.path / f"proxy_{model_name}.ipc"
-#         shared_memory_socket = f"ipc://{ipc_socket_path.as_posix()}"
-#         data_store_socket = (workspace.path / "data_store.socket").as_posix()
+        model_config = TritonModelConfig(
+            model_name=model_name,
+            inputs=[TensorSpec(name="input1", dtype=np.float32, shape=(-1,))],
+            outputs=[TensorSpec(name="output1", dtype=np.float32, shape=(-1,))],
+            backend_parameters={"workspace-path": workspace.path.as_posix()},
+            decoupled=decoupled,
+        )
 
-#         model_config = TritonModelConfig(
-#             model_name=model_name,
-#             inputs=[TensorSpec(name="input1", dtype=np.float32, shape=(-1,))],
-#             outputs=[TensorSpec(name="output1", dtype=np.float32, shape=(-1,))],
-#             backend_parameters={"workspace-path": workspace.path.as_posix()},
-#             decoupled=decoupled,
-#         )
+        backend_model = _get_proxy_backend(model_config)
 
-#         zmq_context = zmq.asyncio.Context()
+        validator = TritonResultsValidator(model_config, True)
+        inference_handler_config_path = workspace.path / f"{model_name}-config.sock"
+        inference_handler_config = get_config_from_handshake_server(inference_handler_config_path)
 
-#         authkey = multiprocessing.current_process().authkey
-#         tensor_store = TensorStore(data_store_socket, authkey)
-#         tensor_store.start()
+        serializer_deserializer = TensorStoreSerializerDeserializer()
+        serializer_deserializer.connect(
+            inference_handler_config["data_socket"],
+            base64.decodebytes(inference_handler_config["authkey"].encode("ascii")),
+        )
+        request_server_socket = workspace.path / f"{model_name}_0_0-server.sock"
+        request_server_socket = f"ipc://{request_server_socket.as_posix()}"
+        requests_respones_connector = RequestsResponsesConnector(
+            url=request_server_socket,
+            serializer_deserializer=serializer_deserializer,
+        )
+        requests_respones_connector.start()
+        inference_handler = InferenceHandler(
+            infer_fn,
+            requests_responses_connector=requests_respones_connector,
+            validator=validator,
+            name=f"inference_handler-{model_name}",
+        )
+        inference_handler.start()
 
-#         backend_model = _get_proxy_backend(mocker, model_config, shared_memory_socket, data_store_socket)
+        requests = [
+            InferenceRequest(
+                model_name=model_name,
+                inputs=[Tensor("input1", np.array([[1, 2, 3]], dtype=np.float32))],
+                requested_output_names=["output1"],
+            ),
+        ]
 
-#         serializer_deserializer = None
-#         validator = None
-#         inference_handler = InferenceHandler(
-#             infer_fn,
-#             shared_memory_socket,
-#             zmq_context,
-#             serializer_deserializer,
-#             validator,
-#         )
-#         inference_handler.start()
+        try:
+            result = backend_model.execute(requests)
+            pytest.fail(f"Model raised exception, but exec_batch passed - result: {result}")
+        except pb_utils.TritonModelException:  # pytype: disable=module-attr
+            LOGGER.info("Inference exception")
+            msg = traceback.format_exc()
+            LOGGER.info(msg)
+            assert "division by zero" in msg
+        except Exception:
+            msg = traceback.format_exc()
+            pytest.fail(f"Wrong exception raised: {msg}")
+        finally:
+            inference_handler.stop()
+            requests_respones_connector.close()
+            backend_model.finalize()
 
-#         requests = [
-#             InferenceRequest(
-#                 model_name=model_name,
-#                 inputs=[Tensor("input1", np.array([[1, 2, 3]], dtype=np.float32))],
-#                 requested_output_names=["output1"],
-#             ),
-#         ]
+    finally:
+        sys.path.pop()
+        if "pb_utils" in locals() and hasattr(pb_utils, "TritonModelException"):  # pytype: disable=name-error
+            delattr(pb_utils, "TritonModelException")  # pytype: disable=name-error
 
-#         try:
-#             result = backend_model.execute(requests)
-#             pytest.fail(f"Model raised exception, but exec_batch passed - result: {result}")
-#         except pb_utils.TritonModelException:  # pytype: disable=module-attr
-#             LOGGER.info("Inference exception")
-#             msg = traceback.format_exc()
-#             LOGGER.info(msg)
-#             assert "division by zero" in msg
-#         except Exception:
-#             msg = traceback.format_exc()
-#             pytest.fail(f"Wrong exception raised: {msg}")
-#         finally:
-#             zmq_context.term()
-#             inference_handler.stop()
-#             backend_model.finalize()
-#             tensor_store.close()
-
-#     finally:
-#         sys.path.pop()
-#         if "pb_utils" in locals() and hasattr(pb_utils, "TritonModelException"):  # pytype: disable=name-error
-#             delattr(pb_utils, "TritonModelException")  # pytype: disable=name-error
-
-#         print("sys.path cleaned-up")  # noqa: T201
-#         for entry in sys.path:
-#             print(f"  {entry}")  # noqa: T201
+        print("sys.path cleaned-up")  # noqa: T201
+        for entry in sys.path:
+            print(f"  {entry}")  # noqa: T201

@@ -18,7 +18,6 @@ Runs inference session over NLP model
 import logging
 import pathlib
 import tempfile
-import textwrap
 from concurrent.futures import FIRST_COMPLETED, wait
 from typing import Callable, List
 
@@ -123,10 +122,14 @@ def huggingface_distilbert(test_time_s: int, init_timeout_s: int, batch_size: in
 
         finally:
             if triton_log_path.exists():
-                logger.debug("-" * 64)
-                server_logs = triton_log_path.read_text(errors="replace")
-                server_logs = "--- triton logs:\n\n" + textwrap.indent(server_logs, prefix=" " * 8)
-                logger.debug(server_logs)
+                logger.info("-" * 32 + " triton logs " + "-" * 32)
+                triton_logs_logger = logger.getChild("triton_logs")
+                stdout_handler = logging.StreamHandler()
+                stdout_handler.setFormatter(logging.Formatter("        %(message)s"))
+                triton_logs_logger.addHandler(stdout_handler)
+                triton_logs_logger.propagate = False
+                for line in triton_log_path.read_text(errors="replace").splitlines():
+                    triton_logs_logger.info(line)
 
 
 def _create_hf_tensorflow_distilbert_base_uncased_fn(model_name: str) -> Callable:

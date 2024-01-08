@@ -39,13 +39,9 @@ async def _generate_for_request(request):
     - stream: whether to stream the results or not.
     - other fields: the sampling parameters (See `SamplingParams` for details).
     """
-    # TODO: how await is implemented in request.json()
-    # request_dict = await request.json()
-
-    prompt = request.data.get("prompt").tolist()[0].decode("utf-8")  # TODO: can we do pop here ...
+    prompt = request.data.get("prompt").tolist()[0].decode("utf-8")
     stream = request.parameters.get("stream", False)
 
-    # TODO: ... then this line will be obsolete
     sampling_params = {name: value.item() for name, value in request.data.items() if name not in ("prompt", "stream")}
     sampling_params = SamplingParams(**sampling_params)
     request_id = random_uuid()

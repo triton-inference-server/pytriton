@@ -11,18 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import base64
+import multiprocessing
 import pathlib
 import tempfile
 
 import numpy as np
-import pytest
 
 from pytriton.decorators import TritonContext, batch
 from pytriton.model_config.tensor import Tensor
 from pytriton.model_config.triton_model_config import TensorSpec
 from pytriton.models.manager import ModelManager
 from pytriton.models.model import Model, ModelConfig
-from pytriton.proxy.data import TensorStore
+from pytriton.proxy.communication import HandshakeServer
+from pytriton.proxy.data import PROTOCOL_VERSION, TensorStore
 from pytriton.proxy.types import Request
 from pytriton.utils.workspace import Workspace
 
@@ -33,6 +35,7 @@ def test_get_model_config_return_model_config_when_minimal_required_data(tmp_pat
 
     triton_context = TritonContext()
     workspace = Workspace(tmp_path / "workspace")
+
     model = Model(
         model_name="simple",
         model_version=2,
@@ -211,16 +214,29 @@ def test_generate_models_with_same_names_and_different_versions_create_model_sto
             assert (model_repository / "simple" / "2" / "model.py").is_file()
 
 
-@pytest.mark.skip(reason="temporary skip")
 def test_setup_create_proxy_backend_connection(tmp_path):
     def infer_func(inputs):
         return inputs
 
     triton_context = TritonContext()
     workspace = Workspace(tmp_path / "workspace")
-    tensor_store = TensorStore(workspace.path / "data_store.sock")
+
+    data_socket = workspace.path / "data_store.sock"
+    tensor_store = TensorStore(data_socket)
+
+    model_name = "simple"
+    config_socket = workspace.path / f"{model_name}-config.sock"
+    handshake_server = HandshakeServer(
+        config_socket,
+        {
+            "protocol_version": PROTOCOL_VERSION,
+            "data_socket": data_socket.as_posix(),
+            "authkey": base64.encodebytes(multiprocessing.current_process().authkey).decode("ascii"),
+        },
+    )
+
     model = Model(
-        model_name="simple",
+        model_name=model_name,
         model_version=2,
         inference_fn=infer_func,
         inputs=[
@@ -237,24 +253,38 @@ def test_setup_create_proxy_backend_connection(tmp_path):
     )
 
     try:
+        handshake_server.start()
         tensor_store.start()
         model.setup()
         assert len(model._inference_handlers) == 1
     finally:
         model.clean()
         tensor_store.close()
+        handshake_server.close()
 
 
-@pytest.mark.skip(reason="temporary skip")
 def test_setup_can_be_called_multiple_times(tmp_path):
     def infer_func(inputs):
         return inputs
 
     triton_context = TritonContext()
     workspace = Workspace(tmp_path / "workspace")
-    tensor_store = TensorStore(workspace.path / "data_store.sock")
+    data_socket = workspace.path / "data_store.sock"
+    tensor_store = TensorStore(data_socket)
+
+    model_name = "simple"
+    config_socket = workspace.path / f"{model_name}-config.sock"
+    handshake_server = HandshakeServer(
+        config_socket,
+        {
+            "protocol_version": PROTOCOL_VERSION,
+            "data_socket": data_socket.as_posix(),
+            "authkey": base64.encodebytes(multiprocessing.current_process().authkey).decode("ascii"),
+        },
+    )
+
     model = Model(
-        model_name="simple",
+        model_name=model_name,
         model_version=2,
         inference_fn=infer_func,
         inputs=[
@@ -271,6 +301,7 @@ def test_setup_can_be_called_multiple_times(tmp_path):
     )
 
     try:
+        handshake_server.start()
         tensor_store.start()
         model.setup()
         assert len(model._inference_handlers) == 1
@@ -288,18 +319,30 @@ def test_setup_can_be_called_multiple_times(tmp_path):
     finally:
         model.clean()
         tensor_store.close()
+        handshake_server.close()
 
 
-@pytest.mark.skip(reason="temporary skip")
 def test_clean_remove_proxy_backend_connection(tmp_path):
     def infer_func(inputs):
         return inputs
 
     triton_context = TritonContext()
     workspace = Workspace(tmp_path / "workspace")
-    tensor_store = TensorStore(workspace.path / "data_store.sock")
+    data_socket = workspace.path / "data_store.sock"
+    tensor_store = TensorStore(data_socket)
+
+    model_name = "simple"
+    config_socket = workspace.path / f"{model_name}-config.sock"
+    handshake_server = HandshakeServer(
+        config_socket,
+        {
+            "protocol_version": PROTOCOL_VERSION,
+            "data_socket": data_socket.as_posix(),
+            "authkey": base64.encodebytes(multiprocessing.current_process().authkey).decode("ascii"),
+        },
+    )
     model = Model(
-        model_name="simple",
+        model_name=model_name,
         model_version=2,
         inference_fn=infer_func,
         inputs=[
@@ -316,24 +359,38 @@ def test_clean_remove_proxy_backend_connection(tmp_path):
     )
 
     try:
+        handshake_server.start()
         tensor_store.start()
         model.setup()
     finally:
         model.clean()
         tensor_store.close()
+        handshake_server.close()
+
     assert len(model._inference_handlers) == 0
 
 
-@pytest.mark.skip(reason="temporary skip")
 def test_clean_can_be_called_multiple_times(tmp_path):
     def infer_func(inputs):
         return inputs
 
     triton_context = TritonContext()
     workspace = Workspace(tmp_path / "workspace")
-    tensor_store = TensorStore(workspace.path / "data_store.sock")
+    data_socket = workspace.path / "data_store.sock"
+    tensor_store = TensorStore(data_socket)
+
+    model_name = "simple"
+    config_socket = workspace.path / f"{model_name}-config.sock"
+    handshake_server = HandshakeServer(
+        config_socket,
+        {
+            "protocol_version": PROTOCOL_VERSION,
+            "data_socket": data_socket.as_posix(),
+            "authkey": base64.encodebytes(multiprocessing.current_process().authkey).decode("ascii"),
+        },
+    )
     model = Model(
-        model_name="simple",
+        model_name=model_name,
         model_version=2,
         inference_fn=infer_func,
         inputs=[
@@ -350,6 +407,7 @@ def test_clean_can_be_called_multiple_times(tmp_path):
     )
 
     try:
+        handshake_server.start()
         tensor_store.start()
         model.setup()
         model.clean()
@@ -357,9 +415,9 @@ def test_clean_can_be_called_multiple_times(tmp_path):
         assert len(model._inference_handlers) == 0
     finally:
         tensor_store.close()
+        handshake_server.close()
 
 
-@pytest.mark.skip(reason="temporary skip")
 def test_is_alive_return_false_when_model_not_setup(tmp_path):
     def infer_func(inputs):
         return inputs
@@ -388,16 +446,27 @@ def test_is_alive_return_false_when_model_not_setup(tmp_path):
     assert not model.is_alive()
 
 
-@pytest.mark.skip(reason="temporary skip")
 def test_is_alive_return_true_when_model_is_setup(tmp_path):
     def infer_func(inputs):
         return inputs
 
     triton_context = TritonContext()
     workspace = Workspace(tmp_path / "workspace")
-    tensor_store = TensorStore(workspace.path / "data_store.sock")
+    data_socket = workspace.path / "data_store.sock"
+    tensor_store = TensorStore(data_socket)
+
+    model_name = "simple"
+    config_socket = workspace.path / f"{model_name}-config.sock"
+    handshake_server = HandshakeServer(
+        config_socket,
+        {
+            "protocol_version": PROTOCOL_VERSION,
+            "data_socket": data_socket.as_posix(),
+            "authkey": base64.encodebytes(multiprocessing.current_process().authkey).decode("ascii"),
+        },
+    )
     model = Model(
-        model_name="simple",
+        model_name=model_name,
         model_version=2,
         inference_fn=infer_func,
         inputs=[
@@ -414,6 +483,7 @@ def test_is_alive_return_true_when_model_is_setup(tmp_path):
     )
 
     try:
+        handshake_server.start()
         tensor_store.start()
         model.setup()
         assert model.is_alive()
@@ -421,9 +491,9 @@ def test_is_alive_return_true_when_model_is_setup(tmp_path):
     finally:
         model.clean()
         tensor_store.close()
+        handshake_server.close()
 
 
-@pytest.mark.skip(reason="temporary skip")
 def test_triton_context_injection(tmp_path):
     class Multimodel:
         @batch
@@ -442,8 +512,27 @@ def test_triton_context_injection(tmp_path):
 
     triton_context = TritonContext()
     workspace = Workspace(tmp_path / "workspace")
-    tensor_store = TensorStore(workspace.path / "data_store.sock")
-    tensor_store.start()
+
+    models_names = ["simple1", "simple2", "simple3"]
+    tensor_stores = [TensorStore(workspace.path / f"{model_name}-data.sock") for model_name in models_names]
+
+    handshake_servers = [
+        HandshakeServer(
+            workspace.path / f"{model_name}-config.sock",
+            {
+                "protocol_version": PROTOCOL_VERSION,
+                "data_socket": tensor_store.address,
+                "authkey": base64.encodebytes(multiprocessing.current_process().authkey).decode("ascii"),
+            },
+        )
+        for model_name, tensor_store in zip(["simple1", "simple2", "simple3"], tensor_stores)
+    ]
+    for handshake_server in handshake_servers:
+        handshake_server.start()
+
+    for tensor_store in tensor_stores:
+        tensor_store.start()
+
     model1 = Model(
         model_name="simple1",
         model_version=1,
@@ -525,4 +614,7 @@ def test_triton_context_injection(tmp_path):
         assert_inputs_properly_mapped_to_outputs("out3", outputs3, input_requests3[0]["variable3"])
     finally:
         manager.clean()
-        tensor_store.close()
+        for tensor_store in tensor_stores:
+            tensor_store.close()
+        for handshake_server in handshake_servers:
+            handshake_server.close()

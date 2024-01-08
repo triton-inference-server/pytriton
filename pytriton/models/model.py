@@ -91,6 +91,7 @@ class Model:
             outputs: Model outputs definition
             config: model configuration parameters
             workspace: workspace for storing artifacts
+            triton_context: Triton context
             strict: Enable strict validation of model outputs
 
         Raises:
