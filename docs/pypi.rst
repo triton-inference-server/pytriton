@@ -16,120 +16,154 @@
 PyTriton
 ==========
 
-PyTriton is a Flask/FastAPI-like interface that simplifies Triton's deployment in Python environments.
-The library allows serving Machine Learning models directly from Python through
-NVIDIA's `Triton Inference Server`_.
+PyTriton - a Flask/FastAPI-like framework designed to streamline
+the use of NVIDIA's `Triton Inference Server <https://github.com/triton-inference-server>`_.
 
-.. _Triton Inference Server: https://github.com/triton-inference-server
+For comprehensive guidance on how to deploy your models, optimize performance,
+and explore the API, delve into the extensive resources found in our
+`documentation <https://triton-inference-server.github.io/pytriton/>`_.
 
-In PyTriton, as in Flask or FastAPI, you can define any Python function that executes a machine learning model prediction and exposes
-it through an HTTP/gRPC API. PyTriton installs Triton Inference Server in your environment and uses it for handling
-HTTP/gRPC requests and responses. Our library provides a Python API that allows attaching a Python function to Triton
-and a communication layer to send/receive data between Triton and the function. This solution helps utilize the
-performance features of Triton Inference Server, such as dynamic batching or response cache, without changing your model
-environment. Thus, it improves the performance of running inference on GPU for models implemented in Python. The solution is
-framework-agnostic and can be used along with frameworks like PyTorch, TensorFlow, or JAX.
+Features at a Glance
+--------------------
+
+The distinct capabilities of PyTriton are summarized in the feature matrix:
+
++------------------------+--------------------------------------------------------------------------------------+
+| Feature                | Description                                                                          |
++========================+======================================================================================+
+| Native Python support  | You can create any `Python function <https://triton-inference-server.github.io/pytri |
+|                        | ton/latest/inference_callable/>`_ and expose it as an HTTP/gRPC API.                 |
++------------------------+--------------------------------------------------------------------------------------+
+| Framework-agnostic     | You can run any Python code with any framework of your choice, such as: PyTorch,     |
+|                        | TensorFlow, or JAX.                                                                  |
++------------------------+--------------------------------------------------------------------------------------+
+| Performance            | You can benefit from `dynamic batching <https://triton-inference-server.github.io/py |
+| optimization           | triton/latest/decorators/#batch>`_, response cache, model pipelining, `clusters      |
+|                        | <https://triton-inference-server.github.io/pytriton/latest/deploying_in_clusters/>`_ |
+|                        | , and GPU/CPU inference.                                                             |
++------------------------+--------------------------------------------------------------------------------------+
+| Decorators             | You can use batching `decorators <https://triton-inference-server.github.io/pytriton |
+|                        | /latest/decorators/>`_ to handle batching  and other pre-processing tasks for your   |
+|                        | inference function.                                                                  |
++------------------------+--------------------------------------------------------------------------------------+
+| Easy `installation     | You can use a simple and familiar interface based on Flask/FastAPI for easy          |
+| <https://triton-infer  | installation and `setup <https://triton-inference-server.github.io/pytriton/latest/b |
+| ence-server.github.io/ | inding_models/>`_.                                                                   |
+| pytriton/latest/instal |                                                                                      |
+| lation/>`_ and setup   |                                                                                      |
++------------------------+--------------------------------------------------------------------------------------+
+| `Model clients         | You can access high-level model clients for HTTP/gRPC requests with configurable     |
+| <https://triton-infer  | options and both synchronous and `asynchronous <https://triton-inference-server.gith |
+| ence-server.github.io/ | ub.io/pytriton/latest/clients/#asynciomodelclient>`_  API.                           |
+| pytriton/latest/clien  |                                                                                      |
+| ts>`_                  |                                                                                      |
++------------------------+--------------------------------------------------------------------------------------+
+| Streaming (alpha)      | You can stream partial responses from a model by serving it in a `decoupled mode     |
+|                        | <https://triton-inference-server.github.io/pytriton/latest/clients/#decoupledmodelcl |
+|                        | ient>`_.                                                                             |
++------------------------+--------------------------------------------------------------------------------------+
+
+Learn more about PyTriton's `architecture <https://triton-inference-server.github.io/pytriton/latest/#architecture>`_.
+
+Prerequisites
+-------------
+
+Before proceeding with the installation of PyTriton, ensure your system meets the following criteria:
+
+- **Operating System**: Compatible with glibc version ``2.35`` or higher.
+  - Primarily tested on Ubuntu 22.04.
+  - Other supported OS include Debian 11+, Rocky Linux 9+, and Red Hat UBI 9+.
+  - Use ``ldd --version`` to verify your glibc version.
+- **Python**: Version ``3.8`` or newer.
+- **pip**: Version ``20.3`` or newer.
+- **libpython**: Ensure ``libpython3.*.so`` is installed, corresponding to your Python version.
+
+Install
+-------
+
+The PyTriton can be installed from pypi.org by running the following command::
+
+    pip install nvidia-pytriton
+
+**Important**: The Triton Inference Server binary is installed as part of the PyTriton package.
+
+Discover more about PyTriton's `installation procedures <https://triton-inference-server.github.io/pytriton/latest/installation/>`_, including Docker usage, prerequisites, and insights into `building binaries from source <https://triton-inference-server.github.io/pytriton/latest/building/>`_ to match your specific Triton server versions.
 
 
-Installation
---------------
+Quick Start
+-----------
 
-The package can be installed from `pypi`_ using:
+The quick start presents how to run Python model in Triton Inference Server without need to change the current working
+environment. In the example we are using a simple `Linear` model.
 
-.. _pypi: https://pypi.org/project/nvidia-pytriton/
-
-.. code-block:: text
-
-    pip install -U nvidia-pytriton
-
-More details about installation can be found in the `documentation`_.
-
-.. _documentation: https://triton-inference-server.github.io/pytriton/latest/installation/
-
-Example
----------
-
-The example presents how to run Python model in Triton Inference Server without need to change the current working
-environment. In the example we are using a simple `Linear` PyTorch model.
-
-The requirement for the example is to have installed PyTorch in your environment. You can do it running:
-
-
-.. code-block:: text
-
-    pip install torch
-
-In the next step define the `Linear` model:
-
-.. code-block:: python
-
-    import torch
-
-    model = torch.nn.Linear(2, 3).to("cuda").eval()
-
-Create a function for handling inference request:
+The `infer_fn` is a function that takes an `data` tensor and returns a list with single output tensor. The `@batch` from `batching decorators <https://triton-inference-server.github.io/pytriton/latest/decorators/>`_ is used to handle batching for the model.
 
 .. code-block:: python
 
     import numpy as np
     from pytriton.decorators import batch
 
-
     @batch
-    def infer_fn(**inputs: np.ndarray):
-        (input1_batch,) = inputs.values()
-        input1_batch_tensor = torch.from_numpy(input1_batch).to("cuda")
-        output1_batch_tensor = model(input1_batch_tensor)  # Calling the Python model inference
-        output1_batch = output1_batch_tensor.cpu().detach().numpy()
-        return [output1_batch]
+    def infer_fn(data):
+        result = data * np.array([[-1]], dtype=np.float32)  # Process inputs and produce result
+        return [result]
 
 
-In the next step, create the connection between the model and Triton Inference Server using the bind method:
+In the next step, you can create the binding between the inference callable and Triton Inference Server using the `bind` method from pyTriton. This method takes the model name, the inference callable, the inputs and outputs tensors, and an optional model configuration object.
 
 .. code-block:: python
 
-    from pytriton.model_config import ModelConfig, Tensor
+    from pytriton.model_config import Tensor
     from pytriton.triton import Triton
+    triton = Triton()
+    triton.bind(
+        model_name="Linear",
+        infer_func=infer_fn,
+        inputs=[Tensor(name="data", dtype=np.float32, shape=(-1,)),],
+        outputs=[Tensor(name="result", dtype=np.float32, shape=(-1,)),],
+    )
+    triton.run()
 
-    # Connecting inference callback with Triton Inference Server
-    with Triton() as triton:
-        # Load model into Triton Inference Server
-        triton.bind(
-            model_name="Linear",
-            infer_func=infer_fn,
-            inputs=[
-                Tensor(dtype=np.float32, shape=(-1,)),
-            ],
-            outputs=[
-                Tensor(dtype=np.float32, shape=(-1,)),
-            ],
-            config=ModelConfig(max_batch_size=128)
-        )
-
-Finally, serve the model with Triton Inference Server:
+Finally, you can send an inference query to the model using the `ModelClient` class. The `infer_sample` method takes the input data as a numpy array and returns the output data as a numpy array. You can learn more about the `ModelClient` class in the `clients <https://triton-inference-server.github.io/pytriton/latest/clients/>`_ section.
 
 .. code-block:: python
 
-    from pytriton.triton import Triton
+    from pytriton.client import ModelClient
 
-    with Triton() as triton:
-        ...  # Load models here
-        triton.serve()
+    client = ModelClient("localhost", "Linear")
+    data = np.array([1, 2, ], dtype=np.float32)
+    print(client.infer_sample(data=data))
 
-The `bind` method is creating a connection between Triton Inference Server and the `infer_fn` which handle
-the inference queries. The `inputs` and `outputs` describe the model inputs and outputs that are exposed in
-Triton. The config field allows more parameters for model deployment.
+After the inference is done, you can stop the Triton Inference Server and close the client:
 
-The `serve` method is blocking and at this point the application will wait for incoming HTTP/gRPC requests. From that
-moment the model is available under name `Linear` in Triton server. The inference queries can be sent to
-`localhost:8000/v2/models/Linear/infer` which are passed to the `infer_fn` function.
+.. code-block:: python
+
+    client.close()
+    triton.stop()
+
+The output of the inference should be:
+
+.. code-block:: python
+
+    {'result': array([-1., -2.], dtype=float32)}
+
+
+For the full example, including defining the model and binding it to the Triton server, check out our detailed `Quick Start <https://triton-inference-server.github.io/pytriton/latest/quick_start/>`_ instructions. Get your model up and running, explore how to serve it, and learn how to `invoke it from client applications <https://triton-inference-server.github.io/pytriton/latest/clients/>`_.
+
+
+The full example code can be found in `examples/linear_random_pytorch <examples/linear_random_pytorch>`_.
+
+Examples
+--------
+
+The `examples <https://triton-inference-server.github.io/pytriton/latest/examples/>`_ page showcases various use cases of serving models using PyTriton. This includes simple examples of running models in PyTorch, TensorFlow2, JAX, and plain Python. In addition, more advanced scenarios are covered, such as online learning, multi-node models, and deployment on Kubernetes using PyTriton. Each example is accompanied by instructions on how to build and run it. Discover more about utilizing PyTriton by exploring our examples.
+
 
 Links
 -------
 
-* Documentation: https://triton-inference-server.github.io/pytriton
-* Source: https://github.com/triton-inference-server/pytriton
-* Issues: https://github.com/triton-inference-server/pytriton/issues
-* Changelog: https://github.com/triton-inference-server/pytriton/blob/main/CHANGELOG.md
-* Known Issues: https://github.com/triton-inference-server/pytriton/blob/main/docs/known_issues.md
-* Contributing: https://github.com/triton-inference-server/pytriton/blob/main/CONTRIBUTING.md
+* `Source <https://github.com/triton-inference-server/pytriton>`_
+* `Issues  <https://github.com/triton-inference-server/pytriton/issues>`_
+* `Changelog <https://github.com/triton-inference-server/pytriton/blob/main/CHANGELOG.md>`_
+* `Known Issues <https://github.com/triton-inference-server/pytriton/blob/main/docs/known_issues.md>`_
+* `Contributing <https://github.com/triton-inference-server/pytriton/blob/main/CONTRIBUTING.md>`_
