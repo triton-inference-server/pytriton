@@ -24,7 +24,6 @@ theme:
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.expand
-    - navigation.indexes
     - navigation.sections
 extra_css:
   - assets/styles.css
@@ -47,8 +46,10 @@ plugins:
             line_length: 120
             docstring_section_style: list
             merge_init_into_class: true
-            separate_signature: true
             inherited_members: true
+            separate_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
   - search
 watch:
   - pytriton
@@ -84,7 +85,7 @@ nav:
       - Binding Configuration: binding_configuration.md
       - Triton Remote Mode: remote_triton.md
     - Inference Callable:
-      - inference_callables/README.md
+      - Overview: inference_callables/README.md
       - Decorators: inference_callables/decorators.md
       - Custom parameters/headers: inference_callables/custom_params.md
     - Model Clients: clients.md

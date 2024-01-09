@@ -105,7 +105,7 @@ def infer_pt_fn(**inputs: np.ndarray):
 
 ```
 
-Example implementation with [named inputs and outputs](binding_models.md#defining-inputs-and-outputs):
+Example implementation with [named inputs and outputs](../binding_models.md#defining-inputs-and-outputs):
 
 ```python
 import numpy as np

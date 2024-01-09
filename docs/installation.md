@@ -187,4 +187,4 @@ pip install nvidia-pytriton
 ## Building binaries from source
 
 The binary package can be built from the source, allowing access to unreleased hotfixes, the ability to modify the PyTriton code, and compatibility with various Triton Inference Server versions, including custom server builds.
-For further information on building the PyTriton binary, refer to the [Building](building.md) page.
+For further information on building the PyTriton binary, refer to the [Building](guides/building.md) page.

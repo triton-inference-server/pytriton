@@ -76,7 +76,13 @@ class DynamicBatcher:
 
 More about dynamic batching can be found in
 the [Triton Inference Server documentation](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/model_configuration.md#dynamic-batcher)
-and [API spec](api.md)
+and [API spec](reference/model_config.md)
+
+## Decoupled models
+
+Triton can [support models that send multiple responses for a request or zero responses for a request](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/decoupled_models.md). A decoupled model may also send responses out-of-order relative to the order that the request batches are executed. This allows backend to deliver response whenever it deems fit.
+
+To enable this feature, set `decoupled=True` in `ModelConfig`.
 
 ## Response cache
 

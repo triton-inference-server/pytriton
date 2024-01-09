@@ -26,7 +26,7 @@ Request class contains following fields:
 !!! warning "Parameters/headers usage limitations"
 
     Currently, custom parameters and headers can be only accessed in undecorated inference function (they don't work with decorators).
-    There is separate example how to use parameters/headers in preprocessing step (see [here](downloaded_input_data.md))
+    There is separate example how to use parameters/headers in preprocessing step (see [here](../guides/downloaded_input_data.md))
 
 
 ## Parameters

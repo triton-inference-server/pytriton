@@ -24,7 +24,9 @@ class Request:
     """Data class for request data including numpy array inputs."""
 
     data: Dict[str, np.ndarray]
+    """Input data for the request."""
     parameters: Optional[Dict[str, Union[str, int, bool]]] = None
+    """Parameters for the request."""
 
     def __getitem__(self, input_name: str) -> np.ndarray:
         """Get input data."""

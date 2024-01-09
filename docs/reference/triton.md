@@ -19,3 +19,5 @@ limitations under the License.
 ::: pytriton.triton.Triton
 
 ::: pytriton.triton.RemoteTriton
+
+::: pytriton.proxy.types.Request

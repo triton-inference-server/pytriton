@@ -66,7 +66,7 @@ The inference callable is an entry point for inference. This can be any callable
 model inputs in the form of a list of request dictionaries where input names are mapped into ndarrays.
 Input can be also adapted to different more convenient forms using a set of decorators.
 **More details about designing inference callable and using of decorators can be found
-in [Inference Callable](inference_callable.md) page.**
+in [Inference Callable](inference_callables/README.md) page.**
 
 In the simplest implementation for functionality that passes input data on output, a lambda can be used:
 

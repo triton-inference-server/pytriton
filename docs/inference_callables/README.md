@@ -1,5 +1,5 @@
 <!--
-Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@ limitations under the License.
 -->
 
 # Inference Callable
+
+The inference callable is an entry point for handling inference requests. The interface of the inference callable assumes it receives a list of requests with input dictionaries, where each dictionary represents one request mapping model input names to NumPy ndarrays. Requests contain also custom HTTP/gRPC headers and parameters in parameters dictionary.
 
 This document provides guidelines for creating an Inference Callable for PyTriton, which serves as the entry point for handling inference requests.
 
@@ -55,8 +57,6 @@ class InferCallable:
     def __call__(self, requests: List[Request]) -> List[Dict[str, np.ndarray]]:
         ...
 
-    def alternative_infer(self, requests: List[Request]) -> List[Dict[str, np.ndarray]]:
-        ...
 ```
 
 ### Asynchronous Interface
@@ -70,7 +70,7 @@ import numpy as np
 from typing import Dict, List
 from pytriton.proxy.types import Request
 
-async def infer_coro(requests: List[Request]) -> List[Dict[str, np.ndarray]]:
+async def infer_fn(requests: List[Request]) -> List[Dict[str, np.ndarray]]:
     ...
 ```
 
@@ -82,18 +82,21 @@ Some models can send more than one response for a request, or no response at all
 
 ```python
 import numpy as np
-from typing import Dict, Generator, List
+from typing import AsyncGenerator, Dict, Generator, List
 from pytriton.proxy.types import Request
 
-def streaming_infer_fn(requests: List[Request]) -> Generator[Dict[str, np.ndarray], None, None]:
+def infer_fn(requests: List[Request]) -> Generator[Dict[str, np.ndarray], None, None]:
+    ...
+
+async def infer_fn(requests: List[Request]) -> AsyncGenerator[Dict[str, np.ndarray], None]:
     ...
 ```
 
-This feature only works when the model is served in decoupled mode. For more information, see the [Decoupled Mode](decoupled_mode.md) section.
+This feature only works when the model is served in decoupled mode. For more information, see the [Decoupled Models](../binding_configuration.md#decoupled-models) section.
 
 ## Binding to Triton
 
-To use the Inference Callable with PyTriton, it must be bound to a Triton server instance using the `bind` method.
+To use the Inference Callable with PyTriton, it must be bound to a Triton server instance using the [bind][pytriton.triton.Triton.bind] method.
 
  <!--pytest-codeblocks:cont-->
 
@@ -102,44 +105,17 @@ import numpy as np
 from pytriton.triton import Triton
 from pytriton.model_config import ModelConfig, Tensor
 
-infer_callable = InferCallable()
+def infer_fn(requests: List[Request]) -> List[Dict[str, np.ndarray]]:
+    ...
 
 with Triton() as triton:
     triton.bind(
-        model_name="MyInferenceFunction",
+        model_name="MyModel",
         infer_func=infer_fn,
         inputs=[Tensor(shape=(1,), dtype=np.float32)],
         outputs=[Tensor(shape=(1,), dtype=np.float32)],
         config=ModelConfig(max_batch_size=8)
     )
-    triton.bind(
-        model_name="MyInferenceCallable",
-        infer_func=infer_callable,
-        inputs=[Tensor(shape=(1,), dtype=np.float32)],
-        outputs=[Tensor(shape=(1,), dtype=np.float32)],
-        config=ModelConfig(max_batch_size=8)
-    )
-    triton.bind(
-        model_name="AlternativeInferenceCallable",
-        infer_func=infer_callable.alternative_infer,
-        inputs=[Tensor(shape=(1,), dtype=np.float32)],
-        outputs=[Tensor(shape=(1,), dtype=np.float32)],
-        config=ModelConfig(max_batch_size=8)
-    )
-    triton.bind(
-        model_name="MyInferenceCoroutine",
-        infer_func=infer_coro,
-        inputs=[Tensor(shape=(1,), dtype=np.float32)],
-        outputs=[Tensor(shape=(1,), dtype=np.float32)],
-        config=ModelConfig(max_batch_size=8)
-    )
-    triton.bind(
-        model_name="StreamingInferenceCallable",
-        infer_func=streaming_infer_fn,
-        inputs=[Tensor(shape=(1,), dtype=np.float32)],
-        outputs=[Tensor(shape=(1,), dtype=np.float32)],
-        config=ModelConfig(max_batch_size=8, decoupled=True)
-    )
 ```
 
-For more information on serving the Inference Callable, refer to the [Loading models section](binding_models.md) on the Deploying Models page.
+For more information on serving the Inference Callable, refer to the [Loading models section](../binding_models.md) on the Deploying Models page.
