@@ -16,7 +16,7 @@ limitations under the License.
 
 # Changelog
 
-## Unreleased stuff
+## 0.5.0 (2024-01-09)
 
 - New: Decoupled models support
 - New: AsyncioDecoupledModelClient, which works in async frameworks and decoupled Triton models like some Large Language Models.
