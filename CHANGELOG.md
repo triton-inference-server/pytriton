@@ -154,7 +154,7 @@ limitations under the License.
   of a list of dictionaries. The `Request` class contains data for inputs and parameters
   for combined parameters and headers.
 
-  See [docs/custom_params.md](docs/custom_params.md) for further information
+  See [documentation](docs/inference_callables/custom_params.md) for further information
 
 - Added `FuturesModelClient` which enables sending inference requests in a parallel manner.
 - Added displaying documentation link after models are loaded.

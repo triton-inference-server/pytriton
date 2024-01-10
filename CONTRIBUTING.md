@@ -187,6 +187,10 @@ Before you submit a pull request, check that it meets these guidelines:
 1. The pull request should include tests.
 2. If the pull request adds functionality, you should update the docs. Put your new functionality into a function with a docstring and add the feature to the list in README.md.
 
+## Version management
+
+PyTriton follows the [Semantic Versioning](https://semver.org/) scheme for versioning. Official releases can be found on [PyPI](https://pypi.org/project/nvidia-pytriton/) and [GitHub releases](https://github.com/triton-inference-server/pytriton/releases). The most up-to-date development version is available on the `main` branch, which may include hotfixes that have not yet been released through the standard channels. To install the latest development version, refer to the instructions in the
+[Building binaries from source](https://triton-inference-server.github.io/pytriton/latest/guides/building/) guide.
 
 ## Documentation
 

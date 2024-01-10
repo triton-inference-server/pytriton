@@ -163,44 +163,44 @@ triton.stop()
 
 Fine-tune your model deployment strategy with our targeted documentation:
 
-- [Initialize Triton](https://triton-inference-server.github.io/pytriton/latest/initialization/) for seamless startup.
-- Bind your [models to Triton](https://triton-inference-server.github.io/pytriton/latest/binding_models/) for enhanced communication.
-- Adjust your [binding configurations](https://triton-inference-server.github.io/pytriton/latest/binding_configuration/) for improved control.
-- Expand your reach by [deploying on clusters](https://triton-inference-server.github.io/pytriton/latest/deploying_in_clusters/).
-- Master the use of [Triton in remote mode](https://triton-inference-server.github.io/pytriton/latest/remote_triton/).
+- [Initialize Triton](initialization.md) for seamless startup.
+- Bind your [models to Triton](binding_models.md) for enhanced communication.
+- Adjust your [binding configurations](binding_configuration.md) for improved control.
+- Expand your reach by [deploying on clusters](guides/deploying_in_clusters.md).
+- Master the use of [Triton in remote mode](remote_triton.md).
 
 
 ### Inference Management
 
 Hone your understanding of inference process management through PyTriton:
 
-- Tailor the [Inference Callable](https://triton-inference-server.github.io/pytriton/latest/inference_callable/) to your model's requirements.
-- Use [decorators](https://triton-inference-server.github.io/pytriton/latest/decorators/) to simplify your inference callbacks.
-- Incorporate [custom parameters/headers](https://triton-inference-server.github.io/pytriton/latest/custom_params/) for flexibility.
+- Tailor the [Inference Callable](inference_callables/README.md) to your model's requirements.
+- Use [decorators](inference_callables/decorators.md) to simplify your inference callbacks.
+- Incorporate [custom parameters/headers](inference_callables/custom_params.md) for flexibility.
 data.
 
 
 ### Dive into Examples
 
-Visit the [examples directory](https://triton-inference-server.github.io/pytriton/latest/examples/) for a curated selection of use cases ranging from basic to advanced, including:
+Visit the [examples directory](../examples/) for a curated selection of use cases ranging from basic to advanced, including:
 
 - Standard model serving scenarios with different frameworks: PyTorch, TensorFlow2, JAX.
 - Advanced setups like online learning, multi-node execution, or Kubernetes deployments.
 
 ### Troubleshooting
 
-If you encounter any obstacles, our [Known Issues](https://triton-inference-server.github.io/pytriton/latest/known_issues/) page is a helpful resource for troubleshooting common challenges.
+If you encounter any obstacles, our [Known Issues](known_issues.md) page is a helpful resource for troubleshooting common challenges.
 
 ### Streaming (alpha)
 
-We introduced new alpha feature to PyTriton that allows to stream partial responses from a model. It is based on NVIDIA Triton Inference deocoupled models feature. Look at example in [examples/huggingface_dialogpt_streaming_pytorch](examples/huggingface_dialogpt_streaming_pytorch).
+We introduced new alpha feature to PyTriton that allows to stream partial responses from a model. It is based on NVIDIA Triton Inference deocoupled models feature. Look at example in [examples/huggingface_dialogpt_streaming_pytorch](../examples/huggingface_dialogpt_streaming_pytorch).
 
 ### Profiling model
 
 The [Perf Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md) can be
 used to profile models served through PyTriton. We have prepared an example of
 using the Perf Analyzer to profile the BART PyTorch model. The example code can be found
-in [examples/perf_analyzer](examples/perf_analyzer).
+in [examples/perf_analyzer](../examples/perf_analyzer).
 
 
 ## What next?

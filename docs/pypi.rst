@@ -32,19 +32,19 @@ The distinct capabilities of PyTriton are summarized in the feature matrix:
 | Feature                | Description                                                                          |
 +========================+======================================================================================+
 | Native Python support  | You can create any `Python function <https://triton-inference-server.github.io/pytri |
-|                        | ton/latest/inference_callable/>`_ and expose it as an HTTP/gRPC API.                 |
+|                        | ton/latest/inference_callables/>`_ and expose it as an HTTP/gRPC API.                |
 +------------------------+--------------------------------------------------------------------------------------+
 | Framework-agnostic     | You can run any Python code with any framework of your choice, such as: PyTorch,     |
 |                        | TensorFlow, or JAX.                                                                  |
 +------------------------+--------------------------------------------------------------------------------------+
 | Performance            | You can benefit from `dynamic batching <https://triton-inference-server.github.io/py |
-| optimization           | triton/latest/decorators/#batch>`_, response cache, model pipelining, `clusters      |
-|                        | <https://triton-inference-server.github.io/pytriton/latest/deploying_in_clusters/>`_ |
-|                        | , and GPU/CPU inference.                                                             |
+| optimization           | triton/latest/inference_callables/decorators/#batch>`_, response cache, model        |
+|                        | pipelining, `clusters <https://triton-inference-server.github.io/pytriton/latest/    |
+|                        | guides/deploying_in_clusters/>`_, and GPU/CPU inference.                             |
 +------------------------+--------------------------------------------------------------------------------------+
 | Decorators             | You can use batching `decorators <https://triton-inference-server.github.io/pytriton |
-|                        | /latest/decorators/>`_ to handle batching  and other pre-processing tasks for your   |
-|                        | inference function.                                                                  |
+|                        | /latest/inference_callables/decorators/>`_ to handle batching  and other             |
+|                        | pre-processing tasks for your inference function.                                    |
 +------------------------+--------------------------------------------------------------------------------------+
 | Easy `installation     | You can use a simple and familiar interface based on Flask/FastAPI for easy          |
 | <https://triton-infer  | installation and `setup <https://triton-inference-server.github.io/pytriton/latest/b |
@@ -87,7 +87,7 @@ The PyTriton can be installed from pypi.org by running the following command::
 
 **Important**: The Triton Inference Server binary is installed as part of the PyTriton package.
 
-Discover more about PyTriton's `installation procedures <https://triton-inference-server.github.io/pytriton/latest/installation/>`_, including Docker usage, prerequisites, and insights into `building binaries from source <https://triton-inference-server.github.io/pytriton/latest/building/>`_ to match your specific Triton server versions.
+Discover more about PyTriton's `installation procedures <https://triton-inference-server.github.io/pytriton/latest/installation/>`_, including Docker usage, prerequisites, and insights into `building binaries from source <https://triton-inference-server.github.io/pytriton/latest/guides/building/>`_ to match your specific Triton server versions.
 
 
 Quick Start
@@ -96,7 +96,7 @@ Quick Start
 The quick start presents how to run Python model in Triton Inference Server without need to change the current working
 environment. In the example we are using a simple `Linear` model.
 
-The `infer_fn` is a function that takes an `data` tensor and returns a list with single output tensor. The `@batch` from `batching decorators <https://triton-inference-server.github.io/pytriton/latest/decorators/>`_ is used to handle batching for the model.
+The `infer_fn` is a function that takes an `data` tensor and returns a list with single output tensor. The `@batch` from `batching decorators <https://triton-inference-server.github.io/pytriton/latest/inference_callables/decorators/>`_ is used to handle batching for the model.
 
 .. code-block:: python
 
