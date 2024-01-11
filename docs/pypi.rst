@@ -151,7 +151,7 @@ The output of the inference should be:
 For the full example, including defining the model and binding it to the Triton server, check out our detailed `Quick Start <https://triton-inference-server.github.io/pytriton/latest/quick_start/>`_ instructions. Get your model up and running, explore how to serve it, and learn how to `invoke it from client applications <https://triton-inference-server.github.io/pytriton/latest/clients/>`_.
 
 
-The full example code can be found in `examples/linear_random_pytorch <examples/linear_random_pytorch>`_.
+The full example code can be found in `examples/linear_random_pytorch <https://github.com/triton-inference-server/pytriton/tree/main/examples/linear_random_pytorch>`_.
 
 Examples
 --------

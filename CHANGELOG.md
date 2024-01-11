@@ -20,7 +20,7 @@ limitations under the License.
 
 - New: Decoupled models support
 - New: AsyncioDecoupledModelClient, which works in async frameworks and decoupled Triton models like some Large Language Models.
-- Fix: Fixed a bug that prevented getting the log level when HTTP endpoint was disabled. Thanks @catwell
+- Fix: Fixed a bug that prevented getting the log level when HTTP endpoint was disabled. Thanks [@catwell](https://github.com/catwell).
 
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)

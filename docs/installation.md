@@ -17,7 +17,7 @@ limitations under the License.
 # Installation
 
 This page explains how to install the library. We assume that you have a basic understanding of the Python programming language
-and are familiar with machine learning models. Using [Docker](https://www.docker.com/) is optional but not required.
+and are familiar with machine learning models.
 
 You should be comfortable with the Python programming language
 and know how to work with Machine Learning models. Using [Docker](https://www.docker.com/) is optional and not necessary.
@@ -26,7 +26,7 @@ The library can be installed in any of the following ways:
 
 - system environment
 - virtualenv
-- [Docker](https://www.docker.com/) image
+- Docker image
 
 If you opt for using Docker, you can get NVIDIA optimized Docker images for Python frameworks from the [NVIDIA NGC Catalog](https://catalog.ngc.nvidia.com/containers).
 
