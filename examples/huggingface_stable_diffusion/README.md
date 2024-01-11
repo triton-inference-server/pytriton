@@ -65,10 +65,10 @@ The step-by-step guide:
 
 4. Open new terminal tab (ex. `Ctrl + T` on Ubuntu) or window
 5. Go to the example directory
-6. Run the `client.sh` to perform queries on model:
+6. Run the `client.py` to perform queries on model:
 
 ```shell
-./client.sh
+./client.py
 ```
 
 ## Running example on Kubernetes cluster

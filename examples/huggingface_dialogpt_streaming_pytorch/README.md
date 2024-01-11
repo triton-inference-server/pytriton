@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# HuggingFace BART PyTorch Model
+# HuggingFace DialoGPT streaming
 
 ## Overview
 
-The example presents a HuggingFace BART PyTorch model inference.
+The example presents a [DialoGPT](https://huggingface.co/microsoft/DialoGPT-small) model inference. The model is downloaded from HuggingFace.
 
 Example consists of following scripts:
 
