@@ -359,8 +359,10 @@ def test_group_by_keys():
     results = groupby_keys_fun(input_requests)
     for req, res in zip(input_requests, results):
         assert req.keys() == res.keys()
-        for key in req:
-            assert np.all(req[key] * len(req.keys()) == res[key])
+        for key, value in req.items():
+            result_value = res[key]
+            expected_value = value * len(req.keys())
+            assert np.all(expected_value == result_value)
 
 
 class GroupByValuesTestCase(typing.NamedTuple):
