@@ -1,0 +1,7 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "PyTriton: Framework facilitating NVIDIA Triton Inference Server usage in Python environments."
+url: https://github.com/triton-inference-server/pytriton
+repository-code: https://github.com/triton-inference-server/pytriton
+authors:
+  - name: "NVIDIA Corporation"
