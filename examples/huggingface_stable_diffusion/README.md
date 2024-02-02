@@ -41,7 +41,7 @@ pip install torch
 Or you can use NVIDIA PyTorch container:
 
 ```shell
-docker run -it --gpus 1 --shm-size 8gb -v {repository_path}:{repository_path} -w {repository_path} nvcr.io/nvidia/pytorch:23.12-py3 bash
+docker run -it --gpus 1 --shm-size 8gb -v {repository_path}:{repository_path} -w {repository_path} nvcr.io/nvidia/pytorch:24.01-py3 bash
 ```
 
 If you select to use container we recommend to install
@@ -99,7 +99,7 @@ export DOCKER_IMAGE_NAME_WITH_TAG=localhost:5000/stable-diffusion-example:latest
 
 ```shell
 # Export the base image used for build
-export FROM_IMAGE_NAME=nvcr.io/nvidia/pytorch:23.12-py3
+export FROM_IMAGE_NAME=nvcr.io/nvidia/pytorch:24.01-py3
 ./examples/huggingface_stable_diffusion/kubernetes/build_and_push.sh
 ```
 

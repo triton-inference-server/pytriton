@@ -16,6 +16,13 @@ limitations under the License.
 
 # Changelog
 
+## Unreleased
+
+
+[//]: <> (put here on external component update with short summary what change or link to changelog)
+
+- Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.42.0](https://github.com/triton-inference-server/server/releases/tag/v2.42.0)
+
 ## 0.5.0 (2024-01-09)
 
 - New: Decoupled models support
