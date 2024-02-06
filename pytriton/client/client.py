@@ -293,6 +293,16 @@ class BaseModelClient:
         raise NotImplementedError
 
 
+def _run_once_per_lib(f):
+    def wrapper(_self):
+        if _self._triton_client_lib not in wrapper.patched:
+            wrapper.patched.add(_self._triton_client_lib)
+            return f(_self)
+
+    wrapper.patched = set()
+    return wrapper
+
+
 class ModelClient(BaseModelClient):
     """Synchronous client for model deployed on the Triton Inference Server."""
 
@@ -710,6 +720,26 @@ class ModelClient(BaseModelClient):
         # However, it is not used here yet and planned for future release
         kwargs = {"client_timeout": self._inference_timeout_s}
         return kwargs
+
+    @_run_once_per_lib
+    def _monkey_patch_client(self):
+        """Monkey patch InferenceServerClient to catch error in __del__."""
+        _LOGGER.info(f"Patch ModelClient {self._triton_url.scheme}")
+        if not hasattr(self._triton_client_lib.InferenceServerClient, "__del__"):
+            return
+
+        old_del = self._triton_client_lib.InferenceServerClient.__del__
+
+        def _monkey_patched_del(self):
+            """Monkey patched del."""
+            try:
+                old_del(self)
+            except gevent.exceptions.InvalidThreadUseError:
+                _LOGGER.info("gevent.exceptions.InvalidThreadUseError in __del__ of InferenceServerClient")
+            except Exception as e:
+                _LOGGER.error("Exception in __del__ of InferenceServerClient: %s", e)
+
+        self._triton_client_lib.InferenceServerClient.__del__ = _monkey_patched_del
 
 
 class DecoupledModelClient(ModelClient):
