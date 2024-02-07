@@ -96,7 +96,13 @@ This feature only works when the model is served in decoupled mode. For more inf
 
 ## Binding to Triton
 
-To use the Inference Callable with PyTriton, it must be bound to a Triton server instance using the [bind][pytriton.triton.Triton.bind] method.
+To use the Inference Callable with PyTriton, it must be bound to a Triton server instance using the [bind][pytriton.triton.Triton.bind] method. This method takes the following arguments:
+
+- `model_name`: The name of the model that will be used by Triton clients.
+- `infer_func`: The Inference Callable described above.
+- `inputs`: A list of Tensor objects that describe the input tensors expected by the model.
+- `outputs`: A list of Tensor objects that describe the output tensors produced by the model.
+- `config`: A ModelConfig object that specifies additional configuration options for the model (e.g., maximum batch size).
 
  <!--pytest-codeblocks:cont-->
 
