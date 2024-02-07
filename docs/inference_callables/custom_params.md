@@ -20,6 +20,7 @@ This document provides guidelines for using custom HTTP/gRPC headers and paramet
 Original Triton documentation related to parameters can be found [here](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_parameters.md).
 Now, undecorated inference function accepts list of Request instances.
 Request class contains following fields:
+
 - data - for inputs (stored as dictionary, but can be also accessed with request dict interface e.g. request["input_name"])
 - parameters - for combined parameters and HTTP/gRPC headers
 
@@ -45,26 +46,26 @@ headers from standard ones (only headers with specified prefix are passed to the
 
 1. Define inference callable (that one uses one parameter and one header):
 
-```python
-import numpy as np
-from pytriton.model_config import ModelConfig, Tensor
-from pytriton.triton import Triton, TritonConfig
+    ```python
+    import numpy as np
+    from pytriton.model_config import ModelConfig, Tensor
+    from pytriton.triton import Triton, TritonConfig
 
-def _infer_with_params_and_headers(requests):
-    responses = []
-    for req in requests:
-        a_batch, b_batch = req.values()
-        scaled_add_batch = (a_batch + b_batch) / float(req.parameters["header_divisor"])
-        scaled_sub_batch = (a_batch - b_batch) * float(req.parameters["parameter_multiplier"])
-        responses.append({"scaled_add": scaled_add_batch, "scaled_sub": scaled_sub_batch})
-    return responses
-```
+    def _infer_with_params_and_headers(requests):
+        responses = []
+        for req in requests:
+            a_batch, b_batch = req.values()
+            scaled_add_batch = (a_batch + b_batch) / float(req.parameters["header_divisor"])
+            scaled_sub_batch = (a_batch - b_batch) * float(req.parameters["parameter_multiplier"])
+            responses.append({"scaled_add": scaled_add_batch, "scaled_sub": scaled_sub_batch})
+        return responses
+    ```
 
 2. Bind inference callable to Triton ("header" is the prefix for custom headers):
 
-<!--pytest.mark.skip-->
-```python
-with Triton(config=TritonConfig(http_header_forward_pattern="header.*")) as triton:
+    <!--pytest-codeblocks:cont-->
+    ```python
+    triton = Triton(config=TritonConfig(http_header_forward_pattern="header.*"))
     triton.bind(
         model_name="ParamsAndHeaders",
         infer_func=_infer_with_params_and_headers,
@@ -79,23 +80,35 @@ with Triton(config=TritonConfig(http_header_forward_pattern="header.*")) as trit
         config=ModelConfig(max_batch_size=128),
     )
 
-    triton.serve()
-```
+    triton.run()
+    ```
 
 3. Call the model using ModelClient:
 
-<!--pytest-codeblocks:cont-->
+    <!--pytest-codeblocks:cont-->
 
-```python
-import numpy as np
-from pytriton.client import ModelClient
+    ```python
+    import numpy as np
+    from pytriton.client import ModelClient
 
-batch_size = 2
-a_batch = np.ones((batch_size, 1), dtype=np.float32) * 2
-b_batch = np.ones((batch_size, 1), dtype=np.float32)
-```
-<!--pytest.mark.skip-->
-```python
-with ModelClient("localhost", "ParamsAndHeaders") as client:
-    result_batch = client.infer_batch(a_batch, b_batch, parameters={"parameter_multiplier": 2}, headers={"header_divisor": 3})
-```
+    batch_size = 2
+    a_batch = np.ones((batch_size, 1), dtype=np.float32) * 2
+    b_batch = np.ones((batch_size, 1), dtype=np.float32)
+    ```
+    <!--pytest-codeblocks:cont-->
+    ```python
+    with ModelClient("localhost", "ParamsAndHeaders") as client:
+        result_batch = client.infer_batch(a_batch, b_batch, parameters={"parameter_multiplier": 2}, headers={"header_divisor": 3})
+    ```
+
+
+    <!--pytest-codeblocks:cont-->
+    <!--
+    This code is used by pytest to verify the correctness of the documentation.
+    ```python
+    triton.stop();
+
+    assert np.allclose(result_batch["scaled_add"], (a_batch + b_batch) / 3)
+    assert np.allclose(result_batch["scaled_sub"], (a_batch - b_batch) * 2)
+    ```
+    -->
