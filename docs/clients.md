@@ -17,13 +17,32 @@ limitations under the License.
 
 # Triton clients
 
-The prerequisite for this page is to install PyTriton. You also need ```Linear``` model described in quick_start. You should run it so client can connect to it.
+PyTriton client is a user-friendly tool designed to communicate with the Triton Inference Server effortlessly. It manages the technical details for you, allowing you to concentrate on your data and the outcomes you aim to achieve. Here's how it assists:
 
-The clients section presents how to send requests to the Triton Inference Server using the PyTriton library.
+1. **Fetching Model Configuration:** The client retrieves details about the model from the server, such as the shape and names of the input and output data tensors. This step is crucial for preparing your data correctly and for interpreting the response. This functionality is encapsulated in the [ModelClient][pytriton.client.ModelClient] class.
+
+2. **Sending Requests:** Utilizing the model information, the client generates an inference request by mapping arguments you pass to the [infer_sample][pytriton.client.ModelClient.infer_sample] or [infer_batch][pytriton.client.ModelClient.infer_batch] methods to model inputs. It sends your data to the Triton server, requesting the model to perform inference. Arguments can be passed as positional or keyword arguments (mixing them is not allowed), and the client handles the rest.
+
+3. **Returning Responses:** It then delivers the model's response back to you. It decodes inputs as numpy arrays and maps model outputs to dictionary elements returned to you from the `infer_sample` or `infer_batch` methods. It also removes the batch dimension if it was added by the client.
+
+This process might introduce a bit of delay due to the extra step of fetching model configuration. However, you can minimize this by reusing the PyTriton client for multiple requests or by setting it up with pre-loaded model configuration if you have it.
+
+PyTriton includes five specialized high-level clients to cater to different needs:
+
+- **[ModelClient][pytriton.client.ModelClient]:** A straightforward, synchronous client for simple request-response operations.
+- **[FuturesModelClient][pytriton.client.FuturesModelClient]:** A multithreaded client that handles multiple requests in parallel, speeding up operations.
+- **[DecoupledModelClient][pytriton.client.DecoupledModelClient]:** A synchronous client designed for decoupled models, which allow for flexible interaction patterns with the Triton server.
+- **[AsyncioModelClient][pytriton.client.AsyncioModelClient]:** An asynchronous client that works well with Python's asyncio for efficient concurrent operations.
+- **[AsyncioDecoupledModelClient][pytriton.client.AsyncioDecoupledModelClient]:** An asyncio-compatible client specifically for working with decoupled models asynchronously.
+
+PyTriton clients used [tritonclient](https://github.com/triton-inference-server/client) package from Triton. It is a Python client library for Triton Inference Server. It provides low level API for communicating with the server using HTTP or gRPC protocol. PyTriton clients are built on top of tritonclient and provide high level API for communicating with the server. Not all features of tritonclient are available in PyTriton clients. If you need more control over the communication with the server, you can use tritonclient directly.
+
 
 ## ModelClient
 
 ModelClient is a simple client that can perform inference requests synchronously. You can use ModelClient to communicate with the deployed model using HTTP or gRPC protocol. You can specify the protocol when creating the ModelClient object.
+
+You need ```Linear``` model described in quick_start. You should run it so client can connect to it.
 
 For example, you can use ModelClient to send requests to a PyTorch model that performs linear regression:
 
@@ -97,13 +116,34 @@ print(result_dict)
 <!--pytest-codeblocks:cont-->
 <!--
 ```python
+assert result_dict["OUTPUT_1"].shape == (128, 3)
+```
+-->
+
+URL `localhost:8000` is the default address for Triton server HTTP protocol. If you have a different address, you should replace it with the correct one. You can also use the gRPC protocol by putting `grpc` in address string:
+
+<!--pytest-codeblocks:cont-->
+```python
+client = ModelClient("grpc://localhost", "Linear")
+```
+
+<!--pytest-codeblocks:cont-->
+<!--
+```python
+# Check that client is valid
+result_dict = client.infer_batch(input1_data)
+assert result_dict["OUTPUT_1"].shape == (128, 3)
+
 # Stop the Triton server to free up resources
 triton.stop()
 # End of the first test
 
-assert result_dict["OUTPUT_1"].shape == (128, 3)
 ```
 -->
+
+
+
+You can omit port number if it is default for HTTP or gRPC protocol. Default port for HTTP is `8000` and for gRPC is `8001`.
 
 
 You can also use ModelClient to send requests to a model that performs image classification. The example assumes that a model takes in an image and returns the top 5 predicted classes. This model is not included in the PyTriton library.
@@ -518,7 +558,7 @@ async def main():
     # Call the infer_sample method with the input data
     result_dict = await client.infer_sample(input1_data)
     # Close the client to release the resources
-    client.close()
+    await client.close()
 
     # Print the result dictionary
     print(result_dict)
@@ -782,13 +822,58 @@ When creating a [ModelClient][pytriton.client.client.ModelClient] or [FuturesMod
 
 Example usage:
 
-<!--pytest.mark.skip-->
+<!-- Timeout test -->
+<!--
+```python
+
+import torch
+
+model = torch.nn.Linear(2, 3).eval()
+
+import numpy as np
+from pytriton.decorators import batch
+
+
+@batch
+def infer_fn(**inputs: np.ndarray):
+    (input1_batch,) = inputs.values()
+    input1_batch_tensor = torch.from_numpy(input1_batch).float()
+    output1_batch_tensor = model(input1_batch_tensor)  # Calling the Python model inference
+    output1_batch = output1_batch_tensor.detach().double().numpy()
+    return [output1_batch]
+
+
+from pytriton.model_config import ModelConfig, Tensor
+from pytriton.triton import Triton
+
+# Connecting inference callable with Triton Inference Server
+triton = Triton()
+# Load model into Triton Inference Server
+triton.bind(
+    model_name="MyModel",
+    infer_func=infer_fn,
+    inputs=[
+        Tensor(dtype=np.float64, shape=(-1,)),
+    ],
+    outputs=[
+        Tensor(dtype=np.float64, shape=(-1,)),
+    ],
+    config=ModelConfig(max_batch_size=128)
+)
+
+
+triton.run()
+```
+-->
+
+<!--pytest-codeblocks:cont-->
+
 ```python
 import numpy as np
 from pytriton.client import ModelClient, FuturesModelClient
 
 input1_data = np.random.randn(128, 2)
-client = ModelClient("localhost", "MyModel", init_timeout_s=120):
+client = ModelClient("localhost", "MyModel", init_timeout_s=120)
 # Raises PyTritonClientTimeoutError if the server or model is not ready within the specified timeout
 result_dict = client.infer_batch(input1_data)
 client.close()
@@ -796,7 +881,7 @@ client.close()
 
 with FuturesModelClient("localhost", "MyModel", init_timeout_s=120) as client:
     future = client.infer_batch(input1_data)
-    ...
+    #...
     # It will raise `PyTritonClientTimeoutError` if the server is not ready and the model is not loaded within 120 seconds
     # from the time `infer_batch` was called by a thread from `ThreadPoolExecutor`
     result_dict = future.result()
@@ -804,7 +889,7 @@ with FuturesModelClient("localhost", "MyModel", init_timeout_s=120) as client:
 
 You can disable the default behavior of waiting for the server and model to be ready during first inference request by setting `lazy_init` to `False`:
 
-<!--pytest.mark.skip-->
+<!--pytest-codeblocks:cont-->
 ```python
 import numpy as np
 from pytriton.client import ModelClient, FuturesModelClient
@@ -820,13 +905,13 @@ with ModelClient("localhost", "MyModel", init_timeout_s=120, lazy_init=False) as
 You can specify the timeout for the client to wait for the inference response from the server.
 The default timeout is 60 seconds. You can specify the timeout when creating the [ModelClient][pytriton.client.client.ModelClient] or [FuturesModelClient][pytriton.client.client.FuturesModelClient] object:
 
-<!--pytest.mark.skip-->
+<!--pytest-codeblocks:cont-->
 ```python
 import numpy as np
 from pytriton.client import ModelClient, FuturesModelClient
 
 input1_data = np.random.randn(128, 2)
-client = ModelClient("localhost", "MyModel", inference_timeout_s=240):
+client = ModelClient("localhost", "MyModel", inference_timeout_s=240)
 # Raises `PyTritonClientTimeoutError` if the server does not respond to inference request within 240 seconds
 result_dict = client.infer_batch(input1_data)
 client.close()
@@ -839,6 +924,17 @@ with FuturesModelClient("localhost", "MyModel", inference_timeout_s=240) as clie
     # from the time `infer_batch` was called by a thread from `ThreadPoolExecutor`
     result_dict = future.result()
 ```
+
+<!--pytest-codeblocks:cont-->
+<!--
+```python
+
+# Stop the Triton server to free up resources
+triton.stop()
+# End of the timeout test
+
+```
+-->
 
 !!! warning "gRPC client timeout not fully supported"
 
