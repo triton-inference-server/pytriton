@@ -19,6 +19,7 @@ import socket
 import time
 from concurrent.futures import wait
 from contextlib import closing
+from typing import Callable
 
 import numpy as np
 import pytest
@@ -35,21 +36,23 @@ _LARGE_TIMEOUT = 1.5
 _GARGANTUAN_TIMEOUT = 5.0
 
 
-def find_free_ports():
-    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-        s.bind(("", 0))
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s2:
-            s2.bind(("", 0))
-            s2.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s3:
-                s3.bind(("", 0))
-                s3.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                return {
-                    "http_port": s.getsockname()[1],
-                    "grpc_port": s2.getsockname()[1],
-                    "metrics_port": s3.getsockname()[1],
-                }
+def find_free_ports(not_allowed_protocol=None):
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as http_socket:
+        http_socket.bind(("", 0))
+        http_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as grpc_socket:
+            grpc_socket.bind(("", 0))
+            grpc_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as metrics_socket:
+                metrics_socket.bind(("", 0))
+                metrics_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                result = {}
+                if not_allowed_protocol != "http":
+                    result["http_port"] = http_socket.getsockname()[1]
+                if not_allowed_protocol != "grpc":
+                    result["grpc_port"] = grpc_socket.getsockname()[1]
+                result["metrics_port"] = metrics_socket.getsockname()[1]
+                return result
 
 
 def triton_server_builder(ports):
@@ -66,18 +69,37 @@ def triton_server_builder(ports):
         return return_value
 
     class TritonInstance:
-
         """Context manager to hold Triton instance and ports"""
 
-        def __init__(self, grpc_port, http_port, metrics_port, model_name, infer_function):
+        # Type hints added for linter
+        model_name: str
+        infer_function: Callable
+        config: TritonConfig
+
+        def __init__(
+            self,
+            model_name,
+            infer_function,
+            grpc_port=None,
+            http_port=None,
+            metrics_port=None,
+        ):
             self.grpc_port = grpc_port
             self.http_port = http_port
             self.metrics_port = metrics_port
             self.model_name = model_name
-            self.config = TritonConfig(http_port=http_port, grpc_port=grpc_port, metrics_port=metrics_port)
+            kwargs = {}
+            if self.grpc_port is not None:
+                self.grpc_url = f"grpc://localhost:{self.grpc_port}"
+            else:
+                kwargs["allow_grpc"] = False
+            if self.http_port is not None:
+                self.http_url = f"http://localhost:{self.http_port}"
+            else:
+                kwargs["allow_http"] = False
+            assert self.grpc_port is not None or self.http_port is not None
+            self.config = TritonConfig(http_port=http_port, grpc_port=grpc_port, metrics_port=metrics_port, **kwargs)
             self.infer_function = infer_function
-            self.grpc_url = f"grpc://localhost:{self.grpc_port}"
-            self.http_url = f"http://localhost:{self.http_port}"
 
         def __enter__(self):
             self.triton = Triton(config=self.config)
@@ -106,7 +128,7 @@ def triton_server_builder(ports):
                 f"Creating model client with init_timeout_s={init_timeout_s} and inference_timeout_s={inference_timeout_s}"
             )
             return ModelClient(
-                self.http_url,
+                self.http_url if self.http_port is not None else self.grpc_url,
                 self.model_name,
                 init_timeout_s=init_timeout_s,
                 inference_timeout_s=inference_timeout_s,
@@ -117,47 +139,78 @@ def triton_server_builder(ports):
                 f"Creating futures model client with init_timeout_s={init_timeout_s} and inference_timeout_s={inference_timeout_s}"
             )
             return FuturesModelClient(
-                self.http_url,
+                self.http_url if self.http_port is not None else self.grpc_url,
                 self.model_name,
                 init_timeout_s=init_timeout_s,
                 inference_timeout_s=inference_timeout_s,
             )
 
     _LOGGER.debug(f"Using ports: {ports}")
-    with TritonInstance(**ports, model_name="Sleeper", infer_function=_infer_fn) as triton:
+    with TritonInstance(
+        model_name="Sleeper",
+        infer_function=_infer_fn,
+        **ports,
+    ) as triton:
         yield triton
 
 
+@pytest.fixture(
+    params=[
+        "http",
+        "grpc",
+        None,
+    ],
+    scope="function",
+)
+def non_allowed_protocol(request):
+    return request.param
+
+
+@pytest.fixture(
+    params=[
+        "ModelClient",
+        "FuturesModelClient",
+    ],
+    scope="function",
+)
+def client_type(request):
+    return request.param
+
+
 # Define a fixture to create and return a Triton server instance
 @pytest.fixture(scope="function")
-def first_triton_server():
+def first_triton_server(non_allowed_protocol):
     _LOGGER.debug("Preparing first Triton server.")
-    ports = find_free_ports()
+    ports = find_free_ports(non_allowed_protocol)
     yield from triton_server_builder(ports)
 
 
 # Define a fixture to create and return a Triton server instance
 @pytest.fixture(scope="function")
-def second_triton_server():
+def second_triton_server(non_allowed_protocol):
     _LOGGER.debug("Preparing second Triton server.")
-    ports = find_free_ports()
+    ports = find_free_ports(non_allowed_protocol)
     yield from triton_server_builder(ports)
 
 
 @pytest.fixture(scope="function")
-def first_futures_http_client(first_triton_server):
-    _LOGGER.debug(
-        f"Preparing client for {first_triton_server.http_url} with init timeout {_GARGANTUAN_TIMEOUT} and inference timeout {_SMALL_TIMEOUT}."
-    )
-    return first_triton_server.get_model_futures_client()
+def first_client(first_triton_server, client_type):
+    if client_type == "ModelClient":
+        return first_triton_server.get_model_client()
+    elif client_type == "FuturesModelClient":
+        return first_triton_server.get_model_futures_client()
+    else:
+        raise ValueError(f"Unknown client type {client_type}")
 
 
 @pytest.fixture(scope="function")
-def second_futures_http_client(second_triton_server):
-    _LOGGER.debug(
-        f"Preparing client for {second_triton_server.http_url} with init timeout {_GARGANTUAN_TIMEOUT} and inference timeout {_SMALL_TIMEOUT}."
-    )
-    return second_triton_server.get_model_futures_client()
+def second_client(second_triton_server, client_type):
+    if client_type == "ModelClient":
+        return second_triton_server.get_model_client()
+    elif client_type == "FuturesModelClient":
+        return second_triton_server.get_model_futures_client()
+    else:
+        raise ValueError(f"Unknown client type {client_type}")
 
 
 @pytest.fixture(scope="session")
@@ -166,15 +219,37 @@ def input_sleep_large():
     yield np.array([[_LARGE_TIMEOUT]], dtype=np.float64)
 
 
-def test_infer_sample_success_futures(first_futures_http_client, second_futures_http_client, input_sleep_large):
+def test_infer_sample_success_single(first_client, input_sleep_large, client_type):
     _LOGGER.debug(f"Testing async grpc_client with input {input_sleep_large}.")
-    with first_futures_http_client as first_client:
-        with second_futures_http_client as second_client:
+    with first_client as first_client:
+        if client_type == "ModelClient":
+            first = first_client.infer_sample(input_sleep_large)
+        elif client_type == "FuturesModelClient":
             first_future = first_client.infer_sample(input_sleep_large)
-            second_future = second_client.infer_sample(input_sleep_large)
-            done, _not_done = wait([first_future, second_future], timeout=_LARGE_TIMEOUT * 1.3)
-            assert len(done) == 2
+            done, _not_done = wait(
+                [
+                    first_future,
+                ],
+                timeout=_LARGE_TIMEOUT * 1.3,
+            )
+            assert len(done) == 1
             first = first_future.result()
-            second = second_future.result()
+        assert first["OUTPUT_1"] == input_sleep_large
+
+
+def test_infer_sample_success_cohabit(first_client, second_client, input_sleep_large, client_type):
+    _LOGGER.debug(f"Testing async grpc_client with input {input_sleep_large}.")
+    with first_client as first_client:
+        with second_client as second_client:
+            if client_type == "ModelClient":
+                first = first_client.infer_sample(input_sleep_large)
+                second = second_client.infer_sample(input_sleep_large)
+            elif client_type == "FuturesModelClient":
+                first_future = first_client.infer_sample(input_sleep_large)
+                second_future = second_client.infer_sample(input_sleep_large)
+                done, _not_done = wait([first_future, second_future], timeout=_LARGE_TIMEOUT * 1.3)
+                assert len(done) == 2
+                first = first_future.result()
+                second = second_future.result()
             assert first["OUTPUT_1"] == input_sleep_large
             assert second["OUTPUT_1"] == input_sleep_large

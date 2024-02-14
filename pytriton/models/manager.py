@@ -27,6 +27,8 @@ import logging
 import socket
 from typing import Dict, Iterable, Tuple
 
+from tritonclient.grpc import InferenceServerException
+
 from pytriton.client import ModelClient
 from pytriton.client.utils import create_client_from_url, wait_for_server_ready
 from pytriton.constants import CREATE_TRITON_CLIENT_TIMEOUT_S, DEFAULT_TRITON_STARTUP_TIMEOUT_S
@@ -93,7 +95,7 @@ class ModelManager:
                 server_live = client.is_server_live()
             # TimeoutError and ConnectionRefusedError are derived from OSError so they are redundant here
             # OSError is raised from gevent/_socketcommon.py:590 sometimes, when server is not ready
-            except (socket.timeout, OSError):
+            except (socket.timeout, OSError, InferenceServerException):
                 pass
             except Exception as ex:
                 LOGGER.error(f"Unexpected exception during server live check: {ex}")
