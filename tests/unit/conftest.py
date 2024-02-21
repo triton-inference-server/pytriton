@@ -235,8 +235,10 @@ def sleep_s():
 
 class CallableType(enum.Enum):
     FUNCTION = "function"
+    METHOD = "method"
     CALLABLE = "callable"
-    COROUTINE = "coroutine"
+    FUNCTION_COROUTINE = "function_coroutine"
+    METHOD_COROUTINE = "method_coroutine"
     CALLABLE_COROUTINE = "callable_coroutine"
 
 
@@ -278,9 +280,82 @@ async def _streaming_passthrough_coro(
         raise _TestInferenceError("Inference error")
 
 
+def _make_passthrough_function(streaming: bool, sleep_s: float, raise_error: bool = False):
+    sleep_s = sleep_s if sleep_s is not None else max(0.0001, random.random() / 1000)  # sleep 0.1ms-1ms
+
+    def _passthrough_fn_wrapper(requests: Requests) -> Responses:
+        return _passthrough_fn(requests, raise_error=raise_error, sleep_s=sleep_s)
+
+    def _streaming_passthrough_fn_wrapper(requests: Requests) -> typing.Generator[Responses, None, None]:
+        yield from _streaming_passthrough_fn(requests, raise_error=raise_error, sleep_s=sleep_s)
+
+    return _streaming_passthrough_fn_wrapper if streaming else _passthrough_fn_wrapper
+
+
+def _make_passthrough_method(streaming: bool, sleep_s: float, raise_error: bool = False):
+    class _PassthroughCallable:
+        def infer(self, requests: Requests) -> Responses:
+            return _passthrough_fn(requests, raise_error=raise_error, sleep_s=sleep_s)
+
+    class _StreamingPassthroughCallable:
+        def infer(self, requests: Requests) -> typing.Generator[Responses, None, None]:
+            yield from _streaming_passthrough_fn(requests, raise_error=raise_error, sleep_s=sleep_s)
+
+    return _StreamingPassthroughCallable().infer if streaming else _PassthroughCallable().infer
+
+
+def _make_passthrough_callable(streaming: bool, sleep_s: float, raise_error: bool = False):
+    class _PassthroughCallable:
+        def __call__(self, requests: Requests) -> Responses:
+            return _passthrough_fn(requests, raise_error=raise_error, sleep_s=sleep_s)
+
+    class _StreamingPassthroughCallable:
+        def __call__(self, requests: Requests) -> typing.Generator[Responses, None, None]:
+            yield from _streaming_passthrough_fn(requests, raise_error=raise_error, sleep_s=sleep_s)
+
+    return _StreamingPassthroughCallable() if streaming else _PassthroughCallable()
+
+
+def _make_passthrough_coro(streaming: bool, sleep_s: float, raise_error: bool = False):
+    async def _passthrough_coro_wrapper(requests: Requests) -> Responses:
+        return await _passthrough_coro(requests, raise_error=raise_error, sleep_s=sleep_s)
+
+    async def _streaming_passthrough_coro_wrapper(requests: Requests) -> typing.AsyncGenerator[Responses, None]:
+        async for responses in _streaming_passthrough_coro(requests, raise_error=raise_error, sleep_s=sleep_s):
+            yield responses
+
+    return _streaming_passthrough_coro_wrapper if streaming else _passthrough_coro_wrapper
+
+
+def _make_passthrough_method_coro(streaming: bool, sleep_s: float, raise_error: bool = False):
+    class _PassthroughCallableCoro:
+        async def infer(self, requests: Requests) -> Responses:
+            return await _passthrough_coro(requests, raise_error=raise_error, sleep_s=sleep_s)
+
+    class _StreamingPassthroughCallableCoro:
+        async def infer(self, requests: Requests) -> typing.AsyncGenerator[Responses, None]:
+            async for responses in _streaming_passthrough_coro(requests, raise_error=raise_error, sleep_s=sleep_s):
+                yield responses
+
+    return _StreamingPassthroughCallableCoro().infer if streaming else _PassthroughCallableCoro().infer
+
+
+def _make_passthrough_callable_coro(streaming: bool, sleep_s: float, raise_error: bool = False):
+    class _PassthroughCallableCoro:
+        async def __call__(self, requests: Requests) -> Responses:
+            return await _passthrough_coro(requests, raise_error=raise_error, sleep_s=sleep_s)
+
+    class _StreamingPassthroughCallableCoro:
+        async def __call__(self, requests: Requests) -> typing.AsyncGenerator[Responses, None]:
+            async for responses in _streaming_passthrough_coro(requests, raise_error=raise_error, sleep_s=sleep_s):
+                yield responses
+
+    return _StreamingPassthroughCallableCoro() if streaming else _PassthroughCallableCoro()
+
+
 @pytest.fixture(scope="function")
 def make_passthrough_callable():
-    def _make_passthrough_callable(
+    def __make_passthrough_callable(
         callable_type: CallableType,
         streaming: bool = False,
         sleep_s: typing.Optional[float] = None,
@@ -288,63 +363,13 @@ def make_passthrough_callable():
     ):
         sleep_s = sleep_s if sleep_s is not None else max(0.0001, random.random() / 1000)  # sleep 0.1ms-1ms
 
-        passthrough_callable = None
+        return {
+            CallableType.FUNCTION: _make_passthrough_function,
+            CallableType.METHOD: _make_passthrough_method,
+            CallableType.CALLABLE: _make_passthrough_callable,
+            CallableType.FUNCTION_COROUTINE: _make_passthrough_coro,
+            CallableType.METHOD_COROUTINE: _make_passthrough_method_coro,
+            CallableType.CALLABLE_COROUTINE: _make_passthrough_callable_coro,
+        }[callable_type](streaming=streaming, sleep_s=sleep_s, raise_error=raise_error)
 
-        if callable_type == CallableType.FUNCTION:
-
-            def _passthrough_fn_wrapper(requests: Requests) -> Responses:
-                return _passthrough_fn(requests, raise_error=raise_error, sleep_s=sleep_s)
-
-            def _streaming_passthrough_fn_wrapper(requests: Requests) -> typing.Generator[Responses, None, None]:
-                yield from _streaming_passthrough_fn(requests, raise_error=raise_error, sleep_s=sleep_s)
-
-            passthrough_callable = _streaming_passthrough_fn_wrapper if streaming else _passthrough_fn_wrapper
-
-        elif callable_type == CallableType.CALLABLE:
-
-            class _PassthroughCallable:
-                def __call__(self, requests: Requests) -> Responses:
-                    return _passthrough_fn(requests, raise_error=raise_error, sleep_s=sleep_s)
-
-            class _StreamingPassthroughCallable:
-                def __call__(self, requests: Requests) -> typing.Generator[Responses, None, None]:
-                    yield from _streaming_passthrough_fn(requests, raise_error=raise_error, sleep_s=sleep_s)
-
-            passthrough_callable = _StreamingPassthroughCallable() if streaming else _PassthroughCallable()
-
-        elif callable_type == CallableType.COROUTINE:
-
-            async def _passthrough_coro_wrapper(requests: Requests) -> Responses:
-                return await _passthrough_coro(requests, raise_error=raise_error, sleep_s=sleep_s)
-
-            async def _streaming_passthrough_coro_wrapper(
-                requests: Requests,
-            ) -> typing.AsyncGenerator[Responses, None]:
-                async for responses in _streaming_passthrough_coro(requests, raise_error=raise_error, sleep_s=sleep_s):
-                    yield responses
-
-            passthrough_callable = _streaming_passthrough_coro_wrapper if streaming else _passthrough_coro_wrapper
-
-        elif callable_type == CallableType.CALLABLE_COROUTINE:
-
-            class _PassthroughCallableCoro:
-                async def __call__(self, requests: Requests) -> Responses:
-                    return await _passthrough_coro(requests, raise_error=raise_error, sleep_s=sleep_s)
-
-            class _StreamingPassthroughCallableCoro:
-                async def __call__(self, requests: Requests) -> typing.AsyncGenerator[Responses, None]:
-                    async for responses in _streaming_passthrough_coro(
-                        requests,
-                        raise_error=raise_error,
-                        sleep_s=sleep_s,
-                    ):
-                        yield responses
-
-            passthrough_callable = _StreamingPassthroughCallableCoro() if streaming else _PassthroughCallableCoro()
-
-        else:
-            raise ValueError(f"Unknown callable type {callable_type}")
-
-        return passthrough_callable
-
-    return _make_passthrough_callable
+    return __make_passthrough_callable

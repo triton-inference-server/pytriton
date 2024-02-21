@@ -55,7 +55,11 @@ class _AsyncGenForCallableAdapter:
         Args:
             inference_callable: A callable to convert to an async generator.
         """
-        if callable(inference_callable) and not inspect.isfunction(inference_callable):
+        if (
+            callable(inference_callable)
+            and not inspect.isfunction(inference_callable)
+            and not inspect.ismethod(inference_callable)
+        ):
             inference_callable = inference_callable.__call__
 
         if inspect.isasyncgenfunction(inference_callable):

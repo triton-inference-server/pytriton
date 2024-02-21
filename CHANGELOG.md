@@ -1,5 +1,5 @@
 <!--
-Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ limitations under the License.
 ## Unreleased
 
 - Fix: ModelManager does not raise ``tritonclient.grpc.InferenceServerException`` for ``stop`` method when HTTP endpoint is disabled in Triton configuration.
+- Fix: Methods can be used as the inference callable
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 

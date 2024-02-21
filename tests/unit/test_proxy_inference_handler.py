@@ -25,8 +25,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 INFERENCE_CALLABLE_TYPES = [
     CallableType.FUNCTION,
+    CallableType.METHOD,
     CallableType.CALLABLE,
-    CallableType.COROUTINE,
+    CallableType.FUNCTION_COROUTINE,
+    CallableType.METHOD_COROUTINE,
     CallableType.CALLABLE_COROUTINE,
 ]
 
