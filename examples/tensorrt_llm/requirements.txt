@@ -1,0 +1,6 @@
+--extra-index-url https://pypi.nvidia.com
+hf_transfer
+huggingface_hub[cli]
+nvidia-pytriton>=0.5.2
+tensorrt_llm==0.9.0.dev2024022000
+transformers
