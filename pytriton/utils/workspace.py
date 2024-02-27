@@ -47,6 +47,9 @@ class Workspace:
             LOGGER.debug(f"Workspace path {self._workspace_path}")
             self._workspace_path.mkdir(parents=True)
 
+        self.model_store_path = self._workspace_path / "model-store"
+        self.model_store_path.mkdir(parents=True)
+
     @property
     def path(self) -> pathlib.Path:
         """Return path to the workspace.

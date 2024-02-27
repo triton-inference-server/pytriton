@@ -24,8 +24,9 @@ The ModelManager is responsible for maintaining the models that has to be server
 import contextlib
 import json
 import logging
+import pathlib
 import socket
-from typing import Dict, Iterable, Tuple
+from typing import Dict, Iterable, Optional, Tuple
 
 from tritonclient.grpc import InferenceServerException
 
@@ -44,14 +45,17 @@ class ModelManager:
     def __init__(
         self,
         triton_url: str,
+        model_store_path: Optional[pathlib.Path] = None,
     ):
         """Create ModelManager object.
 
         Args:
             triton_url: Triton server URL
+            model_store_path: Path to local model store
         """
         self._triton_url = triton_url
         self._models: Dict[Tuple[str, int], Model] = {}
+        self._model_store_path = model_store_path
 
     @property
     def models(self) -> Iterable[Model]:
@@ -76,14 +80,26 @@ class ModelManager:
         LOGGER.debug(f"Adding {model.model_name} ({model.model_version}) to registry under {key}.")
         self._models[key] = model
 
+        _is_model_store_local = self._model_store_path is not None
+        if _is_model_store_local:
+            model.generate_model(self._model_store_path)
+
         if load_model:
-            self._load_model(model)
+            self._load_model(model, _is_model_store_local)
+            model.setup()
 
     def load_models(self) -> None:
-        """Load bound models to Triton server."""
+        """Load bound models to Triton server and setup loaded models."""
         for model in self._models.values():
             if not model.is_alive():
                 self._load_model(model)
+                model.setup()
+
+    def setup_models(self) -> None:
+        """Setup loaded models."""
+        for model in self._models.values():
+            if not model.is_alive():
+                model.setup()
 
     def clean(self) -> None:
         """Clean the model and internal registry."""
@@ -117,15 +133,14 @@ class ModelManager:
         key = (model.model_name.lower(), model.model_version)
         return key
 
-    def _load_model(self, model: Model):
+    def _load_model(self, model: Model, local_model_store=False):
         """Prepare model config and required files dict and load model to Triton server."""
         LOGGER.debug(f"Creating model {model.model_name} with version {model.model_version}.")
-        config = json.dumps(model.get_model_config())
-        files = model.get_proxy_model_files()
+        config = None if local_model_store else json.dumps(model.get_model_config())
+        files = None if local_model_store else model.get_proxy_model_files()
         with ModelClient(
             url=self._triton_url, model_name=model.model_name, model_version=str(model.model_version)
         ) as client:
             client.wait_for_server(timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S)
             client.load_model(config=config, files=files)
-        model.setup()
         LOGGER.debug("Done.")

@@ -18,8 +18,11 @@ limitations under the License.
 
 ## Unreleased
 
+- Add: Add `TritonLifecyclePolicy` parameter to Triton class to control the lifecycle of the Triton Inference Server
+  (Triton Inference Serever can be started at the beginning of the context - default behavior, or at the call of `run` or `serve` method),
+  second flag in this parameter indicates if model configs should be created in local filesystem or passed to Triton Inference Server and managed by it.
 - Fix: ModelManager does not raise ``tritonclient.grpc.InferenceServerException`` for ``stop`` method when HTTP endpoint is disabled in Triton configuration.
-- Fix: Methods can be used as the inference callable
+- Fix: Methods can be used as the inference callable.
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 

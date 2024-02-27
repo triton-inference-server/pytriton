@@ -68,6 +68,39 @@ The order of precedence of configuration methods is:
 - config defined in environment variables
 - default [TritonConfig][pytriton.triton.TritonConfig] values
 
+## Triton Lifecycle Policy
+
+Triton class has additional `lifecycle_policy` parameter of type `TritonLifecyclePolicy`. It indicates how the Triton Server should be managed.
+It stores two flags: `TritonLifecyclePolicy.launch_triton_on_startup` and `TritonLifecyclePolicy.local_model_store`.
+First one indicates if the Triton Server should be started on Triton object creation and the second one
+indicates if the model store should be created in the local filesystem and polled by Triton or configuration should be passed to the Triton server and managed by it.
+
+<!--pytest.mark.skip-->
+```python
+from pytriton.triton import Triton, TritonLifecyclePolicy
+
+lifecycle_policy = TritonLifecyclePolicy(launch_triton_on_startup=False, local_model_store=True)
+with Triton(triton_lifecycle_policy=lifecycle_policy) as triton:
+    ...
+    triton.serve()
+```
+
+Default values for `TritonLifecyclePolicy` flags are `launch_triton_on_startup=True` and `local_model_store=False`.
+In this case Triton Server will be started on the Triton class instantiation (so user can bind models to running server interactively)
+and the model store will be created in Triton server's filesystem and managed by it.
+
+In some usage scenarios, it is necessary to prepare the model first in local model store and then start the Triton server (e.g. VertexAI flow).
+In this case we use VerexAI's `TritonLifecyclePolicy` to manage the Triton server lifecycle.
+
+`VertextAILifecyclePolicy = TritonLifecyclePolicy(launch_triton_on_startup=False, local_model_store=True)`
+
+For easy of use, it is automatically set when `TritonConfig` is created with `allow_vertex_ai` parameter set to `True`.
+
+`config = TritonConfig(allow_http=True, allow_vertex_ai=True, vertex_ai_port=8080)`
+
+For details on how to use `TritonLifecyclePolicy` with VertexAI, see example [examples/add_sub_vertex_ai](../examples/add_sub_vertex_ai).
+
+
 ## Blocking mode
 
 The blocking mode will stop the execution of the current thread and wait for incoming HTTP/gRPC requests for inference

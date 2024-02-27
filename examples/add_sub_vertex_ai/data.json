@@ -1,0 +1,20 @@
+{
+  "id": "0",
+  "inputs": [
+    {
+      "name": "INPUT_1",
+      "shape": [1, 4],
+      "datatype": "FP32",
+      "parameters": {},
+      "data": [[1,2,3,4]]
+    },
+    {
+      "name": "INPUT_2",
+      "shape": [1, 4],
+      "datatype": "FP32",
+      "parameters": {},
+      "data": [[1,2,3,4]]
+    }
+  ]
+}
+

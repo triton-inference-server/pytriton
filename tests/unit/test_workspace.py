@@ -14,6 +14,7 @@
 import multiprocessing
 import os.path
 import pathlib
+import shutil
 import tempfile
 
 import pytest
@@ -27,9 +28,10 @@ def test_workspace_exist_and_empty_when_created():
         workspace = Workspace(tempdir / "workspace")
 
         assert workspace._workspace_path.exists()
+        assert workspace.model_store_path.exists()
         assert workspace.exists()
-        assert workspace.is_empty()
-        assert len(os.listdir(workspace._workspace_path)) == 0
+        assert not workspace.is_empty()
+        assert len(os.listdir(workspace._workspace_path)) == 1
         assert workspace.path == workspace._workspace_path
 
 
@@ -40,7 +42,7 @@ def test_workspace_not_exist_and_empty_when_removed():
         tempdir = pathlib.Path(tempdir)
         workspace = Workspace(tempdir / "workspace")
 
-        os.rmdir(workspace._workspace_path)
+        shutil.rmtree(workspace._workspace_path.as_posix())
         assert not workspace.exists()
         assert workspace.is_empty()
 

@@ -277,6 +277,22 @@ class TritonConfig:
         return cls.from_dict(config)
 
 
+@dataclasses.dataclass
+class TritonLifecyclePolicy:
+    """Triton Inference Server lifecycle policy.
+
+    Indicates when Triton server is launched and where the model store is located (locally or remotely managed by
+    Triton server).
+    """
+
+    launch_triton_on_startup: bool = True
+    local_model_store: bool = False
+
+
+DefaultTritonLifecyclePolicy = TritonLifecyclePolicy()
+VertextAILifecyclePolicy = TritonLifecyclePolicy(launch_triton_on_startup=False, local_model_store=True)
+
+
 class _LogLevelChecker:
     """Check if log level is too verbose."""
 
@@ -326,16 +342,28 @@ class _LogLevelChecker:
 class TritonBase:
     """Base class for Triton Inference Server."""
 
-    def __init__(self, url: str, workspace: Union[Workspace, str, pathlib.Path, None] = None):
+    def __init__(
+        self,
+        url: str,
+        workspace: Union[Workspace, str, pathlib.Path, None] = None,
+        triton_lifecycle_policy: TritonLifecyclePolicy = DefaultTritonLifecyclePolicy,
+    ):
         """Initialize TritonBase.
 
         Args:
             url: Triton Inference Server URL in form of <scheme>://<host>:<port>
             workspace: Workspace for storing communication sockets and the other temporary files.
+            triton_lifecycle_policy:  policy indicating when Triton server is launched and where the model store is located
+            (locally or remotely managed by Triton server).
+
         """
+        self._triton_lifecycle_policy = triton_lifecycle_policy
         self._workspace = workspace if isinstance(workspace, Workspace) else Workspace(workspace)
         self._url = url
-        self._model_manager = ModelManager(self._url)
+        _local_model_config_path = (
+            self._workspace.model_store_path if triton_lifecycle_policy.local_model_store else None
+        )
+        self._model_manager = ModelManager(self._url, _local_model_config_path)
         self._cv = th.Condition()
         self._triton_context = TritonContext()
         self._log_level_checker = _LogLevelChecker(self._url)
@@ -400,7 +428,11 @@ class TritonBase:
                 return
 
             self._wait_for_server()
-            self._model_manager.load_models()
+            if self._triton_lifecycle_policy.local_model_store:
+                self._model_manager.setup_models()
+            else:
+                self._model_manager.load_models()
+
             self._wait_for_models()
             self._connected = True
 
@@ -462,7 +494,8 @@ class TritonBase:
         Returns:
             A Triton object
         """
-        self.connect()
+        if self._triton_lifecycle_policy.launch_triton_on_startup:
+            self.connect()
         return self
 
     def __exit__(self, *_) -> None:
@@ -551,7 +584,11 @@ class Triton(TritonBase):
     """Triton Inference Server for Python models."""
 
     def __init__(
-        self, *, config: Optional[TritonConfig] = None, workspace: Union[Workspace, str, pathlib.Path, None] = None
+        self,
+        *,
+        config: Optional[TritonConfig] = None,
+        workspace: Union[Workspace, str, pathlib.Path, None] = None,
+        triton_lifecycle_policy: Optional[TritonLifecyclePolicy] = None,
     ):
         """Initialize Triton Inference Server context for starting server and loading models.
 
@@ -568,7 +605,16 @@ class Triton(TritonBase):
             workspace: workspace or path where the Triton Model Store and files used by pytriton will be created.
                 If workspace is `None` random workspace will be created.
                 Workspace will be deleted in [Triton.stop()][pytriton.triton.Triton.stop].
+            triton_lifecycle_policy:  policy indicating when Triton server is launched and where the model store is located
+                (locally or remotely managed by Triton server). If triton_lifecycle_policy is None,
+                DefaultTritonLifecyclePolicy is used by default (Triton server is launched on startup and model store is not local).
+                Only if triton_lifecycle_policy is None and config.allow_vertex_ai is True, VertextAILifecyclePolicy is used instead.
         """
+        _triton_lifecycle_policy = (
+            VertextAILifecyclePolicy
+            if triton_lifecycle_policy is None and config is not None and config.allow_vertex_ai
+            else triton_lifecycle_policy
+        ) or DefaultTritonLifecyclePolicy
 
         def _without_none_values(_d):
             return {name: value for name, value in _d.items() if value is not None}
@@ -584,6 +630,7 @@ class Triton(TritonBase):
         super().__init__(
             url=endpoint_utils.get_endpoint(self._triton_server_config, endpoint_protocol),
             workspace=workspace_instance,
+            triton_lifecycle_policy=_triton_lifecycle_policy,
         )
         self._triton_server = None
 
@@ -593,7 +640,8 @@ class Triton(TritonBase):
         Returns:
             A Triton object
         """
-        self._run_server()
+        if self._triton_lifecycle_policy.launch_triton_on_startup:
+            self._run_server()
         super().__enter__()
         return self
 
@@ -654,9 +702,10 @@ class Triton(TritonBase):
             self._triton_server_config[name] = value
 
         self._triton_server_config["model_control_mode"] = "explicit"
+        self._triton_server_config["load-model"] = "*"
         self._triton_server_config["backend_config"] = self._python_backend_config.to_list_args()
         if "model_repository" not in self._triton_server_config:
-            self._triton_server_config["model_repository"] = workspace.path.as_posix()
+            self._triton_server_config["model_repository"] = workspace.model_store_path.as_posix()
 
     def _prepare_triton_inference_server(self) -> pathlib.Path:
         """Prepare binaries and libraries of Triton Inference Server for execution.
@@ -756,7 +805,11 @@ class RemoteTriton(TritonBase):
                 (if you use containers, folder must be shared between containers).
 
         """
-        super().__init__(url=TritonUrl.from_url(url).with_scheme, workspace=workspace)
+        super().__init__(
+            url=TritonUrl.from_url(url).with_scheme,
+            workspace=workspace,
+            triton_lifecycle_policy=TritonLifecyclePolicy(launch_triton_on_startup=True, local_model_store=False),
+        )
 
         with self._cv:
             self._stopped = False
