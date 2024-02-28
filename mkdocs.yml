@@ -92,6 +92,7 @@ nav:
   - Guides:
     - Building binary package: guides/building.md
     - Deploying in Clusters: guides/deploying_in_clusters.md
+    - Distributed Tracing: guides/distributed_tracing.md
     - Chunking and batching: guides/chunking.md
     - Downloaded input data: guides/downloaded_input_data.md
   - Tutorials: examples.md

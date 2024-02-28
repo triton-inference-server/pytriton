@@ -130,14 +130,14 @@ class TritonConfig:
         grpc_http2_max_ping_strikes: Maximum number of bad pings that the server will tolerate before sending
             an HTTP2 GOAWAY frame and closing the transport.
         grpc_restricted_protocol: Specify restricted GRPC protocol setting.
-            The format of this flag is <protocols>,<key>=<value>.
-            Where <protocol> is a comma-separated list of protocols to be restricted.
-            <key> will be additional header key to be checked when a GRPC request
-            is received, and <value> is the value expected to be matched.
+            The format of this flag is `<protocols>,<key>=<value>`.
+            Where `<protocol>` is a comma-separated list of protocols to be restricted.
+            `<key>` will be additional header key to be checked when a GRPC request
+            is received, and `<value>` is the value expected to be matched.
         allow_metrics: Allow the server to provide prometheus metrics.
         allow_gpu_metrics: Allow the server to provide GPU metrics.
         allow_cpu_metrics: Allow the server to provide CPU metrics.
-        metrics_interval_ms: Metrics will be collected once every <metrics-interval-ms> milliseconds.
+        metrics_interval_ms: Metrics will be collected once every `<metrics-interval-ms>` milliseconds.
         metrics_port: The port reporting prometheus metrics.
         metrics_address: The address for the metrics server to bind to. Default is the same as http_address.
         allow_sagemaker: Allow the server to listen for Sagemaker requests.
@@ -149,18 +149,19 @@ class TritonConfig:
         vertex_ai_thread_count: Number of threads handling Vertex AI requests.
         vertex_ai_default_model: The name of the model to use for single-model inference requests.
         metrics_config: Specify a metrics-specific configuration setting.
-            The format of this flag is <setting>=<value>. It can be specified multiple times
+            The format of this flag is `<setting>=<value>`. It can be specified multiple times
         trace_config: Specify global or trace mode specific configuration setting.
-            The format of this flag is <mode>,<setting>=<value>.
-            Where <mode> is either 'triton' or 'opentelemetry'. The default is 'triton'.
-            To specify global trace settings (level, rate, count, or mode), the format would be <setting>=<value>.
+            The format of this flag is `<mode>,<setting>=<value>`.
+            Where `<mode>` is either 'triton' or 'opentelemetry'. The default is 'triton'.
+            To specify global trace settings (level, rate, count, or mode), the format would be `<setting>=<value>`.
             For 'triton' mode, the server will use Triton's Trace APIs.
             For 'opentelemetry' mode, the server will use OpenTelemetry's APIs to generate,
             collect and export traces for individual inference requests.
+            More details, including supported settings can be found at [Triton trace guide](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/trace.md).
         cache_config: Specify a cache-specific configuration setting.
-            The format of this flag is <cache_name>,<setting>=<value>.
-            Where <cache_name> is the name of the cache, such as 'local' or 'redis'.
-            Example: local,size=1048576 will configure a 'local' cache implementation
+            The format of this flag is `<cache_name>,<setting>=<value>`.
+            Where `<cache_name>` is the name of the cache, such as 'local' or 'redis'.
+            Example: `local,size=1048576` will configure a 'local' cache implementation
             with a fixed buffer pool of size 1048576 bytes.
         cache_directory: The global directory searched for cache shared libraries. Default is '/opt/tritonserver/caches'.
             This directory is expected to contain a cache implementation as a shared library with the name 'libtritoncache.so'.
