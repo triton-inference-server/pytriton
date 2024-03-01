@@ -29,9 +29,18 @@ fi
 docker pull -q --platform "${PLATFORM}" "${TRITON_SERVER_IMAGE}"
 
 if [[ "${PULL_RESULT}" != "0" ]]; then
+  BUILD_ARGS=""
+  if [ ! -z "${PYTHON_VERSIONS+x}" ]; then
+    BUILD_ARGS+=" --build-arg PYTHON_VERSIONS=${PYTHON_VERSIONS}"
+  fi
+  if [ ! -z "${PYTRITON_MAKEFLAGS+x}" ]; then
+    BUILD_ARGS+=" --build-arg MAKEFLAGS=${PYTRITON_MAKEFLAGS}"
+  fi
+
   docker buildx build --force-rm \
     --platform "${PLATFORM}" \
     --build-arg FROM_IMAGE="${TRITON_SERVER_IMAGE}" \
+    $BUILD_ARGS \
     --file scripts/Dockerfile.build \
     --tag "${PYTRITON_IMAGE_NAME}" ${DOCKER_BUILD_ADDITIONAL_FLAGS} .
 fi

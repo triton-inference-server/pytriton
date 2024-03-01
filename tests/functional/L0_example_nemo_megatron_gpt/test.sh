@@ -18,5 +18,11 @@ set -xe
 THIS_SCRIPT_DIR="$(realpath --relative-to="${PWD}" "$(dirname "$0")")"
 TEST_MODULE="${THIS_SCRIPT_DIR//\//.}.test"
 
+# nemo-toolkit 1.20.0 requires numpy<1.24,>=1.22, numba crashes with never version
+pip install "numpy==1.22"
+
+# This is necessary to avoid error in ONNX used my NeMo toolkit for version of protobuf never than 3.7
+export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+
 python -m"${TEST_MODULE}" \
     --timeout-s 300

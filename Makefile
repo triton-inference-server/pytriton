@@ -36,11 +36,12 @@ export PRINT_HELP_PYSCRIPT
 
 BROWSER := python -c "$$BROWSER_PYSCRIPT"
 PIP_INSTALL := pip install --extra-index-url https://pypi.ngc.nvidia.com
-TRITONSERVER_IMAGE_VERSION = 24.01
+TEST_CONTAINER_VERSION ?= 24.02
+TRITONSERVER_IMAGE_VERSION ?= 24.02
 TRITONSERVER_IMAGE_NAME = nvcr.io/nvidia/tritonserver:$(TRITONSERVER_IMAGE_VERSION)-pyt-python-py3
 TRITONSERVER_OUTPUT_DIR = ${PWD}/pytriton/tritonserver
 TRITONSERVER_BASENAME = pytriton
-PYTRITON_IMAGE_NAME = $(TRITONSERVER_BASENAME):$(TRITONSERVER_IMAGE_VERSION)
+PYTRITON_IMAGE_NAME = $(TRITONSERVER_BASENAME):$(TEST_CONTAINER_VERSION)
 # to set PLATFORM from outside, use: make PLATFORM=linux/arm64;
 # correct values are: linux/amd64 (default), linux/arm64
 PLATFORM=linux/amd64

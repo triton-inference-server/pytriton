@@ -16,6 +16,12 @@ limitations under the License.
 
 # Changelog
 
+## Unreleased
+
+[//]: <> (put here on external component update with short summary what change or link to changelog)
+
+- Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.43.0](https://github.com/triton-inference-server/server/releases/tag/v2.43.0)
+
 ## 0.5.2 (2024-02-29)
 - Add: Add `TritonLifecyclePolicy` parameter to Triton class to control the lifecycle of the Triton Inference Server
   (Triton Inference Server can be started at the beginning of the context - default behavior, or at the call of `run` or `serve` method),
