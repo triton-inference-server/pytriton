@@ -16,7 +16,8 @@ limitations under the License.
 
 # Changelog
 
-## Unreleased
+## 0.5.3 (2024-03-09)
+- New: Relaxed wheel dependencies to avoid forced downgrading of protobuf and other packages in the NVIDIA 24.02 docker containers for PyTorch and other frameworks.
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 
