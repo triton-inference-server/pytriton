@@ -240,12 +240,6 @@ tensor3 = Tensor(name="tensor3", shape=(-1,), dtype="float32"),
 When the model gets into a state where further inference is impossible,
 you can throw [PyTritonUnrecoverableError][pytriton.exceptions.PyTritonUnrecoverableError]
 from the inference callable. This will cause NVIDIA Triton Inference Server to shut down.
-This might be useful when the model is deployed on a cluster in a multi-node setup. In that case
-to recover the model you need to restart all "workers" on the cluster.
-
-When the model gets into a state where further inference is impossible,
-you can throw the [PyTritonUnrecoverableError][pytriton.exceptions.PyTritonUnrecoverableError]
-from the inference callable. This will cause the NVIDIA Triton Inference Server to shut down.
 This might be useful when the model is deployed on a cluster in a multi-node setup. In that case,
 to recover the model, you need to restart all "workers" on the cluster.
 
