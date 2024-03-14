@@ -23,7 +23,6 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 ENV PIP_NO_CACHE_DIR=off
-ENV LD_LIBRARY_PATH=/usr/local/cuda/compat:$LD_LIBRARY_PATH
 
 WORKDIR /workspace
 
