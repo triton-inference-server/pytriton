@@ -626,6 +626,9 @@ class ModelClient(BaseModelClient):
 
         inputs_wrapped = []
 
+        # to help pytype to obtain variable type
+        inputs: Dict[str, np.ndarray]
+
         for input_name, input_data in inputs.items():
             if input_data.dtype == object and not isinstance(input_data.reshape(-1)[0], bytes):
                 raise RuntimeError(
