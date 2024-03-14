@@ -63,7 +63,7 @@ make build-engine-llama2-7b-int8
 # make build-engine-llama2-7b-basic
 ```
 
-The `Makefile` contains example profiles. However, these may not be optimal for every setup. Adjust them based on your hardware specifications and refer to the model documentation for optimal performance. If working with different models, you'll need to add new targets to the `Makefile`.
+The `Makefile` contains example profiles. However, these may not be optimal for every setup. Adjust them based on your hardware specifications and refer to the TensorRT-LLM [documentation](https://nvidia.github.io/TensorRT-LLM/perf_best_practices.html) for optimal performance. If working with different models, you'll need to add new targets to the `Makefile`.
 
 The `server.py` script supports only decoder-only language models [supported by TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM?tab=readme-ov-file#models), such as Baichuan, BLOOM, Falcon, GPT, GPT-J, GPT-Nemo, GPT-NeoX, LLaMA, LLaMA-v2, Mistral, MPT, OPT, Phi-1.5/Phi-2, Qwen, Replit Code, SantaCoder, and StarCoder. It supports only single-GPU configurations.
 
@@ -90,9 +90,9 @@ curl http://127.0.0.1:8000/v2/models/llama2-7b-int8/generate_stream \
     -sS \
     -w "\n" \
     -d '{
-        "prompt": "San Francisco is a",
+        "text_input": "San Francisco is a",
         "max_tokens": 128,
-        "streaming": true
+        "stream": true
     }'
 ```
 

@@ -28,7 +28,7 @@ ENV LD_LIBRARY_PATH=/usr/local/cuda/compat:$LD_LIBRARY_PATH
 WORKDIR /workspace
 
 # match the version of repository with the version of tensorrt_llm in requirements.txt
-RUN git clone https://github.com/NVIDIA/TensorRT-LLM && cd TensorRT-LLM && git checkout eb8f26c && cd ..
+RUN git clone https://github.com/NVIDIA/TensorRT-LLM && cd TensorRT-LLM && git checkout v0.8.0 && cd ..
 
 ADD requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt

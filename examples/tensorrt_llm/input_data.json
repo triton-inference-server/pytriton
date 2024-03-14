@@ -1,1 +1,1 @@
-{"data": [{"prompt": {"content": ["one day I will understand"], "shape": [1]}, "max_tokens": [1], "streaming": {"content": [true], "shape": [1]}}]}
+{"data": [{"text_input": {"content": ["one day I will understand"], "shape": [1]}, "max_tokens": [1], "stream": {"content": [true], "shape": [1]}}]}

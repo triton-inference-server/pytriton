@@ -46,7 +46,7 @@ GRPC_PORT                      ?= 8001
 METRICS_PORT                   ?= 8002
 
 serve-%: build-engine-%
-	mpirun -n 1 python3 $(SCRIPT_DIR)/server.py --engine-dir $(ENGINE_DIR) --tokenizer $(HF_MODEL_NAME) --model-name $(DEPLOYMENT_NAME) --host $(HOST) --http-port $(HTTP_PORT) --grpc-port $(GRPC_PORT) --metrics-port $(METRICS_PORT)
+	mpirun --allow-run-as-root -n 1 python3 $(SCRIPT_DIR)/server.py --engine-dir $(ENGINE_DIR) --tokenizer $(HF_MODEL_NAME) --model-name $(DEPLOYMENT_NAME) --host $(HOST) --http-port $(HTTP_PORT) --grpc-port $(GRPC_PORT) --metrics-port $(METRICS_PORT)
 
 benchmark-%:
 	perf_analyzer \

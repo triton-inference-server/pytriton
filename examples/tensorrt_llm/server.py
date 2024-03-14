@@ -68,27 +68,27 @@ class GptDeployment:
         request = {key: value[0] for key, value in requests[0].items()}
 
         async for result in self._engine.generate_async(
-            request["prompt"].decode("utf-8"),
-            streaming=request["streaming"].item(),
+            request["text_input"].decode("utf-8"),
+            streaming=request["stream"].item(),
             max_new_tokens=request["max_tokens"].item(),
         ):
             text_output = result.text
             # wrap in array to match (1, ) shape
-            result_dict = {"text": np.char.encode(np.array([text_output]), "utf-8")}
+            result_dict = {"text_output": np.char.encode(np.array([text_output]), "utf-8")}
             yield [result_dict]  # wrap in list to match single item requests list
 
     @property
     def inputs(self):
         return [
-            Tensor(name="prompt", dtype=bytes, shape=(1,)),
-            Tensor(name="max_tokens", dtype=np.uint32, shape=(1,)),
-            Tensor(name="streaming", dtype=np.bool_, shape=(1,)),
+            Tensor(name="text_input", dtype=bytes, shape=(1,)),
+            Tensor(name="max_tokens", dtype=np.int32, shape=(1,)),
+            Tensor(name="stream", dtype=np.bool_, shape=(1,)),
         ]
 
     @property
     def outputs(self):
         return [
-            Tensor(name="text", dtype=bytes, shape=(1,)),
+            Tensor(name="text_output", dtype=bytes, shape=(1,)),
         ]
 
     def close(self):
