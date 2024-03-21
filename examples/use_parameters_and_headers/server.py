@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Server with simple python model performing adding and subtract operation using custom headers and parameters."""
+
 import logging
 
 import numpy as np

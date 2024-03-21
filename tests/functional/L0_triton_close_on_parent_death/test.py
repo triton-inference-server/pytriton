@@ -18,6 +18,7 @@
 - sends SEGFAULT signal to server script
 - waits till all children processes of server script finishes
 """
+
 import argparse
 import logging
 import signal

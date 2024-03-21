@@ -31,6 +31,7 @@ for models inference.
             )
             triton.serve()
 """
+
 import atexit
 import codecs
 import contextlib

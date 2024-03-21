@@ -18,6 +18,7 @@ to configure models of given types.
 
 The dataclasses are exposed in the user API.
 """
+
 import dataclasses
 
 from pytriton.model_config import DynamicBatcher

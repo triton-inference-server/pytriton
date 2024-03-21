@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Utility module supporting model clients."""
+
 import dataclasses
 import enum
 import logging
@@ -126,7 +127,7 @@ def get_model_state(
             return ModelState.UNAVAILABLE
         else:
             requested_model_states = sorted(requested_model_states.items(), key=lambda item: int(item[0]))
-            latest_version, latest_version_state = requested_model_states[-1]
+            _latest_version, latest_version_state = requested_model_states[-1]
             return latest_version_state
     else:
         state = models_states.get((model_name, model_version), ModelState.UNAVAILABLE)
@@ -279,9 +280,7 @@ def wait_for_model_ready(
             )
 
 
-def create_client_from_url(
-    url: str, network_timeout_s: Optional[float] = None
-) -> _TritonSyncClientType:  # type: ignore
+def create_client_from_url(url: str, network_timeout_s: Optional[float] = None) -> _TritonSyncClientType:  # type: ignore
     """Create Triton Inference Server client.
 
     Args:

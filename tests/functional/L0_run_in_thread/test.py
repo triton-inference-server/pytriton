@@ -18,14 +18,19 @@
 - sends SEGFAULT signal to server script
 - waits till all children processes of server script finishes
 """
+
 import argparse
 import logging
 import signal
 import sys
 import time
 
-from tests.utils import ProcessMonitoring  # pytype: disable=import-error
-from tests.utils import DEFAULT_LOG_FORMAT, ScriptThread, find_free_port
+from tests.utils import (
+    DEFAULT_LOG_FORMAT,
+    ProcessMonitoring,  # pytype: disable=import-error
+    ScriptThread,
+    find_free_port,
+)
 
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 

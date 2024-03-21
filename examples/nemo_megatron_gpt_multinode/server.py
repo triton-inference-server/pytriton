@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Text generation server with NeMo Megatron GPT model."""
+
 import argparse
 import logging
 from pathlib import Path

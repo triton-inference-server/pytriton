@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test of multiple_models_python example"""
+
 import argparse
 import logging
 import signal

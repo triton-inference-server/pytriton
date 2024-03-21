@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Set of utils to obtain properties of pytriton distribution."""
+
 import logging
 import pathlib
 import site

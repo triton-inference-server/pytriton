@@ -20,6 +20,8 @@ except PackageNotFoundError:
     # package is not installed
     pass
 
-from pytriton import client  # noqa: F401
-from pytriton import model_config  # noqa: F401
-from pytriton import triton  # noqa: F401
+from pytriton import (
+    client,  # noqa: F401
+    model_config,  # noqa: F401
+    triton,  # noqa: F401
+)

@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Client for BART classifier sample server."""
+
 import argparse
 import logging
 
@@ -58,14 +59,12 @@ def main():
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(name)s: %(message)s")
 
-    sequence = np.array(
-        [
-            ["one day I will see the world"],
-            ["I would love to learn cook the Asian street food"],
-            ["Carnival in Rio de Janeiro"],
-            ["William Shakespeare was a great writer"],
-        ]
-    )
+    sequence = np.array([
+        ["one day I will see the world"],
+        ["I would love to learn cook the Asian street food"],
+        ["Carnival in Rio de Janeiro"],
+        ["William Shakespeare was a great writer"],
+    ])
     sequence = np.char.encode(sequence, "utf-8")
     logger.info(f"Sequence: {sequence}")
 

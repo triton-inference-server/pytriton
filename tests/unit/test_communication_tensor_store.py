@@ -67,7 +67,8 @@ def test_tensor_store_unregisters_shm_from_resource_tracker(tmp_path, mocker):
     tensor_store.put([a, b, c])
 
     shm_names = {
-        shm._name for shm, tensor_ref in tensor_store._handled_blocks.values()  # pytype: disable=attribute-error
+        shm._name
+        for shm, tensor_ref in tensor_store._handled_blocks.values()  # pytype: disable=attribute-error
     }
 
     debug_status = get_debug_status(tensor_store)
@@ -90,7 +91,8 @@ def test_tensor_store_shared_memory_unlinked_on_tensor_store_close(tmp_path):
     tensor_store.put([a, b, c])
 
     shm_names = {
-        shm._name for shm, tensor_ref in tensor_store._handled_blocks.values()  # pytype: disable=attribute-error
+        shm._name
+        for shm, tensor_ref in tensor_store._handled_blocks.values()  # pytype: disable=attribute-error
     }
 
     for shm_name in shm_names:

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Module handling communication between RequestsServer and RequestsServerClients."""
+
 import asyncio
 import enum
 import functools
@@ -456,7 +457,7 @@ class HandshakeServer(threading.Thread):
         try:
             self._config_payload = json.dumps(inference_handler_config).encode()
         except TypeError:
-            raise ValueError(f"InferenceHandler config is not serializable: {inference_handler_config}")
+            raise ValueError(f"InferenceHandler config is not serializable: {inference_handler_config}") from None
 
         self._server = None
         self._error_from_thread = None
@@ -528,6 +529,7 @@ def get_config_from_handshake_server(socket_path: pathlib.Path, timeout_s: float
 
     Args:
         socket_path: path to socket
+        timeout_s: timeout for waiting for the response
 
     Returns:
         config from handshake server

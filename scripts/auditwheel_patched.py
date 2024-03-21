@@ -17,6 +17,7 @@
 Patch changes behavior of auditwheel to not remove libpython from the wheel
 as it is python interpreter library required by python backend.
 """
+
 import re
 
 import auditwheel.main  # noqa

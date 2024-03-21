@@ -21,6 +21,7 @@ Use to configure the CLI argument for Python Backend passed on Triton Inference 
         config["shm-default-byte-size"] = 33554432
         config.to_list_args() # ["python,shm-default-byte-size=33554432"]
 """
+
 from typing import Any, Dict, List, Optional, Union
 
 from pytriton.exceptions import PyTritonError

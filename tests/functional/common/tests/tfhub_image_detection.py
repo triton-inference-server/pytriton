@@ -15,6 +15,7 @@
 """
 Runs inference session over image detector model
 """
+
 import collections
 import logging
 import pathlib
@@ -36,7 +37,7 @@ def tfhub_image_detection(test_time_s: int, init_timeout_s: int, batch_size: int
     expected_5_most_common_coco_labels = ("potted plant", "vase", "person", "bird", "tv")
 
     infer_fn = model_spec.create_infer_fn()
-    (dataset, dataset_info) = dataset_spec.create_dataset_fn(batch_size=batch_size)
+    (dataset, _dataset_info) = dataset_spec.create_dataset_fn(batch_size=batch_size)
     classes = COCO_LABELS
 
     with tempfile.TemporaryDirectory() as temp_dir:

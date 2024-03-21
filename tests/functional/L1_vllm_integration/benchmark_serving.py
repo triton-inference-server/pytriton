@@ -17,6 +17,7 @@
 
 Adapted from: https://github.com/vllm-project/vllm/blob/v0.2.1/benchmarks/benchmark_serving.py
 """
+
 import argparse
 import asyncio
 import json
@@ -200,9 +201,9 @@ def main(args: argparse.Namespace):
     # Compute the latency statistics.
     avg_latency = np.mean([latency for _, _, latency in REQUEST_LATENCY])
     print(f"Average latency: {avg_latency:.2f} s")  # noqa: T201
-    avg_per_token_latency = np.mean(
-        [latency / (prompt_len + output_len) for prompt_len, output_len, latency in REQUEST_LATENCY]
-    )
+    avg_per_token_latency = np.mean([
+        latency / (prompt_len + output_len) for prompt_len, output_len, latency in REQUEST_LATENCY
+    ])
     print(f"Average latency per token: {avg_per_token_latency:.2f} s")  # noqa: T201
     avg_per_output_token_latency = np.mean([latency / output_len for _, output_len, latency in REQUEST_LATENCY])
     print("Average latency per output token: " f"{avg_per_output_token_latency:.2f} s")  # noqa: T201

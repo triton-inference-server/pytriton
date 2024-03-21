@@ -286,7 +286,7 @@ def get_current_container_version():
 
 
 def verify_docker_image_in_readme_same_as_tested(readme_path, image_name_with_version):
-    image_name, image_version = image_name_with_version.split(":")
+    image_name, _image_version = image_name_with_version.split(":")
     framework_name = image_name.split("/")[-1]
     readme_payload = pathlib.Path(readme_path).read_text()
     match_iterator = re.finditer(

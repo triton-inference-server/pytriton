@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,15 +13,15 @@
 # limitations under the License.
 exclude: kubernetes
 repos:
-  - repo: https://github.com/ambv/black
-    rev: 23.11.0
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.0
     hooks:
-      - id: black
-  - repo: https://github.com/pycqa/isort
-    rev: 5.12.0
-    hooks:
-      - id: isort
-        name: isort (python)
+      - id: ruff
+        args: [ ]
+        types_or: [ python, pyi ]
+      - id: ruff-format
+        types_or: [ python, pyi ]
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:
@@ -47,28 +47,7 @@ repos:
     rev: v3.15.0
     hooks:
       - id: pyupgrade
-        args: [--py36-plus]
-  - repo: https://github.com/pycqa/flake8
-    rev: 6.1.0
-    hooks:
-      - id: flake8
-        additional_dependencies:
-            - flake8-bugbear
-            - flake8-comprehensions
-            - flake8-print
-            - mccabe
-            - pep8-naming
-            - pycodestyle
-            - pyflakes
-  - repo: https://github.com/pycqa/pydocstyle
-    rev: 6.3.0
-    hooks:
-      - id: pydocstyle
-        name: Run pydocstyle
-        args:
-          - --convention=google
-        exclude: '(?:tests|examples)\/.*'
-        additional_dependencies: ['toml']
+        args: [--py38-plus]
   - repo: https://github.com/thlorenz/doctoc
     rev: v2.2.0
     hooks:

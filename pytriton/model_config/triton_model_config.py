@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """ModelConfig related objects."""
+
 import dataclasses
 from typing import Dict, Optional, Sequence, Type, Union
 

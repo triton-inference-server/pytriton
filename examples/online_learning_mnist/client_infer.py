@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Client for online_learning sample server."""
+
 import argparse
 import logging
 
@@ -52,9 +53,7 @@ def main():
 
                 test_loss /= len(test_loader.dataset)
                 LOGGER.info(
-                    "\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n".format(
-                        test_loss, correct, len(test_loader.dataset), 100.0 * correct / len(test_loader.dataset)
-                    )
+                    f"\nTest set: Average loss: {test_loss:.4f}, Accuracy: {correct}/{len(test_loader.dataset)} ({100.0 * correct / len(test_loader.dataset):.0f}%)\n"
                 )
 
 

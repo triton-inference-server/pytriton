@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Example client script for multiple_models example."""
+
 import logging
 
 import numpy as np

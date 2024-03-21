@@ -16,7 +16,6 @@
 Runs long inference session with FuturesModelClient over identity model
 """
 
-
 import argparse
 import logging
 import random

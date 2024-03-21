@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Utility module supporting model clients."""
+
 import asyncio
 import logging
 import time
@@ -239,7 +240,7 @@ async def asyncio_wait_for_model_status_loaded(
             version of the model which configuration we're requesting.
             If model_version is None configuration of the latest model is returned.
             The latest versions of the model are the numerically greatest version numbers.
-        timeout_s: timeout to finish model configuration obtain.
+        sleep_time_s: time interval, in seconds, between successive checks to determine if the model configuration has been completed.
 
     Raises:
         PyTritonClientTimeoutError: If obtain of model configuration didn't finish before given timeout.

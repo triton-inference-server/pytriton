@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Inference callable decorators."""
+
 import collections
 import dataclasses
 import inspect
@@ -30,9 +31,10 @@ from pytriton.exceptions import PyTritonBadParameterError, PyTritonRuntimeError,
 from pytriton.model_config.triton_model_config import TritonModelConfig
 from pytriton.proxy.data import _serialize_byte_tensor
 
-_WrappedWithWrapper = NamedTuple(
-    "WrappedWithWrapper", [("wrapped", Optional[Callable]), ("wrapper", Optional[Callable])]
-)
+
+class _WrappedWithWrapper(NamedTuple):
+    wrapped: Optional[Callable]
+    wrapper: Optional[Callable]
 
 
 InputNames = typing.List[str]
@@ -52,7 +54,7 @@ def get_inference_request_batch_size(inference_request: InferenceRequest) -> int
         int: Batch size.
     """
     first_input_value = next(iter(inference_request.values()))
-    batch_size, *dims = first_input_value.shape
+    batch_size, *_dims = first_input_value.shape
     return batch_size
 
 
@@ -557,9 +559,10 @@ def pad_batch(wrapped, instance, args, kwargs):
     new_inputs = {
         input_name: np.repeat(
             input_array,
-            np.concatenate(
-                [np.ones(input_array.shape[0] - 1), np.array([batch_size - input_array.shape[0] + 1])]
-            ).astype(np.int64),
+            np.concatenate([
+                np.ones(input_array.shape[0] - 1),
+                np.array([batch_size - input_array.shape[0] + 1]),
+            ]).astype(np.int64),
             axis=0,
         )
         for input_name, input_array in inputs.items()

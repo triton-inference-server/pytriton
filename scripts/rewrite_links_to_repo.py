@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Script with hook for replacing ../<anything> markdown links in docs to git repo."""
+
 import logging
 import os
 import pathlib

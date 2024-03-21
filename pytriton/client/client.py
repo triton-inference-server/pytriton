@@ -967,6 +967,7 @@ class AsyncioModelClient(BaseModelClient):
                 The latest versions of the model are numerically the greatest version numbers.
             lazy_init: if initialization should be performed just before sending first request to inference server.
             init_timeout_s: timeout for server and model being ready.
+            inference_timeout_s: timeout in seconds for a single model inference request. If not passed, the default timeout of 60 seconds will be used.
             model_config: model configuration. If not passed, it will be read from inference server during initialization.
             ensure_model_is_ready: if model should be checked if it is ready before first inference request.
 
@@ -1584,7 +1585,7 @@ class AsyncioDecoupledModelClient(AsyncioModelClient):
             # stream_infer siletly consumes all errors raised inside async_request_iterator and raises CancelledError
             if len(error_raised_inside_async_request_iterator) > 0:
                 _LOGGER.error(f"Re-raising error raised inside async_request_iterator for {self._model_name} ")
-                raise error_raised_inside_async_request_iterator.pop()
+                raise error_raised_inside_async_request_iterator.pop() from None
             else:
                 raise e
 

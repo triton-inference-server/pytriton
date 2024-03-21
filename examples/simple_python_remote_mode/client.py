@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Client for simple_python_remote_mode sample server."""
+
 import logging
 
 import numpy as np

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Common structures for internal and external ModelConfig."""
+
 import dataclasses
 import enum
 from typing import Dict, Optional

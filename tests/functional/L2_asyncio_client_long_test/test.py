@@ -16,7 +16,6 @@
 Runs long inference session with AsyncioModelClient over identity model
 """
 
-
 import argparse
 import asyncio
 import logging

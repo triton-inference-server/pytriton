@@ -13,8 +13,10 @@
 # limitations under the License.
 # noqa: D104
 
-from .client import AsyncioDecoupledModelClient  # noqa: F401
-from .client import AsyncioModelClient  # noqa: F401
-from .client import DecoupledModelClient  # noqa: F401
-from .client import FuturesModelClient  # noqa: F401
-from .client import ModelClient  # noqa: F401
+from .client import (
+    AsyncioDecoupledModelClient,  # noqa: F401
+    AsyncioModelClient,  # noqa: F401
+    DecoupledModelClient,  # noqa: F401
+    FuturesModelClient,  # noqa: F401
+    ModelClient,  # noqa: F401
+)

@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Client for ResNet50 classifier sample server."""
+
 import argparse
 import io
 import logging

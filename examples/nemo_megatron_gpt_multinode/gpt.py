@@ -57,12 +57,10 @@ class NemoGptCallable:
         formatted_prompts = []
         for task_name, prompt in zip(tasks, prompts):
             task_template = self._model.task_templates[task_name]
-            formatted_prompts.append(
-                {
-                    **{"taskname": task_name},
-                    **dict(zip(task_template["prompt_template_fields"], [prompt])),
-                }
-            )
+            formatted_prompts.append({
+                **{"taskname": task_name},
+                **dict(zip(task_template["prompt_template_fields"], [prompt])),
+            })
         return formatted_prompts
 
     @batch
@@ -83,9 +81,9 @@ class NemoGptCallable:
         tasks = _str_ndarray2list(inputs.pop("tasks"))
         prompts = _str_ndarray2list(inputs.pop("prompts"))
         length_params = LengthParam(**{k: v for k, v in inputs.items() if k in typing.get_type_hints(LengthParam)})
-        sampling_params = SamplingParam(
-            **{k: v for k, v in inputs.items() if k in typing.get_type_hints(SamplingParam)}
-        )
+        sampling_params = SamplingParam(**{
+            k: v for k, v in inputs.items() if k in typing.get_type_hints(SamplingParam)
+        })
         if tasks[0] == "text_generation":
             generate_fn = self._text_generate_fn
         else:

@@ -25,6 +25,7 @@ class ModelConfig.
         model_config = ModelConfigParser.from_file("/path/to/config.pbtxt")
 
 """
+
 import json
 import logging
 import pathlib
@@ -184,7 +185,7 @@ class ModelConfigParser:
             if dtype is None:
                 raise PyTritonModelConfigError(f"Unsupported data type `{data_type}` for {io_type} with name `{name}`")
 
-            dtype = np.dtype("bool") if dtype == bool else dtype
+            dtype = np.dtype("bool") if dtype is bool else dtype
 
         dims = item.get("dims", [])
         if not dims:

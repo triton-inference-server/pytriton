@@ -15,6 +15,7 @@
 """
 Runs short (50min) inference session over NLP model
 """
+
 import argparse
 import logging
 import random

@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test of nemo_megatron_gpt_multinode example"""
+
 import argparse
 import logging
 import re

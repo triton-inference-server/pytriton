@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Example with multiple models served on single Triton server."""
+
 import logging
 
 import numpy as np

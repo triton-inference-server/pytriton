@@ -13,6 +13,7 @@
 # limitations under the License.
 # noqa: D104
 """Constants for pytriton."""
+
 import os
 import pathlib
 

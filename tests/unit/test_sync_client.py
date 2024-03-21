@@ -259,17 +259,15 @@ def test_sync_grpc_client_infer_sample_returns_expected_result_when_positional_a
 
         called_kwargs = mock_infer.call_args.kwargs
         expected_kwargs = dict(EXPECTED_KWARGS_GRPC_DEFAULT)
-        expected_kwargs.update(
-            {
-                "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
-                "model_version": "",
-                "request_id": "0",
-                "inputs": {"a": a, "b": b},
-                "outputs": list(expected_result),
-                "parameters": None,
-                "headers": None,
-            }
-        )
+        expected_kwargs.update({
+            "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
+            "model_version": "",
+            "request_id": "0",
+            "inputs": {"a": a, "b": b},
+            "outputs": list(expected_result),
+            "parameters": None,
+            "headers": None,
+        })
         for arg_name, arg_value in expected_kwargs.items():
             if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
                 assert called_kwargs.get(arg_name) == arg_value
@@ -300,14 +298,12 @@ def test_sync_grpc_client_infer_sample_returns_expected_result_when_infer_on_mod
 
         called_kwargs = mock_infer.call_args.kwargs
         expected_kwargs = dict(EXPECTED_KWARGS_GRPC_DEFAULT)
-        expected_kwargs.update(
-            {
-                "model_name": ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
-                # expect to send data with additional batch axis
-                "inputs": {name: data[np.newaxis, ...] for name, data in inputs_dict.items()},
-                "outputs": list(expected_result),
-            }
-        )
+        expected_kwargs.update({
+            "model_name": ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
+            # expect to send data with additional batch axis
+            "inputs": {name: data[np.newaxis, ...] for name, data in inputs_dict.items()},
+            "outputs": list(expected_result),
+        })
         for arg_name, arg_value in expected_kwargs.items():
             if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
                 assert called_kwargs.get(arg_name) == arg_value
@@ -338,13 +334,11 @@ def test_sync_grpc_client_infer_sample_returns_expected_result_when_named_args_a
 
         called_kwargs = mock_infer.call_args.kwargs
         expected_kwargs = dict(EXPECTED_KWARGS_GRPC_DEFAULT)
-        expected_kwargs.update(
-            {
-                "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
-                "inputs": inputs_dict,
-                "outputs": list(expected_result),
-            }
-        )
+        expected_kwargs.update({
+            "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
+            "inputs": inputs_dict,
+            "outputs": list(expected_result),
+        })
         for arg_name, arg_value in expected_kwargs.items():
             if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
                 assert called_kwargs.get(arg_name) == arg_value
@@ -373,12 +367,10 @@ def test_sync_grpc_client_infer_batch_returns_expected_result_when_positional_ar
 
         called_kwargs = mock_infer.call_args.kwargs
         expected_kwargs = dict(EXPECTED_KWARGS_GRPC_DEFAULT)
-        expected_kwargs.update(
-            {
-                "inputs": {"a": a, "b": b},
-                "outputs": list(expected_result),
-            }
-        )
+        expected_kwargs.update({
+            "inputs": {"a": a, "b": b},
+            "outputs": list(expected_result),
+        })
         for arg_name, arg_value in expected_kwargs.items():
             if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
                 assert called_kwargs.get(arg_name) == arg_value
@@ -409,12 +401,10 @@ def test_sync_grpc_client_infer_batch_returns_expected_result_when_named_args_ar
 
         called_kwargs = mock_infer.call_args.kwargs
         expected_kwargs = dict(EXPECTED_KWARGS_GRPC_DEFAULT)
-        expected_kwargs.update(
-            {
-                "inputs": inputs_dict,
-                "outputs": list(expected_result),
-            }
-        )
+        expected_kwargs.update({
+            "inputs": inputs_dict,
+            "outputs": list(expected_result),
+        })
         for arg_name, arg_value in expected_kwargs.items():
             if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
                 assert called_kwargs.get(arg_name) == arg_value
@@ -588,13 +578,11 @@ def test_sync_http_client_infer_sample_returns_expected_result_when_infer_on_mod
 
         called_kwargs = mock_infer.call_args.kwargs
         expected_kwargs = dict(EXPECTED_KWARGS_HTTP_DEFAULT)
-        expected_kwargs.update(
-            {
-                # expect to send data with additional batch axis
-                "inputs": {"a": a[np.newaxis, ...], "b": b[np.newaxis, ...]},
-                "outputs": list(expected_result),
-            }
-        )
+        expected_kwargs.update({
+            # expect to send data with additional batch axis
+            "inputs": {"a": a[np.newaxis, ...], "b": b[np.newaxis, ...]},
+            "outputs": list(expected_result),
+        })
         for arg_name, arg_value in expected_kwargs.items():
             if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
                 assert called_kwargs.get(arg_name) == arg_value
@@ -623,13 +611,11 @@ def test_sync_http_client_infer_sample_returns_expected_result_when_positional_a
 
         called_kwargs = mock_infer.call_args.kwargs
         expected_kwargs = dict(EXPECTED_KWARGS_HTTP_DEFAULT)
-        expected_kwargs.update(
-            {
-                "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
-                "inputs": {"a": a, "b": b},
-                "outputs": list(expected_result),
-            }
-        )
+        expected_kwargs.update({
+            "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
+            "inputs": {"a": a, "b": b},
+            "outputs": list(expected_result),
+        })
         for arg_name, arg_value in expected_kwargs.items():
             if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
                 assert called_kwargs.get(arg_name) == arg_value
@@ -682,13 +668,11 @@ def test_sync_http_client_infer_sample_from_existing_client(mocker, infer_state)
 
             called_kwargs = mock_infer_from_existing.call_args.kwargs
             expected_kwargs = dict(EXPECTED_KWARGS_HTTP_DEFAULT)
-            expected_kwargs.update(
-                {
-                    "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
-                    "inputs": {"a": a, "b": b},
-                    "outputs": list(expected_result),
-                }
-            )
+            expected_kwargs.update({
+                "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
+                "inputs": {"a": a, "b": b},
+                "outputs": list(expected_result),
+            })
             for arg_name, arg_value in expected_kwargs.items():
                 if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
                     assert called_kwargs.get(arg_name) == arg_value
@@ -744,13 +728,11 @@ def test_sync_http_client_infer_batch_init_from_client(mocker, ensure_model_is_r
 
         called_kwargs = mock_infer_from_existing.call_args.kwargs
         expected_kwargs = dict(EXPECTED_KWARGS_HTTP_DEFAULT)
-        expected_kwargs.update(
-            {
-                "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
-                "inputs": {"a": a, "b": b},
-                "outputs": list(expected_result),
-            }
-        )
+        expected_kwargs.update({
+            "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
+            "inputs": {"a": a, "b": b},
+            "outputs": list(expected_result),
+        })
         for arg_name, arg_value in expected_kwargs.items():
             if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
                 assert called_kwargs.get(arg_name) == arg_value
@@ -781,13 +763,11 @@ def test_sync_http_client_infer_sample_returns_expected_result_when_named_args_a
 
         called_kwargs = mock_infer.call_args.kwargs
         expected_kwargs = dict(EXPECTED_KWARGS_HTTP_DEFAULT)
-        expected_kwargs.update(
-            {
-                "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
-                "inputs": inputs_dict,
-                "outputs": list(expected_result),
-            }
-        )
+        expected_kwargs.update({
+            "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
+            "inputs": inputs_dict,
+            "outputs": list(expected_result),
+        })
         for arg_name, arg_value in expected_kwargs.items():
             if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
                 assert called_kwargs.get(arg_name) == arg_value
@@ -816,12 +796,10 @@ def test_sync_http_client_infer_batch_returns_expected_result_when_positional_ar
 
         called_kwargs = mock_infer.call_args.kwargs
         expected_kwargs = dict(EXPECTED_KWARGS_HTTP_DEFAULT)
-        expected_kwargs.update(
-            {
-                "inputs": {"a": a, "b": b},
-                "outputs": list(expected_result),
-            }
-        )
+        expected_kwargs.update({
+            "inputs": {"a": a, "b": b},
+            "outputs": list(expected_result),
+        })
         for arg_name, arg_value in expected_kwargs.items():
             if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
                 assert called_kwargs.get(arg_name) == arg_value
@@ -852,12 +830,10 @@ def test_sync_http_client_infer_batch_returns_expected_result_when_named_args_ar
 
         called_kwargs = mock_infer.call_args.kwargs
         expected_kwargs = dict(EXPECTED_KWARGS_HTTP_DEFAULT)
-        expected_kwargs.update(
-            {
-                "inputs": inputs_dict,
-                "outputs": list(expected_result),
-            }
-        )
+        expected_kwargs.update({
+            "inputs": inputs_dict,
+            "outputs": list(expected_result),
+        })
         for arg_name, arg_value in expected_kwargs.items():
             if arg_name not in ["inputs", "outputs"]:  # inputs and outputs requires manual verification
                 assert called_kwargs.get(arg_name) == arg_value

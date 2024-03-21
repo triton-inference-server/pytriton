@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+# noqa: CPY001
 # BSD 3-Clause License
 #
 # Copyright (c) 2017,

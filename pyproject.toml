@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ classifiers = [
 authors = []
 maintainers = []
 keywords = []
-license = {text = "Apache 2.0"}
+license = { text = "Apache 2.0" }
 requires-python = ">=3.8,<4"
 dependencies = [
     "numpy >= 1.21",
@@ -75,12 +75,11 @@ doc = [
 dev = [
     "nvidia-pytriton[test]",
     "nvidia-pytriton[doc]",
-    "black >= 24.2",
     "build >= 0.8, <1.0.0", # to support --plat-name for multiarch build
     "ipython >= 8.12", # Python 3.8 maximum for 24.02
-    "isort == 5.12",  # as new depdenencies from 5.13 causes fail during running CI
     "pudb >= 2024.1",
     "pip >= 24.0",  # to support editable installation
+    "ruff >= 0.3.0",
     "twine >= 5.0",
 ]
 
@@ -115,31 +114,38 @@ pytriton = [
 plat-name = "linux_x86_64"
 
 
-[tool.black]
+[tool.ruff]
+preview = true
 line-length = 120
-target-version = ['py38']
-include = '\.pyi?$'
-exclude = '''
+indent-width = 4
+target-version = "py38"
 
-(
-  /(
-      \.eggs         # exclude a few common directories in the
-    | \.git          # root of the project
-    | \.hg
-    | \.mypy_cache
-    | \.tox
-    | \.venv
-    | _build
-    | buck-out
-    | build
-    | dist
-  )/
-)
-'''
+[tool.ruff.lint]
+select = ["B", "C", "C4", "C90", "D", "E", "F", "I", "N", "W", "T", "T10", "T20", "UP", "CPY"]
+ignore = ["E266", "E501", "N818"]
+exclude = []
 
-[tool.isort]
-profile = "black"
-line_length = 120
+[tool.ruff.lint.per-file-ignores]
+"**/__init__.py" = ["D104"]
+"**/__version__.py" = ["D100"]
+"**/{tests,docs,tools,examples}/*" = ["C416", "D"]
+"**/tests/*" = ["CPY"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 18
+
+[tool.ruff.lint.flake8-copyright]
+author = "NVIDIA CORPORATION"
+notice-rgx = 'Copyright \(c\) \d{4}(-\d{4})*,'
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "lf"
 
 [tool.vulture]
 exclude = []

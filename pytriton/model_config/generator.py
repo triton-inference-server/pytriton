@@ -22,6 +22,7 @@ dict or file.
         generator = ModelConfigGenerator(model_config)
         generator.to_file("/path/to/config.pbtxt")
 """
+
 import json
 import logging
 import pathlib
@@ -195,12 +196,10 @@ class ModelConfigGenerator:
         """
         instance_groups = []
         for device_kind, count in self._config.instance_group.items():
-            instance_groups.append(
-                {
-                    "count": count,
-                    "kind": device_kind.value,
-                }
-            )
+            instance_groups.append({
+                "count": count,
+                "kind": device_kind.value,
+            })
 
         if instance_groups:
             model_config["instance_group"] = instance_groups

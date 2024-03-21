@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Simple classifier example based on HF microsoft/DialoGPT model."""
+
 import argparse
 import concurrent
 import logging
@@ -62,7 +63,7 @@ class StreamingBot:
                 }  # add batch dimension to match declared signature
         except queue.Empty:
             generate_future.cancel()
-            raise TimeoutError(f"Timeout occurred during model generation (timeout_s={self._timeout_s}).")
+            raise TimeoutError(f"Timeout occurred during model generation (timeout_s={self._timeout_s}).") from None
 
         generate_future.result()  # raise exception if any occurred in model.generation method
 

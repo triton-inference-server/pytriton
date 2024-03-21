@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Client for mlp_random example."""
+
 import logging
 
 import numpy as np

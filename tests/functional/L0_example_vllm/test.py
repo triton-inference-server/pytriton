@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test of vllm example"""
+
 import argparse
 import logging
 import signal
@@ -93,13 +94,11 @@ def main():
         with ScriptThread(client_cmd, name="client") as client_thread:
             with ScriptThread(client_streaming_cmd, name="client-streaming") as client_streaming_thread:
                 while (
-                    all(
-                        [
-                            server_thread.is_alive(),
-                            client_thread.is_alive(),
-                            client_streaming_thread.is_alive(),
-                        ]
-                    )
+                    all([
+                        server_thread.is_alive(),
+                        client_thread.is_alive(),
+                        client_streaming_thread.is_alive(),
+                    ])
                     and elapsed_s < args.timeout_s
                 ):
                     client_thread.join(timeout=wait_time_s)

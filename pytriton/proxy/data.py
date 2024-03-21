@@ -59,7 +59,7 @@ def _serialize_byte_tensor(tensor) -> bytes:
     of this it should be avoided.
 
     Args:
-        input_tensor: The bytes tensor to serialize.
+        tensor: The bytes tensor to serialize.
 
     Returns:
     serialized array as bytes buffer.
@@ -80,7 +80,7 @@ def _serialize_byte_tensor(tensor) -> bytes:
         # If directly passing bytes to BYTES type,
         # don't convert it to str as Python will encode the
         # bytes which may distort the meaning
-        if tensor.dtype == np.object_ and type(obj.item()) != bytes:
+        if tensor.dtype == np.object_ and not isinstance(obj.item(), bytes):
             s = str(obj.item()).encode("utf-8")
         else:
             s = obj.item()
@@ -198,7 +198,7 @@ def calc_serialized_size_of_numpy_with_struct_header(tensor: np.ndarray) -> List
         items_sizes = []
         order = "C" if tensor.flags.c_contiguous else "F"
         for obj in np.nditer(tensor, flags=["refs_ok"], order=order):
-            if tensor.dtype == np.object_ and type(obj.item()) != bytes:
+            if tensor.dtype == np.object_ and not isinstance(obj.item(), bytes):
                 s = str(obj.item()).encode("utf-8")
             else:
                 s = obj.item()
@@ -465,7 +465,9 @@ class _Popen(multiprocessing.popen_spawn_posix.Popen):
             cmd = spawn.get_command_line(tracker_fd=tracker_fd, pipe_handle=child_r)
             self._fds.extend([child_r, child_w])  # pytype: disable=attribute-error
             self.pid = util.spawnv_passfds(
-                spawn.get_executable(), cmd, self._fds  # pytype: disable=attribute-error,wrong-arg-types
+                spawn.get_executable(),
+                cmd,
+                self._fds,  # pytype: disable=attribute-error,wrong-arg-types
             )
             self.sentinel = parent_r
             with open(parent_w, "wb", closefd=False) as f:

@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Client for online_learning sample server."""
+
 import logging
 
 import torch  # pytype: disable=import-error

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Workspace class for handling space to store artifacts."""
+
 import logging
 import pathlib
 import shutil

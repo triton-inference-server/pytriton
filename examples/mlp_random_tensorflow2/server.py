@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Example with random MLP implemented with TF2 framework."""
+
 import logging
 
 import numpy as np

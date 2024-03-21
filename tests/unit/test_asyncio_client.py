@@ -210,13 +210,11 @@ async def test_async_http_client_infer_sample_returns_expected_result_when_infer
 
         called_kwargs = mock_infer.call_args.kwargs
         expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
-        expected_kwargs.update(
-            {
-                # expect to send data with additional batch axis
-                "inputs": {"a": a[np.newaxis, ...], "b": b[np.newaxis, ...]},
-                "outputs": list(expected_result),
-            }
-        )
+        expected_kwargs.update({
+            # expect to send data with additional batch axis
+            "inputs": {"a": a[np.newaxis, ...], "b": b[np.newaxis, ...]},
+            "outputs": list(expected_result),
+        })
         assert all(
             called_kwargs.get(arg_name) == arg_value
             for arg_name, arg_value in expected_kwargs.items()
@@ -341,7 +339,7 @@ async def test_async_grpc_client_infer_sample_raises_exception_wrong_coupled_dec
     await client.__aenter__()
     _LOGGER.debug("Entered client")
     with pytest.raises(PyTritonClientInferenceServerError):
-        async for result in client.infer_sample(a, b):
+        async for _result in client.infer_sample(a, b):
             pass
     _LOGGER.debug("Exiting client")
     await client.__aexit__(None, None, None)
@@ -404,13 +402,11 @@ async def test_async_http_client_infer_sample_returns_expected_result_when_posit
 
         called_kwargs = mock_infer.call_args.kwargs
         expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
-        expected_kwargs.update(
-            {
-                "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
-                "inputs": {"a": a, "b": b},
-                "outputs": list(expected_result),
-            }
-        )
+        expected_kwargs.update({
+            "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
+            "inputs": {"a": a, "b": b},
+            "outputs": list(expected_result),
+        })
         assert all(
             called_kwargs.get(arg_name) == arg_value
             for arg_name, arg_value in expected_kwargs.items()
@@ -440,12 +436,10 @@ async def test_async_http_client_infer_batch_returns_expected_result_when_positi
 
         called_kwargs = mock_infer.call_args.kwargs
         expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
-        expected_kwargs.update(
-            {
-                "inputs": {"a": a, "b": b},
-                "outputs": list(expected_result),
-            }
-        )
+        expected_kwargs.update({
+            "inputs": {"a": a, "b": b},
+            "outputs": list(expected_result),
+        })
         assert all(
             called_kwargs.get(arg_name) == arg_value
             for arg_name, arg_value in expected_kwargs.items()
@@ -479,13 +473,11 @@ async def test_async_http_client_infer_sample_returns_expected_result_when_named
 
         called_kwargs = mock_infer.call_args.kwargs
         expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
-        expected_kwargs.update(
-            {
-                "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
-                "inputs": inputs_dict,
-                "outputs": list(expected_result),
-            }
-        )
+        expected_kwargs.update({
+            "model_name": ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name,
+            "inputs": inputs_dict,
+            "outputs": list(expected_result),
+        })
         assert all(
             called_kwargs.get(arg_name) == arg_value
             for arg_name, arg_value in expected_kwargs.items()
@@ -517,12 +509,10 @@ async def test_async_http_client_infer_batch_returns_expected_result_when_named_
 
         called_kwargs = mock_infer.call_args.kwargs
         expected_kwargs = dict(EXPECTED_KWARGS_DEFAULT)
-        expected_kwargs.update(
-            {
-                "inputs": inputs_dict,
-                "outputs": list(expected_result),
-            }
-        )
+        expected_kwargs.update({
+            "inputs": inputs_dict,
+            "outputs": list(expected_result),
+        })
         assert all(
             called_kwargs.get(arg_name) == arg_value
             for arg_name, arg_value in expected_kwargs.items()

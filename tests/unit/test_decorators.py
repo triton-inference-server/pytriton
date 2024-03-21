@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Inference decorators tests."""
+
 import typing
 
 import numpy as np
@@ -545,32 +546,28 @@ def _expected_test_group_by_values_with_dynamic_axes_on_output():
             keys=["a"],
             expected_result={
                 "a": np.array([[1], [1], [1], [1], [1], [1], [2], [2], [2], [2]]),
-                "output": np.block(
-                    [  # 16 is the max output_length
-                        [np.ones((6, 16), dtype="int")],
-                        [np.ones((4, 3), dtype="int"), np.zeros((4, 13), dtype="int")],
-                    ]
-                ),
+                "output": np.block([  # 16 is the max output_length
+                    [np.ones((6, 16), dtype="int")],
+                    [np.ones((4, 3), dtype="int"), np.zeros((4, 13), dtype="int")],
+                ]),
             },
         ),
         GroupByValuesTestCase(  # output axes: a: (1,), output: (-1, -1, -1)
             inference_request={
                 "a": np.array([[1], [1], [1], [1], [1], [1], [2], [2], [2], [2]]),
                 "b": np.array([[7, 5], [8, 6], [1, 2], [1, 2], [11, 12], [1, 2], [5, 6], [7, 2], [4, 2], [1, 122]]),
-                "output_length": np.array(
-                    [
-                        [8, 2, 1],
-                        [8, 2, 1],
-                        [16, 4, 2],
-                        [16, 4, 2],
-                        [4, 2, 2],
-                        [8, 2, 2],
-                        [3, 1, 4],
-                        [3, 1, 4],
-                        [3, 2, 2],
-                        [3, 2, 2],
-                    ]
-                ),
+                "output_length": np.array([
+                    [8, 2, 1],
+                    [8, 2, 1],
+                    [16, 4, 2],
+                    [16, 4, 2],
+                    [4, 2, 2],
+                    [8, 2, 2],
+                    [3, 1, 4],
+                    [3, 1, 4],
+                    [3, 2, 2],
+                    [3, 2, 2],
+                ]),
             },
             keys=["a"],
             expected_result={
@@ -596,25 +593,21 @@ def test_group_by_values_with_dynamic_axes_of_bytes_on_output():
     @group_by_values("a", pad_fn=ConstantPadder(0))
     def _fn(**inputs):
         if inputs["a"][0][0] == 1:
-            sequences = np.array(
-                [
-                    [b"foo", b"barxxx", b""],
-                    [b"bar1", b"Loriem ipsum", b"foo"],
-                    [b"foo", b"barxxx", b""],
-                    [b"bar1", b"Loriem ipsum", b"foo"],
-                    [b"foo", b"barxxx", b""],
-                    [b"bar1", b"Loriem ipsum", b"foo"],
-                ]
-            )
+            sequences = np.array([
+                [b"foo", b"barxxx", b""],
+                [b"bar1", b"Loriem ipsum", b"foo"],
+                [b"foo", b"barxxx", b""],
+                [b"bar1", b"Loriem ipsum", b"foo"],
+                [b"foo", b"barxxx", b""],
+                [b"bar1", b"Loriem ipsum", b"foo"],
+            ])
         else:
-            sequences = np.array(
-                [
-                    [b"foo", b"bar", b"", b""],
-                    [b"1", b"22", b"3", b"4444"],
-                    [b"foo", b"bar", b"", b""],
-                    [b"1", b"22", b"3", b"4444"],
-                ]
-            )
+            sequences = np.array([
+                [b"foo", b"bar", b"", b""],
+                [b"1", b"22", b"3", b"4444"],
+                [b"foo", b"bar", b"", b""],
+                [b"1", b"22", b"3", b"4444"],
+            ])
 
         return {"a": inputs["a"], "output": sequences}
 
@@ -622,20 +615,18 @@ def test_group_by_values_with_dynamic_axes_of_bytes_on_output():
     inference_request = {"a": a}
     expected_result = {
         "a": a,
-        "output": np.array(
-            [
-                [b"foo", b"barxxx", b"", b""],
-                [b"bar1", b"Loriem ipsum", b"foo", b""],
-                [b"foo", b"barxxx", b"", b""],
-                [b"bar1", b"Loriem ipsum", b"foo", b""],
-                [b"foo", b"barxxx", b"", b""],
-                [b"bar1", b"Loriem ipsum", b"foo", b""],
-                [b"foo", b"bar", b"", b""],
-                [b"1", b"22", b"3", b"4444"],
-                [b"foo", b"bar", b"", b""],
-                [b"1", b"22", b"3", b"4444"],
-            ]
-        ),
+        "output": np.array([
+            [b"foo", b"barxxx", b"", b""],
+            [b"bar1", b"Loriem ipsum", b"foo", b""],
+            [b"foo", b"barxxx", b"", b""],
+            [b"bar1", b"Loriem ipsum", b"foo", b""],
+            [b"foo", b"barxxx", b"", b""],
+            [b"bar1", b"Loriem ipsum", b"foo", b""],
+            [b"foo", b"bar", b"", b""],
+            [b"1", b"22", b"3", b"4444"],
+            [b"foo", b"bar", b"", b""],
+            [b"1", b"22", b"3", b"4444"],
+        ]),
     }
 
     result = _fn(**inference_request)
@@ -646,25 +637,21 @@ def test_group_by_values_with_dynamic_axes_of_unicode_on_output():
     @group_by_values("a", pad_fn=ConstantPadder(0))
     def _fn(**inputs):
         if inputs["a"][0][0] == 1:
-            sequences = np.array(
-                [
-                    ["foo", "barxxx", ""],
-                    ["bar1", "Loriem ipsum", "foo"],
-                    ["foo", "barxxx", ""],
-                    ["bar1", "Loriem ipsum", "foo"],
-                    ["foo", "barxxx", ""],
-                    ["bar1", "Loriem ipsum", "foo"],
-                ]
-            )
+            sequences = np.array([
+                ["foo", "barxxx", ""],
+                ["bar1", "Loriem ipsum", "foo"],
+                ["foo", "barxxx", ""],
+                ["bar1", "Loriem ipsum", "foo"],
+                ["foo", "barxxx", ""],
+                ["bar1", "Loriem ipsum", "foo"],
+            ])
         else:
-            sequences = np.array(
-                [
-                    ["foo", "bar", "", ""],
-                    ["1", "22", "3", "4444"],
-                    ["foo", "bar", "", ""],
-                    ["1", "22", "3", "4444"],
-                ]
-            )
+            sequences = np.array([
+                ["foo", "bar", "", ""],
+                ["1", "22", "3", "4444"],
+                ["foo", "bar", "", ""],
+                ["1", "22", "3", "4444"],
+            ])
 
         return {"a": inputs["a"], "output": sequences}
 
@@ -672,20 +659,18 @@ def test_group_by_values_with_dynamic_axes_of_unicode_on_output():
     inference_request = {"a": a}
     expected_result = {
         "a": a,
-        "output": np.array(
-            [
-                ["foo", "barxxx", "", ""],
-                ["bar1", "Loriem ipsum", "foo", ""],
-                ["foo", "barxxx", "", ""],
-                ["bar1", "Loriem ipsum", "foo", ""],
-                ["foo", "barxxx", "", ""],
-                ["bar1", "Loriem ipsum", "foo", ""],
-                ["foo", "bar", "", ""],
-                ["1", "22", "3", "4444"],
-                ["foo", "bar", "", ""],
-                ["1", "22", "3", "4444"],
-            ]
-        ),
+        "output": np.array([
+            ["foo", "barxxx", "", ""],
+            ["bar1", "Loriem ipsum", "foo", ""],
+            ["foo", "barxxx", "", ""],
+            ["bar1", "Loriem ipsum", "foo", ""],
+            ["foo", "barxxx", "", ""],
+            ["bar1", "Loriem ipsum", "foo", ""],
+            ["foo", "bar", "", ""],
+            ["1", "22", "3", "4444"],
+            ["foo", "bar", "", ""],
+            ["1", "22", "3", "4444"],
+        ]),
     }
 
     result = _fn(**inference_request)

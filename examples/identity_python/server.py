@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Very simple example with python identity operation."""
+
 import logging
 
 import numpy as np

@@ -14,7 +14,6 @@
 # limitations under the License.
 """Example use of TensorRT-LLM with PyTriton."""
 
-
 import argparse
 import contextlib
 import json

@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Client for Stable Diffusion 1.5."""
+
 import argparse
 import base64
 import io

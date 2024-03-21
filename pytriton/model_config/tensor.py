@@ -28,6 +28,7 @@ Describe the model input or output.
         # Custom name
         tensor = Tensor(name="data", dtype=np.float32, shape=(16,))
 """
+
 import dataclasses
 from typing import Optional, Type, Union
 

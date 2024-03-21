@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test of simple_python_remote_mode example"""
+
 import argparse
 import logging
 import signal
@@ -78,14 +79,12 @@ def main():
             with ScriptThread(server_remote_pow_cmd, name="server_remote_pow") as server_remote_pow_thread:
                 with ScriptThread(client_cmd, name="client") as client_thread:
                     while (
-                        all(
-                            [
-                                server_thread.is_alive(),
-                                server_remote_mul_thread.is_alive(),
-                                server_remote_pow_thread.is_alive(),
-                                client_thread.is_alive(),
-                            ]
-                        )
+                        all([
+                            server_thread.is_alive(),
+                            server_remote_mul_thread.is_alive(),
+                            server_remote_pow_thread.is_alive(),
+                            client_thread.is_alive(),
+                        ])
                         and elapsed_s < args.timeout_s
                     ):
                         client_thread.join(timeout=wait_time_s)

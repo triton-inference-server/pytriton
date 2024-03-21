@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Server with simple python model performing adding and subtract operation."""
+
 import logging
 
 import cupy as cp  # pytype: disable=import-error

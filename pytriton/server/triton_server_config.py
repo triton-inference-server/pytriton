@@ -21,6 +21,7 @@ Use to configure the CLI argument for starting the Triton Inference Server proce
         config["log-verbose"] = 1
         config.to_cli_string()
 """
+
 from typing import Any, Dict, List, Optional
 
 from pytriton.exceptions import PyTritonError
@@ -169,7 +170,7 @@ class TritonServerConfig:
         Returns:
             The list of arguments consisting of all set arguments to the tritonserver.
 
-            Example:
+        Example:
             input cli_string: "--model-control-mode=explicit
                 --backend-config=tensorflow,version=2"
             output: ['--model-control-mode', 'explicit',

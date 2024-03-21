@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Server starting triton with simple python model performing adding and subtract operation."""
+
 import logging
 
 import numpy as np

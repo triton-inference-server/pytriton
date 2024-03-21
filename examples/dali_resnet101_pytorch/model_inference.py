@@ -1,10 +1,11 @@
+# noqa: CPY001
 # Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-# http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,10 +40,9 @@ class SegmentationPyTorch:
             self.class_index = weights.meta["categories"].index(seg_class_name)
         except ValueError:
             raise ValueError(
-                "Requested segmentation class '%s' is not supported by the "
-                "fcn_resnet101 model. All supported class names are: %s"
-                % (seg_class_name, ", ".join(weights.meta["categories"]))
-            )
+                f"Requested segmentation class '{seg_class_name}' is not supported by the "
+                f"fcn_resnet101 model. All supported class names are: {', '.join(weights.meta['categories'])}"
+            ) from None
 
         # Inference uses PyTorch to run a segmentation model on the pre-processed
         # input and outputs the segmentation masks.

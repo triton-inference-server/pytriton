@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """e2e run triton in not main thread"""
+
 import argparse
 import logging
 import random

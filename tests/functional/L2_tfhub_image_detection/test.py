@@ -15,6 +15,7 @@
 """
 Runs longer (10h) inference session over image detector model
 """
+
 import argparse
 import logging
 import random

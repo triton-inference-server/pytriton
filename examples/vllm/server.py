@@ -21,14 +21,14 @@ import logging
 from typing import AsyncGenerator, Dict, List
 
 import numpy as np
-from vllm.engine.arg_utils import AsyncEngineArgs  # pytype: disable=import-error
-from vllm.engine.async_llm_engine import AsyncLLMEngine  # pytype: disable=import-error
-from vllm.sampling_params import SamplingParams  # pytype: disable=import-error
-from vllm.utils import random_uuid  # pytype: disable=import-error
 
 from pytriton.model_config import ModelConfig, Tensor
 from pytriton.proxy.types import Request
 from pytriton.triton import Triton, TritonConfig
+from vllm.engine.arg_utils import AsyncEngineArgs  # pytype: disable=import-error
+from vllm.engine.async_llm_engine import AsyncLLMEngine  # pytype: disable=import-error
+from vllm.sampling_params import SamplingParams  # pytype: disable=import-error
+from vllm.utils import random_uuid  # pytype: disable=import-error
 
 LOGGER = logging.getLogger("examples.vllm.server")
 

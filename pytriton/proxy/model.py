@@ -15,6 +15,7 @@
 
 This file is automatically copied during deployment on Triton and should not be modified.
 """
+
 import asyncio
 import base64
 import json
@@ -149,7 +150,8 @@ def _wrap_response(response: Response, requested_outputs_names, model_outputs_di
         }
         return pb_utils.InferenceResponse(  # pytype: disable=module-attr
             output_tensors=[
-                pb_utils.Tensor(name, value) for name, value in casted.items()  # pytype: disable=module-attr
+                pb_utils.Tensor(name, value)
+                for name, value in casted.items()  # pytype: disable=module-attr
             ]
         )
     else:
@@ -169,7 +171,7 @@ class BatchResponsesHandler:
         """Handle responses from InferenceHandler.
 
         Args:
-            requests_id: id of requests
+            scope: scope of the request
             responses_queue: queue with responses payload from InferenceHandler
 
         Returns:
@@ -237,7 +239,7 @@ class DecoupledResponsesHandler:
         """Handle responses from InferenceHandler.
 
         Args:
-            requests_id: id of requests
+            scope: scope of the request
             responses_queue: queue with responses from InferenceHandler
 
         Returns:
@@ -423,7 +425,9 @@ class TritonPythonModel:
             self._requests_server_thread.start()
         except Exception:
             msg = traceback.format_exc()
-            raise pb_utils.TritonModelException(f"Model initialize error: {msg}")  # pytype: disable=module-attr
+            raise pb_utils.TritonModelException(
+                f"Model initialize error: {msg}"
+            ) from None  # pytype: disable=module-attr
 
     def execute(self, triton_requests):
         """Triton Inference Server Python Backend API method.
@@ -466,7 +470,7 @@ class TritonPythonModel:
             return triton_responses_or_error
         except Exception:
             msg = traceback.format_exc()
-            raise pb_utils.TritonModelException(f"Model execute error: {msg}")  # pytype: disable=module-attr
+            raise pb_utils.TritonModelException(f"Model execute error: {msg}") from None  # pytype: disable=module-attr
 
     def finalize(self) -> None:
         """Finalize the model cleaning the buffers."""

@@ -21,6 +21,7 @@
 - wait server shutdown (with timeout)
 - checks if resources are released
 """
+
 import argparse
 import logging
 import pathlib
@@ -28,8 +29,12 @@ import signal
 import sys
 import time
 
-from tests.utils import ProcessMonitoring  # pytype: disable=import-error
-from tests.utils import DEFAULT_LOG_FORMAT, ScriptThread, find_free_port
+from tests.utils import (
+    DEFAULT_LOG_FORMAT,
+    ProcessMonitoring,  # pytype: disable=import-error
+    ScriptThread,
+    find_free_port,
+)
 
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 

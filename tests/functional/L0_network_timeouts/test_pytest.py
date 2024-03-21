@@ -72,7 +72,6 @@ def triton_server(find_free_ports):
         return return_value
 
     class TritonInstance:
-
         """Context manager to hold Triton instance and ports"""
 
         def __init__(self, grpc_port, http_port, metrics_port, model_name, infer_function):

@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """e2e tests inference on add_sub model with different i/o size which might cause shared memory reallocation"""
+
 import argparse
 import logging
 import random

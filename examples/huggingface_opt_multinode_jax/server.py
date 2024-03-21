@@ -245,7 +245,7 @@ def main():
         with lock:
             model, params = get_model(args.model_name, cache_dir)
 
-        server_ip, port = args.head_url.split(":")
+        server_ip, _port = args.head_url.split(":")
 
         run(
             model=model,

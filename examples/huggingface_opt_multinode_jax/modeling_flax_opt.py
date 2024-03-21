@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Flax OPT model."""
+"""Flax OPT model."""
 
 # pytype: disable=import-error,annotation-type-mismatch,bad-return-type
 
@@ -164,7 +164,7 @@ class FlaxOPTAttention(nn.Module):
         cache_index = self.variable("cache", "cache_index", lambda: jnp.array(0, dtype=jnp.int32))
 
         if is_initialized:
-            *batch_dims, max_length, num_heads, depth_per_head = cached_key.value.shape
+            *batch_dims, max_length, _num_heads, _depth_per_head = cached_key.value.shape
             # update key, value caches with our new 1d spatial slices
             cur_index = cache_index.value
             indices = (0,) * len(batch_dims) + (cur_index, 0, 0)
