@@ -32,7 +32,7 @@ IFS=' '
 
 read -r -a PYTHON_VERSIONS <<< "$PYTHON_VERSIONS"
 
-for version in "${PYTHON_VERSION[@]}"; do
+for version in "${PYTHON_VERSIONS[@]}"; do
   pyenv install -f ${version}
 done
 
@@ -56,7 +56,7 @@ fi
 echo "Cloning Python Backend branch ${GIT_BRANCH_NAME} to ${PYTHON_BACKEND_DIR}."
 git clone https://github.com/triton-inference-server/python_backend -b "${GIT_BRANCH_NAME}" ${PYTHON_BACKEND_DIR}
 
-for version in "${PYTHON_VERSION[@]}"; do
+for version in "${PYTHON_VERSIONS[@]}"; do
   echo "Building Python Backend Stub for Python version ${version}"
   cd "${PYTHON_BACKEND_DIR}"
 

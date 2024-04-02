@@ -28,8 +28,8 @@ fi
 # fetch base image earlier as in some environments there are issues with pulling base images while building
 docker pull -q --platform "${PLATFORM}" "${TRITON_SERVER_IMAGE}"
 
+BUILD_ARGS=${BUILD_ARGS:-""}
 if [[ "${PULL_RESULT}" != "0" ]]; then
-  BUILD_ARGS=""
   if [ ! -z "${PYTHON_VERSIONS+x}" ]; then
     BUILD_ARGS+=" --build-arg PYTHON_VERSIONS=${PYTHON_VERSIONS}"
   fi
