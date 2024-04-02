@@ -25,10 +25,10 @@ fi
 export GIT_BRANCH_NAME="r${NVIDIA_TRITON_SERVER_VERSION}"
 
 # Use PYTHON_VERSION from the environment, or default to the specified versions
-export PYTHON_VERSIONS=${PYTHON_VERSIONS:-"3.8 3.9 3.10 3.11"}
+export PYTHON_VERSIONS=${PYTHON_VERSIONS:-"3.8,3.9,3.10,3.11"}
 
 # Convert string to array
-IFS=' '
+IFS=','
 
 read -r -a PYTHON_VERSIONS <<< "$PYTHON_VERSIONS"
 
