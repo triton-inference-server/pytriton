@@ -35,7 +35,7 @@ pip install tensorflow
 
 Or you can use NVIDIA TensorFlow container:
 ```shell
-docker run -it --gpus 1 --shm-size 8gb -v {repository_path}:{repository_path} -w {repository_path} nvcr.io/nvidia/tensorflow:24.02-tf2-py3 bash
+docker run -it --gpus 1 --shm-size 8gb -v {repository_path}:{repository_path} -w {repository_path} nvcr.io/nvidia/tensorflow:24.03-tf2-py3 bash
 ```
 
 If you select to use container we recommend to install

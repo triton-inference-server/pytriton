@@ -40,7 +40,7 @@ dependencies = [
     "protobuf >= 3.7",
     "pyzmq >= 23.0",
     "sh >= 1.14",
-    "tritonclient[all] ~= 2.43",
+    "tritonclient[all] ~= 2.44",
     "typing_inspect >= 0.6.0",
     "wrapt >= 1.11",
 ]
@@ -52,9 +52,9 @@ dependencies = [
 
 [project.optional-dependencies]
 test = [
-    "pytest ~= 8.0",
+    "pytest ~= 8.1.1",
     "pytest-codeblocks ~= 0.16", # 0.17 causes fail during numpy import
-    "pytest-mock ~= 3.12",
+    "pytest-mock ~= 3.14",
     "pytest-timeout ~= 2.2",
     "pytest-asyncio ~= 0.23.5",
     "pytype!=2021.11.18,!=2022.2.17",
@@ -85,7 +85,9 @@ dev = [
 
 [build-system]
 requires = [
-    "setuptools>=69.0.3",
+    # Setuptools must albo be installed separately in add_libs_to_wheel.sh
+    # to support Python 3.12. Update versions in both places.
+    "setuptools>=69.2.0",
     "setuptools_scm[toml]>=8.0",
     "wheel>=0.42",
 ]

@@ -16,6 +16,13 @@ limitations under the License.
 
 # Changelog
 
+## Unreleased
+
+[//]: <> (put here on external component update with short summary what change or link to changelog)
+
+- Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.44.0](https://github.com/triton-inference-server/server/releases/tag/v2.44.0)
+
+
 ## 0.5.3 (2024-03-09)
 - New: Relaxed wheel dependencies to avoid forced downgrading of protobuf and other packages in the NVIDIA 24.02 docker containers for PyTorch and other frameworks.
 

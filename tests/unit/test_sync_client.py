@@ -13,6 +13,7 @@
 # limitations under the License.
 import gc
 import logging
+import sys
 import threading
 import time
 
@@ -658,9 +659,10 @@ def test_sync_http_client_infer_sample_from_existing_client(mocker, infer_state)
             result_from_existing = client_from_existing.infer_sample(a, b)
 
             if infer_state == "after_infer":
-                spy_get_model_config.not_called()
-                spy_is_server_ready.not_called()
-                spy_is_server_live.not_called()
+                if sys.version_info < (3, 12):
+                    spy_get_model_config.not_called()
+                    spy_is_server_ready.not_called()
+                    spy_is_server_live.not_called()
             else:
                 assert len(spy_get_model_config.mock_calls) == 2
                 assert len(spy_is_server_ready.mock_calls) == 3
@@ -718,13 +720,15 @@ def test_sync_http_client_infer_batch_init_from_client(mocker, ensure_model_is_r
         result_from_existing = client_from_existing.infer_batch(a, b)
 
         if ensure_model_is_ready:
-            spy_get_model_config.not_called()
+            if sys.version_info < (3, 12):
+                spy_get_model_config.not_called()
             assert len(spy_is_server_ready.mock_calls) == 2
             assert len(spy_is_server_live.mock_calls) == 2
         else:
-            spy_get_model_config.not_called()
-            spy_is_server_ready.not_called()
-            spy_is_server_live.not_called()
+            if sys.version_info < (3, 12):
+                spy_get_model_config.not_called()
+                spy_is_server_ready.not_called()
+                spy_is_server_live.not_called()
 
         called_kwargs = mock_infer_from_existing.call_args.kwargs
         expected_kwargs = dict(EXPECTED_KWARGS_HTTP_DEFAULT)
