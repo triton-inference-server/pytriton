@@ -16,7 +16,9 @@ limitations under the License.
 
 # Changelog
 
-## Unreleased
+## 0.5.4 (2024-04-09)
+
+- New: Python 3.12 support
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 
