@@ -176,7 +176,7 @@ class RequestsResponsesConnector(threading.Thread, BaseRequestsResponsesConnecto
                 )
 
         try:
-            requests = await self.preprocess(scope, requests_payload)
+            requests = self.preprocess(scope, requests_payload)
 
             if self._run_inference_fn is None:
                 await loop.run_in_executor(None, _wait_for_inference_fn, self.INFERENCE_FN_REGISTER_WAIT_TIME_S)
@@ -196,7 +196,7 @@ class RequestsResponsesConnector(threading.Thread, BaseRequestsResponsesConnecto
                     await send(scope, flags, error_msg)
                     break
 
-                responses_payload = await self.postprocess(scope, responses_or_error)
+                responses_payload = self.postprocess(scope, responses_or_error)
 
                 await send(scope, flags, responses_payload)
                 if flags & PyTritonResponseFlags.EOS:
@@ -208,11 +208,11 @@ class RequestsResponsesConnector(threading.Thread, BaseRequestsResponsesConnecto
             flags = PyTritonResponseFlags.ERROR | PyTritonResponseFlags.EOS
             await send(scope, flags, error_msg)
         finally:
-            await loop.run_in_executor(None, self._serializer_deserializer.free_requests_resources, requests_payload)
+            self._serializer_deserializer.free_requests_resources(requests_payload)
             self._responses_queues.pop(requests_id)
             LOGGER.debug(f"Finished handling requests for {scope['requests_id'].hex()}")
 
-    async def preprocess(self, scope: Scope, requests_payload: bytes) -> Requests:
+    def preprocess(self, scope: Scope, requests_payload: bytes) -> Requests:
         """Preprocess requests before running inference on them.
 
         Currently, this method only deserializes requests.
@@ -224,11 +224,9 @@ class RequestsResponsesConnector(threading.Thread, BaseRequestsResponsesConnecto
         Returns:
             deserialized requests
         """
-        LOGGER.debug(f"Preprocessing requests for {scope['requests_id'].hex()}")
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, self._serializer_deserializer.deserialize_requests, requests_payload)
+        return self._serializer_deserializer.deserialize_requests(requests_payload)
 
-    async def postprocess(self, scope: Scope, responses: Responses) -> bytes:
+    def postprocess(self, scope: Scope, responses: Responses) -> bytes:
         """Postprocess responses before sending them back to Triton.
 
         Currently, this method only serializes responses.
@@ -240,12 +238,10 @@ class RequestsResponsesConnector(threading.Thread, BaseRequestsResponsesConnecto
         Returns:
             serialized responses
         """
-        LOGGER.debug(f"Postprocessing responses for {scope['requests_id'].hex()}")
         if responses is None:
             return b""
         else:
-            loop = asyncio.get_running_loop()
-            return await loop.run_in_executor(None, self._serializer_deserializer.serialize_responses, responses)
+            return self._serializer_deserializer.serialize_responses(responses)
 
     def register_inference_hook(self, run_inference_fn: typing.Callable[[Scope, Requests], concurrent.futures.Future]):
         """Register inference hook.
@@ -278,7 +274,6 @@ class RequestsResponsesConnector(threading.Thread, BaseRequestsResponsesConnecto
             responses: responses to send back to server
         """
         requests_id = scope["requests_id"]
-        LOGGER.debug(f"Pushing responses for {scope['requests_id'].hex()} into responses queue ({flags}, {responses})")
         queue = self._responses_queues[requests_id]
         loop = self._requests_server_client.loop
         # use no_wait as there is no limit for responses queues

@@ -18,6 +18,7 @@ It is used for interaction between model and proxy_backend.
 
 import abc
 import atexit
+import base64
 import ctypes
 import ctypes.util
 import dataclasses
@@ -29,6 +30,7 @@ import math
 import multiprocessing.managers
 import multiprocessing.popen_spawn_posix
 import multiprocessing.shared_memory
+import os
 import pathlib
 import signal
 import struct
@@ -379,6 +381,14 @@ class BlocksStoreManager(multiprocessing.managers.BaseManager):
         PR_SET_PDEATHSIG = 1  # noqa
         libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
         libc.prctl(PR_SET_PDEATHSIG, signal.SIGTERM)  # terminate process when parent **thread** dies
+
+        if bool(os.environ.get("PYTRITON_VIZTRACER")):
+            from viztracer import VizTracer  # type: ignore # pytype: disable=import-error
+
+            cls._tracer = VizTracer(log_async=True, log_gc=True, tracer_entries=10000000, pid_suffix=True)
+            cls._tracer.register_exit()
+            cls._tracer.start()
+
         super()._run_server(
             registry, address, authkey, serializer, writer, initializer, initargs
         )  # pytype: disable=attribute-error
@@ -662,8 +672,6 @@ class TensorStore:
         Args:
             tensor_id: id of tensor to release
         """
-        LOGGER.debug(f"Releasing shared memory block for tensor {tensor_id}")
-
         tensor_ref = None
         with self._handled_blocks_lock:
             tensor_ref = self._handled_blocks.pop(tensor_id, None)
@@ -829,6 +837,130 @@ class BaseRequestsResponsesSerializerDeserializer(abc.ABC):
     @abc.abstractmethod
     def free_responses_resources(self, responses_payload: bytes):
         """Free resources used by responses."""
+        pass
+
+
+class Base64SerializerDeserializer(BaseRequestsResponsesSerializerDeserializer):
+    """Serializer/deserializer for requests/responses using base64 implementation."""
+
+    def serialize_requests(self, requests: Requests) -> bytes:
+        """Serialize requests.
+
+        Args:
+            requests: list of requests to serialize
+
+        Returns:
+            Serialized requests
+        """
+        serialized_requests = self._serialize_named_tensors_lists(requests)
+        requests = {
+            "requests": [
+                {"data": serialized_request, "parameters": request.parameters}
+                for request, serialized_request in zip(requests, serialized_requests)
+            ]
+        }
+        requests = json.dumps(requests).encode("utf-8")
+        return requests
+
+    def deserialize_requests(self, requests_payload: bytes) -> Requests:
+        """Deserialize requests.
+
+        Args:
+            requests_payload: serialized requests
+
+        Returns:
+            List of deserialized requests
+        """
+        requests = json.loads(requests_payload)
+        requests_data = [request["data"] for request in requests["requests"]]
+        requests_data = self._deserialized_named_tensors_lists(requests_data)
+
+        requests = [
+            Request(
+                data=request_data,
+                parameters=request.get("parameters"),
+            )
+            for request, request_data in zip(requests["requests"], requests_data)
+        ]
+        return requests
+
+    def free_requests_resources(self, requests_payload: bytes):
+        """Free resources used by requests."""
+        pass
+
+    def serialize_responses(self, responses: Responses) -> bytes:
+        """Serialize responses.
+
+        Args:
+            responses: list of responses to serialize
+
+        Returns:
+            Serialized responses
+        """
+        responses = self._serialize_named_tensors_lists(responses)
+        responses = {"responses": [{"data": response} for response in responses]}
+        return json.dumps(responses).encode("utf-8")
+
+    def deserialize_responses(self, responses_payload: bytes) -> Responses:
+        """Deserialize responses.
+
+        Args:
+            responses_payload: serialized responses
+
+        Returns:
+            List of deserialized responses
+        """
+        if responses_payload:
+            responses = json.loads(responses_payload)
+            responses = [response["data"] for response in responses["responses"]]
+            responses = self._deserialized_named_tensors_lists(responses)
+            return [Response(data=response) for response in responses]
+        else:
+            return []
+
+    def free_responses_resources(self, responses_payload: bytes):
+        """Free resources used by responses."""
+        pass
+
+    def _serialize_named_tensors_lists(self, named_tensors_lists):
+        def _encode(_tensor):
+            frames = serialize_numpy_with_struct_header(_tensor)
+            return [base64.b64encode(frame).decode("utf-8") for frame in frames]
+
+        return [
+            {tensor_name: _encode(tensor) for tensor_name, tensor in tensors.items()} for tensors in named_tensors_lists
+        ]
+
+    def _deserialized_named_tensors_lists(self, named_tensors_lists):
+        def _decode(decoded_tensor):
+            frames = [base64.b64decode(frame.encode("utf-8")) for frame in decoded_tensor]
+            return deserialize_numpy_with_struct_header(frames)
+
+        return [
+            {tensor_name: _decode(encoded_tensor) for tensor_name, encoded_tensor in tensors.items()}
+            for tensors in named_tensors_lists
+        ]
+
+    def start(self, url: Union[str, pathlib.Path], authkey: Optional[bytes] = None):
+        """Start Dummy implementation.
+
+        Args:
+            url: address of data store
+            authkey: authentication key required to setup connection. If not provided, current process authkey will be used
+        """
+        pass
+
+    def connect(self, url: Union[str, pathlib.Path], authkey: Optional[bytes] = None):
+        """Connect to Dummy implementation.
+
+        Args:
+            url: address of data store
+            authkey: authentication key required to setup connection. If not provided, current process authkey will be used
+        """
+        pass
+
+    def close(self):
+        """Close Dummy implementation."""
         pass
 
 

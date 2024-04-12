@@ -179,7 +179,6 @@ class RequestsServer:
                     requests_id, flags, responses_payload = await asyncio.wait_for(
                         self._socket.recv_multipart(), flag_check_interval_s
                     )
-                    SERVER_LOGGER.debug(f"Received response {requests_id.hex()} {flags.hex()} {responses_payload}")
                     flags = int.from_bytes(flags, byteorder="big")
                     responses_queue = self._responses_queues[requests_id]
                     responses_queue.put_nowait((flags, responses_payload))  # queue have no max_size
@@ -266,7 +265,6 @@ class RequestsServer:
         # sending in same loop, thus thread as handle_messages
         # send_multipart doesn't return anything, as it copies requests_payload
         await self._socket.send_multipart([requests_id, requests_payload])
-        SERVER_LOGGER.debug(f"Sent requests {requests_id.hex()}")
 
         return handle_responses_task
 
@@ -278,13 +276,11 @@ class RequestsServer:
             responses_queue: queue with responses payload from InferenceHandler
         """
         requests_id = scope["requests_id"]
-        SERVER_LOGGER.debug(f"Started handling responses {requests_id.hex()}")
         try:
             return await self._handle_responses_fn(scope, responses_queue)
         finally:
             self._responses_queues.pop(requests_id)
             self._handle_responses_tasks.pop(requests_id)
-            SERVER_LOGGER.debug(f"Finished handling responses {requests_id.hex()}")
 
 
 class RequestsServerClient:

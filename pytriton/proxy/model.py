@@ -21,13 +21,14 @@ import base64
 import json
 import logging
 import multiprocessing
+import os
 import pathlib
 import threading
 import time
 import traceback
 import typing
 
-import triton_python_backend_utils as pb_utils  # pytype: disable=import-error
+import triton_python_backend_utils as pb_utils  # type: ignore # pytype: disable=import-error
 
 from . import communication, data
 from .communication import (  # pytype: disable=import-error
@@ -37,7 +38,11 @@ from .communication import (  # pytype: disable=import-error
     RequestsServer,
     get_config_from_handshake_server,
 )
-from .data import PROTOCOL_VERSION, TensorStoreSerializerDeserializer  # pytype: disable=import-error
+from .data import (  # pytype: disable=import-error
+    PROTOCOL_VERSION,
+    Base64SerializerDeserializer,
+    TensorStoreSerializerDeserializer,
+)
 from .types import Request, Response, ResponsesOrError  # pytype: disable=import-error
 
 LOGGER = logging.getLogger(__name__)
@@ -47,7 +52,7 @@ def _update_loggers():
     def get_triton_backend_logger():
         try:
             # https://github.com/triton-inference-server/python_backend/blob/main/src/pb_stub.cc#L1501
-            import triton_python_backend_utils as pb_utils  # pytype: disable=import-error
+            import triton_python_backend_utils as pb_utils  # type: ignore # pytype: disable=import-error
 
             logger = pb_utils.Logger  # pytype: disable=module-attr
             logger.error = logger.log_error
@@ -115,7 +120,9 @@ class TritonRequestsServer:
             triton_requests: list of Triton requests
         """
         self._server.wait_till_running()  # wait until loop is up and running, raise RuntimeError if server is stopping or not launched yet
-        return asyncio.run_coroutine_threadsafe(self._infer(requests_id, triton_requests), self._server.server_loop)
+        return asyncio.run_coroutine_threadsafe(
+            self._send_requests(requests_id, triton_requests), self._server.server_loop
+        )
 
     def _wrap_request(self, triton_request, inputs) -> Request:
         request = {}
@@ -125,17 +132,9 @@ class TritonRequestsServer:
                 request[input_name] = input_tensor.as_numpy()
         return Request(data=request, parameters=json.loads(triton_request.parameters()))
 
-    async def _infer(self, requests_id: bytes, triton_requests) -> asyncio.Task:
-        wrap_tasks = [
-            self._server._server_loop.run_in_executor(
-                None, self._wrap_request, triton_request, self._model_inputs_names
-            )
-            for triton_request in triton_requests
-        ]
-        requests = await asyncio.gather(*wrap_tasks)
-        requests_payload = await self._server.server_loop.run_in_executor(
-            None, self._serializer_deserializer.serialize_requests, requests
-        )
+    async def _send_requests(self, requests_id: bytes, triton_requests) -> asyncio.Task:
+        requests = [self._wrap_request(triton_request, self._model_inputs_names) for triton_request in triton_requests]
+        requests_payload = self._serializer_deserializer.serialize_requests(requests)
         # will return when socket.send_multipart returns
         handle_responses_task = await self._server.send_requests(requests_id, requests_payload)
         return handle_responses_task
@@ -178,7 +177,6 @@ class BatchResponsesHandler:
             Triton Responses or TritonModelException
         """
         requests_id: bytes = scope["requests_id"]
-        loop = asyncio.get_running_loop()
         triton_requests = self._requests_map[requests_id]
 
         eos = False
@@ -197,16 +195,11 @@ class BatchResponsesHandler:
                 elif responses_payload:
                     # inference handler should send all responses in payload
                     assert triton_responses_or_error is None
-                    responses = await loop.run_in_executor(
-                        None, self._serializer_deserializer.deserialize_responses, responses_payload
-                    )
-                    wrap_tasks = [
-                        loop.run_in_executor(
-                            None, _wrap_response, response, request.requested_output_names(), self._model_outputs_dict
-                        )
+                    responses = self._serializer_deserializer.deserialize_responses(responses_payload)
+                    triton_responses_or_error = [
+                        _wrap_response(response, request.requested_output_names(), self._model_outputs_dict)
                         for request, response in zip(triton_requests, responses)
                     ]
-                    triton_responses_or_error = await asyncio.gather(*wrap_tasks)
             except asyncio.CancelledError:
                 LOGGER.warning(f"Cancelled responses handler for requests={requests_id.hex()}")
                 triton_responses_or_error = pb_utils.TritonModelException(  # pytype: disable=module-attr
@@ -215,9 +208,7 @@ class BatchResponsesHandler:
                 eos = True
             finally:
                 if not error:
-                    await loop.run_in_executor(
-                        None, self._serializer_deserializer.free_responses_resources, responses_payload
-                    )
+                    self._serializer_deserializer.free_responses_resources(responses_payload)
                 responses_queue.task_done()
 
         self._requests_map.pop(requests_id)
@@ -254,7 +245,6 @@ class DecoupledResponsesHandler:
         while not eos:
             try:
                 flags, responses_payload = await responses_queue.get()
-                LOGGER.debug(f"Got {flags} {responses_payload}")
 
                 eos = flags & PyTritonResponseFlags.EOS
                 error = flags & PyTritonResponseFlags.ERROR
@@ -268,9 +258,7 @@ class DecoupledResponsesHandler:
                         for _ in triton_senders
                     ]
                 else:
-                    responses = await loop.run_in_executor(
-                        None, self._serializer_deserializer.deserialize_responses, responses_payload
-                    )
+                    responses = self._serializer_deserializer.deserialize_responses(responses_payload)
                     triton_responses = [
                         _wrap_response(response, request.requested_output_names(), self._model_outputs_dict)
                         for request, response in zip(triton_requests, responses)
@@ -300,9 +288,7 @@ class DecoupledResponsesHandler:
                 await asyncio.gather(*send_responses_futures)
             finally:
                 if not error:
-                    await loop.run_in_executor(
-                        None, self._serializer_deserializer.free_responses_resources, responses_payload
-                    )
+                    self._serializer_deserializer.free_responses_resources(responses_payload)
                 responses_queue.task_done()
 
         self._requests_map.pop(requests_id)
@@ -336,7 +322,6 @@ class TritonPythonModel:
         self._model_config = None
         self._model_inputs = None
         self._model_outputs = None
-        self._model_inputs_names = None
         self._model_instance_name = None
         self._decoupled_model = None
         self._serializer_deserializer = None
@@ -365,17 +350,23 @@ class TritonPythonModel:
         """
         _update_loggers()  # Triton backend logger is available from this point on
 
+        if bool(os.environ.get("PYTRITON_VIZTRACER")):
+            from viztracer import VizTracer  # type: ignore # pytype: disable=import-error
+
+            self._tracer = VizTracer(log_async=True, log_gc=True, tracer_entries=10000000, pid_suffix=True)
+            self._tracer.register_exit()
+            self._tracer.start()
+
         try:
             model_name = args["model_name"]
 
-            self._model_config = model_config_dict = json.loads(args["model_config"])
-            self._model_inputs = {model_input["name"] for model_input in model_config_dict["input"]}
-            self._model_outputs = {model_output["name"]: model_output for model_output in model_config_dict["output"]}
-            self._model_inputs_names = list(self._model_inputs)
-            self._decoupled_model = model_config_dict.get("model_transaction_policy", {}).get("decoupled", False)
+            self._model_config = model_config = json.loads(args["model_config"])
+            self._model_inputs = {model_input["name"]: model_input for model_input in model_config["input"]}
+            self._model_outputs = {model_output["name"]: model_output for model_output in model_config["output"]}
             self._model_instance_name = args.get("model_instance_name")
+            self._decoupled_model = model_config.get("model_transaction_policy", {}).get("decoupled", False)
 
-            workspace_path = pathlib.Path(model_config_dict["parameters"]["workspace-path"]["string_value"])
+            workspace_path = pathlib.Path(model_config["parameters"]["workspace-path"]["string_value"])
 
             LOGGER.debug(f"Model instance name: {self._model_instance_name}")
             LOGGER.debug(f"Decoupled model: {self._decoupled_model}")
@@ -385,7 +376,10 @@ class TritonPythonModel:
 
             # init serializer/deserializer
             data_socket = workspace_path / f"{model_name}-data.sock"
-            self._serializer_deserializer = TensorStoreSerializerDeserializer()
+            if os.environ.get("PYTRITON_NO_TENSORSTORE"):
+                self._serializer_deserializer = Base64SerializerDeserializer()
+            else:
+                self._serializer_deserializer = TensorStoreSerializerDeserializer()
 
             handshake_socket = workspace_path / f"{model_name}-config.sock"
             model_first_instance_name = "_".join(self._model_instance_name.split("_")[:-1] + ["0"])
@@ -490,12 +484,3 @@ class TritonPythonModel:
 
         LOGGER.debug(f"[{self._model_instance_name}] Finalized.")
         self._model_instance_name = None
-
-    @property
-    def model_supports_batching(self) -> bool:
-        """Return if model supports batching.
-
-        Returns:
-            True if model support batching, False otherwise.
-        """
-        return self._model_config["max_batch_size"] > 0

@@ -17,6 +17,7 @@ import base64
 import copy
 import enum
 import logging
+import os
 import pathlib
 import shutil
 import threading
@@ -30,7 +31,7 @@ from pytriton.model_config.model_config import ModelConfig
 from pytriton.model_config.tensor import Tensor
 from pytriton.model_config.triton_model_config import DeviceKind, ResponseCache, TensorSpec, TritonModelConfig
 from pytriton.proxy.communication import get_config_from_handshake_server
-from pytriton.proxy.data import TensorStoreSerializerDeserializer
+from pytriton.proxy.data import Base64SerializerDeserializer, TensorStoreSerializerDeserializer
 from pytriton.proxy.inference import InferenceHandler, InferenceHandlerEvent, RequestsResponsesConnector
 from pytriton.proxy.validators import TritonResultsValidator
 from pytriton.utils.workspace import Workspace
@@ -119,7 +120,10 @@ class Model:
 
         self.config = config
         self._workspace = workspace
-        self._serializer_deserializer = TensorStoreSerializerDeserializer()
+        if os.environ.get("PYTRITON_NO_TENSORSTORE"):
+            self._serializer_deserializer = Base64SerializerDeserializer()
+        else:
+            self._serializer_deserializer = TensorStoreSerializerDeserializer()
         self._triton_model_config: Optional[TritonModelConfig] = None
         self._model_events_observers: typing.List[ModelEventsHandler] = []
 
