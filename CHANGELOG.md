@@ -16,7 +16,7 @@ limitations under the License.
 
 # Changelog
 
-## Unreleased
+## 0.5.5 (2024-04-15)
 
 - Fix: Performance improvements
 
