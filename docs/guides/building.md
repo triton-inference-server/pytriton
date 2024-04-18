@@ -73,7 +73,7 @@ For more information on the Triton Inference Server build process, refer to the
 
 !!! warning "Untested Build"
 
-    The Triton Inference Server has only been rigorously tested on Ubuntu 20.04. Other OS and hardware platforms are not
+    The Triton Inference Server has only been rigorously tested on Ubuntu 22.04. Other OS and hardware platforms are not
     officially supported. You can test the build by following the steps outlined in the
     [Triton Inference Server testing guide](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/test.md).
 
