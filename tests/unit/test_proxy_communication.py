@@ -24,6 +24,7 @@ import pathlib
 import queue
 import threading
 import time
+from concurrent.futures import Future as ConcurrentFuture
 
 import pytest
 
@@ -57,7 +58,7 @@ def test_client_run_without_server(tmp_path: pathlib.Path):
 def test_server_run():
     url = "inproc://test_server_run"
 
-    async def _handle_responses_fn(scope, queue):
+    async def _handle_responses_fn(scope, queue, responses_future):
         pass
 
     requests_server = RequestsServer(url, handle_responses_fn=_handle_responses_fn)
@@ -72,7 +73,7 @@ def test_server_run():
 def test_server_and_client_start_stop(tmp_path: pathlib.Path):
     url = f"ipc://{tmp_path}/test_server_and_client_start_stop"
 
-    async def _handle_responses_fn(scope, queue):
+    async def _handle_responses_fn(scope, queue, responses_future):
         pass
 
     async def _handle_requests_fn(scope, requests_payload: bytes, send):
@@ -98,10 +99,11 @@ def test_server_and_client_run(tmp_path: pathlib.Path):
     final_queue = queue.Queue()
 
     # new task for each response
-    async def _handle_responses_fn(scope, responses_queue):
+    async def _handle_responses_fn(scope, responses_queue, responses_future):
         requests_id = scope["requests_id"]
         flags, responses_payload = await responses_queue.get()
         final_queue.put((requests_id, flags, responses_payload))
+        responses_future.set_result(None)
 
     # new task for each request
     async def _passthrough_request_fn(scope, requests_payload: bytes, send):
@@ -120,8 +122,15 @@ def test_server_and_client_run(tmp_path: pathlib.Path):
         client_thread = threading.Thread(target=requests_client.run, name="requests_client")
         client_thread.start()
 
-        handle_responses_task_future0 = requests_server.push(b"0x00", b"0")
-        handle_responses_task_future1 = requests_server.push(b"0x01", b"1")
+        future = ConcurrentFuture()
+        requests_server.wait_till_running()
+        handle_responses_task_future0 = asyncio.run_coroutine_threadsafe(
+            requests_server.send_requests(b"0x00", b"0", future), requests_server.server_loop
+        )
+        future = ConcurrentFuture()
+        handle_responses_task_future1 = asyncio.run_coroutine_threadsafe(
+            requests_server.send_requests(b"0x01", b"1", future), requests_server.server_loop
+        )
 
         handle_responses_task0 = handle_responses_task_future0.result()
         handle_responses_task1 = handle_responses_task_future1.result()

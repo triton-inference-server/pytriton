@@ -24,9 +24,9 @@ import multiprocessing
 import os
 import pathlib
 import threading
-import time
 import traceback
 import typing
+from concurrent.futures import Future as ConcurrentFuture
 
 import triton_python_backend_utils as pb_utils  # type: ignore # pytype: disable=import-error
 
@@ -132,12 +132,13 @@ class TritonRequestsServer:
                 request[input_name] = input_tensor.as_numpy()
         return Request(data=request, parameters=json.loads(triton_request.parameters()))
 
-    async def _send_requests(self, requests_id: bytes, triton_requests) -> asyncio.Task:
+    async def _send_requests(self, requests_id: bytes, triton_requests) -> ConcurrentFuture:
         requests = [self._wrap_request(triton_request, self._model_inputs_names) for triton_request in triton_requests]
         requests_payload = self._serializer_deserializer.serialize_requests(requests)
         # will return when socket.send_multipart returns
-        handle_responses_task = await self._server.send_requests(requests_id, requests_payload)
-        return handle_responses_task
+        responses_future = ConcurrentFuture()
+        await self._server.send_requests(requests_id, requests_payload, responses_future)
+        return responses_future
 
 
 def _wrap_response(response: Response, requested_outputs_names, model_outputs_dict):
@@ -166,12 +167,15 @@ class BatchResponsesHandler:
         self._serializer_deserializer = serializer_deserializer
         self._model_outputs_dict = model_outputs_dict
 
-    async def handle_responses(self, scope: typing.Dict[str, typing.Any], responses_queue: asyncio.Queue):
+    async def handle_responses(
+        self, scope: typing.Dict[str, typing.Any], responses_queue: asyncio.Queue, responses_future: ConcurrentFuture
+    ):
         """Handle responses from InferenceHandler.
 
         Args:
             scope: scope of the request
             responses_queue: queue with responses payload from InferenceHandler
+            responses_future: future for another thread that will be set with Triton Responses or TritonModelException
 
         Returns:
             Triton Responses or TritonModelException
@@ -212,6 +216,7 @@ class BatchResponsesHandler:
                 responses_queue.task_done()
 
         self._requests_map.pop(requests_id)
+        responses_future.set_result(triton_responses_or_error)
         return triton_responses_or_error
 
 
@@ -225,13 +230,14 @@ class DecoupledResponsesHandler:
         self._model_outputs_dict = model_outputs_dict
 
     async def handle_responses(
-        self, scope: typing.Dict[str, typing.Any], responses_queue: asyncio.Queue
+        self, scope: typing.Dict[str, typing.Any], responses_queue: asyncio.Queue, responses_future: ConcurrentFuture
     ) -> typing.Optional[ResponsesOrError]:
         """Handle responses from InferenceHandler.
 
         Args:
             scope: scope of the request
             responses_queue: queue with responses from InferenceHandler
+            responses_future: future for another thread that will be set with Triton Responses or TritonModelException
 
         Returns:
             Responses or None if responses were sent to client
@@ -292,6 +298,7 @@ class DecoupledResponsesHandler:
                 responses_queue.task_done()
 
         self._requests_map.pop(requests_id)
+        responses_future.set_result(None)
 
 
 class TritonInferenceHandlerConfigGenerator:
@@ -447,14 +454,11 @@ class TritonPythonModel:
             self._requests[requests_id] = triton_requests
 
             # TODO: add this future to container to avoid garbage collection
-            handle_responses_task_future = self._requests_server.push(requests_id, triton_requests)
+            handle_responses_task_async_future = self._requests_server.push(requests_id, triton_requests)
 
             if not self._decoupled_model:
-                handle_responses_task = handle_responses_task_future.result()
-                check_interval_s = 0.001
-                while not handle_responses_task.done():
-                    time.sleep(check_interval_s)
-                triton_responses_or_error = handle_responses_task.result()
+                handle_responses_concurrent_future = handle_responses_task_async_future.result()
+                triton_responses_or_error = handle_responses_concurrent_future.result()
 
                 if triton_responses_or_error is not None and isinstance(triton_responses_or_error, Exception):
                     raise triton_responses_or_error

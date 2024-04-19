@@ -25,6 +25,7 @@ import time
 import traceback
 import typing
 import uuid
+from concurrent.futures import Future as ConcurrentFuture
 
 import zmq  # pytype: disable=import-error
 import zmq.asyncio  # pytype: disable=import-error
@@ -58,7 +59,7 @@ def _set_current_task_name(name: str):
 
 _RequestScope = typing.Dict[str, typing.Any]
 _HandleRequestsCoro = typing.Callable[[_RequestScope, bytes, zmq.asyncio.Socket], typing.Awaitable[typing.Any]]
-HandleResponsesCoro = typing.Callable[[_RequestScope, asyncio.Queue], typing.Awaitable[typing.Any]]
+HandleResponsesCoro = typing.Callable[[_RequestScope, asyncio.Queue, ConcurrentFuture], typing.Awaitable[typing.Any]]
 
 
 class RequestsServer:
@@ -126,22 +127,6 @@ class RequestsServer:
                 raise RuntimeError("Cannot push requests before RequestsServer is started")
             elif self._state == _RequestsServerState.STOPPING:
                 raise RuntimeError(f"Cannot push requests while {type(self).__name__} is shutting down")
-
-    def push(self, requests_id: bytes, requests_payload: bytes):
-        """Push requests to InferenceHandler.
-
-        Args:
-            requests_id: id of requests
-            requests_payload: payload of requests
-
-        Returns:
-            asyncio.Task: task handling responses from InferenceHandler
-
-        Raises:
-            RuntimeError: if RequestsServer is shutting down or not launched yet
-        """
-        self.wait_till_running()
-        return asyncio.run_coroutine_threadsafe(self.send_requests(requests_id, requests_payload), self.server_loop)
 
     async def handle_messages(self):
         """Coroutine for handling messages from InferenceHandler."""
@@ -227,12 +212,15 @@ class RequestsServer:
             self._state_condition.notify_all()
         self._shutdown_event.set()
 
-    async def send_requests(self, requests_id: bytes, requests_payload: bytes) -> asyncio.Task:
+    async def send_requests(
+        self, requests_id: bytes, requests_payload: bytes, responses_future: ConcurrentFuture
+    ) -> asyncio.Task:
         """Send requests to InferenceHandler.
 
         Args:
             requests_id: id of requests
             requests_payload: payload of requests
+            responses_future: future for waiting in another thread
 
         Returns:
             asyncio.Task: task handling responses from InferenceHandler
@@ -253,7 +241,7 @@ class RequestsServer:
         self._responses_queues[requests_id] = asyncio.Queue()
         scope = {"requests_id": requests_id}
         handle_responses_task = self._server_loop.create_task(
-            self._handle_responses(scope, self._responses_queues[requests_id]),
+            self._handle_responses(scope, self._responses_queues[requests_id], responses_future),
             name=f"handle_responses-{requests_id.hex()}",
         )
         self._handle_responses_tasks[requests_id] = handle_responses_task
@@ -268,16 +256,17 @@ class RequestsServer:
 
         return handle_responses_task
 
-    async def _handle_responses(self, scope, responses_queue: asyncio.Queue):
+    async def _handle_responses(self, scope, responses_queue: asyncio.Queue, responses_future: ConcurrentFuture):
         """Handle responses from InferenceHandler.
 
         Args:
             scope: scope for handling responses
             responses_queue: queue with responses payload from InferenceHandler
+            responses_future: future for waiting in another thread
         """
         requests_id = scope["requests_id"]
         try:
-            return await self._handle_responses_fn(scope, responses_queue)
+            return await self._handle_responses_fn(scope, responses_queue, responses_future)
         finally:
             self._responses_queues.pop(requests_id)
             self._handle_responses_tasks.pop(requests_id)
