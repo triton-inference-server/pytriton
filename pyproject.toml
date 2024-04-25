@@ -41,7 +41,7 @@ dependencies = [
     "protobuf >= 3.7",
     "pyzmq >= 23.0",
     "sh >= 1.14",
-    "tritonclient[all] ~= 2.44",
+    "tritonclient[grpc,http] ~= 2.44",
     "typing_inspect >= 0.6.0",
     "wrapt >= 1.11",
 ]
