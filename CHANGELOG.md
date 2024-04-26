@@ -16,6 +16,9 @@ limitations under the License.
 
 # Changelog
 
+## unreleased
+- Change: limited the `tritonclient` pacakge extras to http and grpc only
+
 ## 0.5.5 (2024-04-15)
 
 - Fix: Performance improvements

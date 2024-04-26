@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,14 +12,5 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 set -xe
-
-THIS_SCRIPT_DIR="$(realpath --relative-to="${PWD}" "$(dirname "$0")")"
-TEST_MODULE="${THIS_SCRIPT_DIR//\//.}.test"
-
-# This is necessary to avoid error in ONNX used my NeMo toolkit for version of protobuf never than 3.7
-export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
-
-python -m"${TEST_MODULE}" \
-    --timeout-s 300
+pip3 install "huggingface-hub>=0.13" "numpy==1.22"

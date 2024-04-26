@@ -62,6 +62,13 @@ def main():
     elapsed_s = 0
     wait_time_s = min(args.timeout_s, 1)
 
+    install_cmd = ["bash", "examples/nemo_megatron_gpt_multinode/install.sh"]
+    with ScriptThread(install_cmd, name="install") as install_thread:
+        install_thread.join()
+
+    if install_thread.returncode != 0:
+        raise RuntimeError(f"Install thread returned {install_thread.returncode}")
+
     server_cmd = ["python", "examples/nemo_megatron_gpt_multinode/server.py"]
     client_cmd = [
         "python",
