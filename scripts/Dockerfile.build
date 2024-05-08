@@ -23,6 +23,15 @@ ENV PYTHON_VERSIONS=$PYTHON_VERSIONS
 ARG MAKEFLAGS=""
 ENV MAKEFLAGS=$MAKEFLAGS
 
+# Latest cmake installation - https://apt.kitware.com
+RUN apt-get update -y \
+    && apt-get install ca-certificates gpg wget \
+    && test -f /usr/share/doc/kitware-archive-keyring/copyright || wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null \
+    && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \
+    && apt-get update -y \
+    && test -f /usr/share/doc/kitware-archive-keyring/copyright || rm /usr/share/keyrings/kitware-archive-keyring.gpg \
+    && apt-get install -y kitware-archive-keyring
+
 RUN apt update -y && apt install -y build-essential \
   cmake \
   make \

@@ -78,10 +78,12 @@ dev = [
     "nvidia-pytriton[doc]",
     "build >= 0.8, <1.0.0", # to support --plat-name for multiarch build
     "ipython >= 8.12", # Python 3.8 maximum for 24.02
+    "packaging ~= 24.0",
     "pudb >= 2024.1",
     "pip >= 24.0",  # to support editable installation
     "ruff >= 0.3.0",
     "twine >= 5.0",
+
 ]
 
 [build-system]

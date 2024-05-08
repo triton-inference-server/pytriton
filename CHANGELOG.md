@@ -18,6 +18,9 @@ limitations under the License.
 
 ## unreleased
 - Change: limited the `tritonclient` pacakge extras to http and grpc only
+- Build scripts update
+  - upgrade cmake version during build
+  - automatically configure wheel name based on `glibc` version
 
 ## 0.5.5 (2024-04-15)
 
