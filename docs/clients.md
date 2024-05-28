@@ -44,6 +44,12 @@ ModelClient is a simple client that can perform inference requests synchronously
 
 You need ```Linear``` model described in quick_start. You should run it so client can connect to it.
 
+This example requires torch module:
+<!--pytest.mark.skip-->
+```bash
+pip install torch
+```
+
 For example, you can use ModelClient to send requests to a PyTorch model that performs linear regression:
 
 <!-- This readme is for testing code snippets with pytest. It has codeblocks marked with pytest-codeblocks:cont to combine them into one test. -->
@@ -151,6 +157,7 @@ You can also use ModelClient to send requests to a model that performs image cla
 You need to convert the image to a numpy array and resize it to the expected input shape. You can use Pillow package to do this.
 
 You need to install Pillow package to run the example:
+<!--pytest.mark.skip-->
 ```bash
 pip install Pillow
 ```
@@ -257,6 +264,8 @@ For example, you can use FuturesModelClient to send multiple requests to a text 
 You need to convert the text prompts to numpy arrays of bytes using a tokenizer from transformers. You also need to detokenize the output texts using the same tokenizer:
 
 You need to install torch and transformers package to run the example:
+
+<!--pytest.mark.skip-->
 ```bash
 pip install torch transformers
 ```
@@ -584,6 +593,7 @@ You can also use FastAPI to create a web application that exposes the results of
 
 To use FastAPI, you need to install it with:
 
+<!--pytest.mark.skip-->
 ```bash
 pip install fastapi
 ```
