@@ -42,6 +42,7 @@ dependencies = [
     "pyzmq >= 23.0",
     "sh >= 1.14",
     "tritonclient[grpc,http] ~= 2.44",
+    "grpcio-tools ~= 1.62.0",  # fix issue with grpc client
     "typing_inspect >= 0.6.0",
     "wrapt >= 1.11",
 ]
