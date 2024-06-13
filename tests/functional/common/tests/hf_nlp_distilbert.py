@@ -23,12 +23,12 @@ from typing import Callable, List
 
 import numpy as np
 
+from pytriton.check.utils import find_free_port
 from pytriton.client import FuturesModelClient
 from pytriton.decorators import batch
 from pytriton.model_config import DynamicBatcher, ModelConfig, Tensor
 from pytriton.triton import Triton, TritonConfig
 from tests.functional.common.models import Framework, TestModelSpec
-from tests.utils import find_free_port
 
 logger = logging.getLogger(__package__)
 

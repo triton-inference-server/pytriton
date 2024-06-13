@@ -27,8 +27,8 @@ METADATA = {
 
 
 def main():
+    from pytriton.check.utils import TestMonitoringContext
     from tests.functional.common.tests.hf_nlp_distilbert import huggingface_distilbert
-    from tests.utils import TestMonitoringContext
 
     parser = argparse.ArgumentParser(description="HuggigFace DistillBERT functional test.")
     parser.add_argument(

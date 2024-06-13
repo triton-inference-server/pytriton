@@ -27,8 +27,8 @@ METADATA = {
 
 
 def main():
+    from pytriton.check.utils import DEFAULT_LOG_FORMAT
     from tests.functional.common.tests.tfhub_image_detection import tfhub_image_detection
-    from tests.utils import DEFAULT_LOG_FORMAT
 
     parser = argparse.ArgumentParser(description="short_description")
     parser.add_argument(

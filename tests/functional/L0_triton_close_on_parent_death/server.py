@@ -22,9 +22,9 @@ LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 
 
 def main():
+    from pytriton.check.utils import DEFAULT_LOG_FORMAT, find_free_port
     from pytriton.triton import Triton, TritonConfig
     from tests.functional.common.models import ADD_SUB_PYTHON_MODEL
-    from tests.utils import DEFAULT_LOG_FORMAT, find_free_port
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--http-port", type=int, help="HTTP port on which server listens")

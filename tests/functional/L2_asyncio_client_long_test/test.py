@@ -28,8 +28,8 @@ METADATA = {
 
 
 async def main():
+    from pytriton.check.utils import TestMonitoringContext
     from tests.functional.common.tests.client_stress import asyncio_stress_test
-    from tests.utils import TestMonitoringContext
 
     parser = argparse.ArgumentParser(description="short_description")
     parser.add_argument(

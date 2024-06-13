@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +11,4 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-set -xe
-
-# 0.4.14 raises error
-pip install --upgrade "jax[cuda12]!=0.4.14" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
-# torch is required for checkpoint loading
-pip install transformers flax torch
+# noqa: D104

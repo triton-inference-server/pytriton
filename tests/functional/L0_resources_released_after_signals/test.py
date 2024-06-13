@@ -29,13 +29,6 @@ import signal
 import sys
 import time
 
-from tests.utils import (
-    DEFAULT_LOG_FORMAT,
-    ProcessMonitoring,  # pytype: disable=import-error
-    ScriptThread,
-    find_free_port,
-)
-
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 
 METADATA = {
@@ -72,6 +65,12 @@ def _check_resources_released(initial_shared_memory_files):
 
 def _run_test(init_timeout_s, verbose, seed, signal_value, test_timeout_s):
     import psutil
+
+    from pytriton.check.utils import (
+        ProcessMonitoring,  # pytype: disable=import-error
+        ScriptThread,
+        find_free_port,
+    )
 
     start_time_s = time.time()
     wait_time_s = min(test_timeout_s, 5)
@@ -134,6 +133,10 @@ def _run_test(init_timeout_s, verbose, seed, signal_value, test_timeout_s):
 
 
 def main():
+    from pytriton.check.utils import (
+        DEFAULT_LOG_FORMAT,
+    )
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--test-timeout-s", required=False, default=300, type=float, help="Timeout for each subtest performance"

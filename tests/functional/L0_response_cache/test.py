@@ -28,11 +28,11 @@ METADATA = {
 def main():
     import numpy as np
 
+    from pytriton.check.utils import DEFAULT_LOG_FORMAT, find_free_port
     from pytriton.client import ModelClient
     from pytriton.decorators import batch
     from pytriton.model_config import ModelConfig, Tensor
     from pytriton.triton import Triton, TritonConfig
-    from tests.utils import DEFAULT_LOG_FORMAT, find_free_port
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(

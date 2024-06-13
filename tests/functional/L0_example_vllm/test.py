@@ -56,7 +56,7 @@ def verify_client_output(client_output):
 
 
 def main():
-    from tests.utils import (
+    from pytriton.check.utils import (
         DEFAULT_LOG_FORMAT,
         ScriptThread,
         get_current_container_version,

@@ -28,8 +28,8 @@ METADATA = {
 
 
 def main():
+    from pytriton.check.utils import DEFAULT_LOG_FORMAT
     from tests.functional.common.tests.client_stress import futures_stress_test
-    from tests.utils import DEFAULT_LOG_FORMAT
 
     parser = argparse.ArgumentParser(description="HuggigFace DistillBERT functional test.")
     parser.add_argument(

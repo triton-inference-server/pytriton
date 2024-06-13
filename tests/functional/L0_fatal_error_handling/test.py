@@ -20,8 +20,6 @@ import os
 import random
 import time
 
-from tests.utils import ProcessMonitoring
-
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 METADATA = {
     "image_name": "nvcr.io/nvidia/pytorch:{TEST_CONTAINER_VERSION}-py3",
@@ -32,13 +30,13 @@ def main():
     import numpy as np
     import pytest
 
+    from pytriton.check.utils import DEFAULT_LOG_FORMAT, ProcessMonitoring, find_free_port
     from pytriton.client import ModelClient
     from pytriton.client.exceptions import PyTritonClientInferenceServerError
     from pytriton.decorators import batch
     from pytriton.exceptions import PyTritonUnrecoverableError
     from pytriton.model_config import ModelConfig, Tensor
     from pytriton.triton import Triton, TritonConfig
-    from tests.utils import DEFAULT_LOG_FORMAT, find_free_port
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(

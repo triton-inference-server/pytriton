@@ -24,11 +24,11 @@ import time
 
 
 def tfhub_image_detection(test_time_s: int, init_timeout_s: int, batch_size: int, verbose: bool):
+    from pytriton.check.utils import find_free_port
     from pytriton.client import ModelClient
     from pytriton.triton import Triton, TritonConfig
     from tests.functional.common.datasets import COCO_LABELS, TFDS_TF_FLOWERS_DATASET
     from tests.functional.common.models import EFFICIENTDET_DETECTION_TF_MODEL
-    from tests.utils import find_free_port
 
     logger = logging.getLogger(__package__)
 

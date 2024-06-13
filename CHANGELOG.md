@@ -17,6 +17,7 @@ limitations under the License.
 # Changelog
 
 ## unreleased
+- New: Add PyTriton Check Tool to perform preliminary checks on the environment where PyTriton is deployed.
 - Change: limited the `tritonclient` pacakge extras to http and grpc only
 - Fix: Pin grpc-tools version to handle grpc issue in tritonclient
 - Build scripts update

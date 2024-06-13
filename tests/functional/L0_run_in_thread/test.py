@@ -25,13 +25,6 @@ import signal
 import sys
 import time
 
-from tests.utils import (
-    DEFAULT_LOG_FORMAT,
-    ProcessMonitoring,  # pytype: disable=import-error
-    ScriptThread,
-    find_free_port,
-)
-
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 
 METADATA = {
@@ -68,6 +61,8 @@ def run_infer(batch_size, init_timeout_s, http_port):
 
 def main():
     import psutil
+
+    from pytriton.check.utils import DEFAULT_LOG_FORMAT, ProcessMonitoring, ScriptThread, find_free_port
 
     parser = argparse.ArgumentParser(description="short_description")
     parser.add_argument("--timeout-s", required=False, default=300, type=float, help="Timeout for test")

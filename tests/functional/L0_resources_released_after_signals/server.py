@@ -18,15 +18,15 @@ import argparse
 import logging
 import random
 
+from pytriton.check.utils import find_free_port
 from pytriton.triton import Triton, TritonConfig
 from tests.functional.common.models import ADD_SUB_PYTHON_MODEL
-from tests.utils import find_free_port
 
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 
 
 def main():
-    from tests.utils import DEFAULT_LOG_FORMAT
+    from pytriton.check.utils import DEFAULT_LOG_FORMAT
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--batch-size", type=int, default=32, help="Size of single inference batch")

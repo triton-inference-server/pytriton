@@ -23,13 +23,6 @@ import sys
 import time
 from multiprocessing.util import DEFAULT_LOGGING_FORMAT
 
-from tests.utils import (
-    ScriptThread,
-    get_current_container_version,
-    search_warning_on_too_verbose_log_level,
-    verify_docker_image_in_readme_same_as_tested,
-)
-
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 METADATA = {
     "image_name": "nvcr.io/nvidia/pytorch:{TEST_CONTAINER_VERSION}-py3",
@@ -55,6 +48,12 @@ def verify_client_output(client_output):
 
 
 def main():
+    from pytriton.check.utils import (
+        ScriptThread,
+        get_current_container_version,
+        search_warning_on_too_verbose_log_level,
+        verify_docker_image_in_readme_same_as_tested,
+    )
     from pytriton.client.utils import create_client_from_url, wait_for_model_ready
 
     parser = argparse.ArgumentParser(description="short_description")

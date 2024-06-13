@@ -95,6 +95,7 @@ nav:
     - Distributed Tracing: guides/distributed_tracing.md
     - Chunking and batching: guides/chunking.md
     - Downloaded input data: guides/downloaded_input_data.md
+    - Basic Troubleshooting: guides/basic_troubleshooting.md
   - Tutorials: examples.md
   - Reference:
     - Triton: reference/triton.md

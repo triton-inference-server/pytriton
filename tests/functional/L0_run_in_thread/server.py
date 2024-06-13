@@ -22,9 +22,9 @@ import threading
 import traceback
 from typing import Any
 
+from pytriton.check.utils import find_free_port
 from pytriton.triton import Triton, TritonConfig
 from tests.functional.common.models import ADD_SUB_PYTHON_MODEL
-from tests.utils import find_free_port
 
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 
@@ -76,7 +76,7 @@ def signal_handler(_signal_num: Any, _) -> None:
 
 
 def main():
-    from tests.utils import DEFAULT_LOG_FORMAT
+    from pytriton.check.utils import DEFAULT_LOG_FORMAT
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(

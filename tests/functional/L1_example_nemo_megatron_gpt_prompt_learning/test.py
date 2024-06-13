@@ -21,13 +21,6 @@ import signal
 import sys
 import time
 
-from tests.utils import (
-    DEFAULT_LOG_FORMAT,
-    ScriptThread,
-    get_current_container_version,
-    verify_docker_image_in_readme_same_as_tested,
-)
-
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 METADATA = {
     "image_name": "nvcr.io/nvidia/nemo:23.06",
@@ -58,6 +51,13 @@ def verify_client_output(client_output):
 
 
 def main():
+    from pytriton.check.utils import (
+        DEFAULT_LOG_FORMAT,
+        ScriptThread,
+        get_current_container_version,
+        verify_docker_image_in_readme_same_as_tested,
+    )
+
     parser = argparse.ArgumentParser(description="short_description")
     parser.add_argument("--timeout-s", required=False, default=300, type=float, help="Timeout for test")
     args = parser.parse_args()

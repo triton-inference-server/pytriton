@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Utils."""
+
 import contextlib
 import fcntl
 import logging
@@ -70,7 +72,10 @@ def _read_outputs(_process, _logger, _outputs):
 
 
 class ScriptThread(threading.Thread):
+    """A class that runs external script in a separate thread."""
+
     def __init__(self, cmd, workdir=None, group=None, target=None, name=None, args=(), kwargs=None) -> None:
+        """Initializes the ScriptThread object."""
         super().__init__(group, target, name, args, kwargs, daemon=True)
         self.cmd = cmd
         self.workdir = workdir
@@ -82,16 +87,19 @@ class ScriptThread(threading.Thread):
         self._logger = logging.getLogger(self.name)
 
     def __enter__(self):
+        """Starts the script thread."""
         self.start(threading.Event())
         self._process_spawned_or_spawn_error_flag.wait()
         return self
 
     def __exit__(self, *args):
+        """Stops the script thread and waits for it to join."""
         self.stop()
         self.join()
         self._process_spawned_or_spawn_error_flag = None
 
     def start(self, flag: typing.Optional[threading.Event] = None) -> None:
+        """Starts the script thread."""
         if flag is None:
             flag = threading.Event()
         self._logger.info(f"Starting {self.name} script with \"{' '.join(self.cmd)}\" cmd")
@@ -99,10 +107,12 @@ class ScriptThread(threading.Thread):
         super().start()
 
     def stop(self):
+        """Sets the active flag to False to stop the script thread."""
         self._logger.info(f"Stopping {self.name} script")
         self.active = False
 
     def run(self):
+        """Runs the script in a separate process."""
         import psutil
 
         self.returncode = None
@@ -139,14 +149,17 @@ class ScriptThread(threading.Thread):
 
     @property
     def output(self):
+        """Return process stream output."""
         return "\n".join(self._output)
 
     @property
     def process(self):
+        """Return process object."""
         return self._process
 
 
 def find_free_port() -> int:
+    """Finds a free port on the local machine."""
     with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
         s.bind(("", 0))
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -279,6 +292,7 @@ class ProcessMonitoring:
 
 
 def get_current_container_version():
+    """Returns the version of the current container."""
     container_version = os.environ.get("NVIDIA_PYTORCH_VERSION") or os.environ.get("NVIDIA_TENSORFLOW_VERSION")
     if container_version and "-" in container_version:
         container_version = container_version.split("-")[0]  # TF version has format <year_month_version>-<tf_version>
@@ -286,6 +300,7 @@ def get_current_container_version():
 
 
 def verify_docker_image_in_readme_same_as_tested(readme_path, image_name_with_version):
+    """Verify that the docker image is the same as described in the readme file."""
     image_name, _image_version = image_name_with_version.split(":")
     framework_name = image_name.split("/")[-1]
     readme_payload = pathlib.Path(readme_path).read_text()
@@ -298,6 +313,7 @@ def verify_docker_image_in_readme_same_as_tested(readme_path, image_name_with_ve
 
 
 def search_warning_on_too_verbose_log_level(logs: str):
+    """Search warnings."""
     pattern = r"Triton Inference Server is running with enabled verbose logs.*It may affect inference performance."
     return re.search(pattern, logs)
 
@@ -374,6 +390,7 @@ class TestMonitoringContext:
 
     @staticmethod
     def extend_args(parser):
+        """Extends argparse args with additional arguments."""
         parser.add_argument(
             "--verbose",
             action="store_true",
@@ -426,6 +443,7 @@ class TestMonitoringContext:
         self._args = args
 
     def __enter__(self):
+        """Enters the context manager for the test monitoring."""
         import faulthandler
         import logging.handlers
 
@@ -531,6 +549,7 @@ class TestMonitoringContext:
         return self
 
     def __exit__(self, *args):
+        """Stops the monitor thread."""
         if hasattr(self, "_monitor"):
             self._monitor.stop()
             self._monitor = None

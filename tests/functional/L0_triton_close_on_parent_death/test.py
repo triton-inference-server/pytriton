@@ -25,13 +25,6 @@ import signal
 import sys
 import time
 
-from tests.utils import (  # pytype: disable=import-error
-    DEFAULT_LOG_FORMAT,
-    ProcessMonitoring,
-    ScriptThread,
-    find_free_port,
-)
-
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 
 METADATA = {
@@ -45,6 +38,12 @@ def main():
     import pytest
     import tritonclient.http
 
+    from pytriton.check.utils import (  # pytype: disable=import-error
+        DEFAULT_LOG_FORMAT,
+        ProcessMonitoring,
+        ScriptThread,
+        find_free_port,
+    )
     from pytriton.client import ModelClient
     from tests.functional.common.models import ADD_SUB_PYTHON_MODEL
 

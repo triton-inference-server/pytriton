@@ -210,3 +210,6 @@ find more options on how to configure Triton, models, and deployment on a cluste
 section.
 
 The details about classes and methods can be found in the [API Reference](reference/triton.md) page.
+
+If there are any issues diffcult to invastigate, it is possible to use pytriton-check tool.
+Usage is described in the [Basic Troubleshooting](guides/basic_troubleshooting.md) section.

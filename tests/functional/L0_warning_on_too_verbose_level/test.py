@@ -19,8 +19,6 @@ import io
 import logging
 import random
 
-from tests.utils import search_warning_on_too_verbose_log_level
-
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 METADATA = {
     "image_name": "nvcr.io/nvidia/pytorch:{TEST_CONTAINER_VERSION}-py3",
@@ -31,12 +29,12 @@ METADATA = {
 def main():
     import numpy as np
 
+    from pytriton.check.utils import DEFAULT_LOG_FORMAT, find_free_port, search_warning_on_too_verbose_log_level
     from pytriton.client import ModelClient
     from pytriton.client.utils import wait_for_server_ready
     from pytriton.decorators import batch
     from pytriton.model_config import ModelConfig, Tensor
     from pytriton.triton import Triton, TritonConfig
-    from tests.utils import DEFAULT_LOG_FORMAT, find_free_port
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
