@@ -16,6 +16,10 @@ limitations under the License.
 
 # HuggingFace BERT JAX Model
 
+## Known issue
+
+HuggingFace BERT JAX Model works only with containers 24.04 and newer due to the usage of new version of CUDA. Please make sure that you are using the correct container version.
+
 ## Overview
 
 The example presents a HuggingFace BERT JAX model inference.

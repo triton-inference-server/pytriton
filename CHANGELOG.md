@@ -16,13 +16,18 @@ limitations under the License.
 
 # Changelog
 
-## unreleased
+## 0.5.6 (2024-06-17)
 - New: Add PyTriton Check Tool to perform preliminary checks on the environment where PyTriton is deployed.
 - Change: limited the `tritonclient` pacakge extras to http and grpc only
 - Fix: Pin grpc-tools version to handle grpc issue in tritonclient
 - Build scripts update
   - upgrade cmake version during build
   - automatically configure wheel name based on `glibc` version
+
+[//]: <> (put here on external component update with short summary what change or link to changelog)
+
+- Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.44.0](https://github.com/triton-inference-server/server/releases/tag/v2.44.0)
+
 
 ## 0.5.5 (2024-04-15)
 

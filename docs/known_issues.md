@@ -22,3 +22,4 @@ limitations under the License.
 - Enabling verbose logging may cause a significant performance drop in model inference.
 - GRPC ModelClient doesn't support timeouts for model configuration and model metadata requests due to a limitation in the underlying tritonclient library.
 - HTTP ModelClient may not respect the specified timeouts for model initialization and inference requests, especially when they are smaller than 1 second, resulting in longer waiting times. This issue is related to the underlying implementation of HTTP protocol.
+- HuggingFace BERT JAX Model works only with containers 24.04 and newer due to the usage of new version of CUDA.
