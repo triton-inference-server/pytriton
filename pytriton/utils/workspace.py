@@ -17,7 +17,15 @@ import logging
 import pathlib
 import shutil
 import tempfile
+import warnings
 from typing import Optional, Union
+
+
+class CleanupWarning(UserWarning):
+    """Warning for cleanup issues."""
+
+    pass
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -80,26 +88,33 @@ class Workspace:
         for p in all_files:
             rel_p = p.relative_to(self.path)
             if rel_p.parts and not rel_p.parts[0].startswith("."):
+                LOGGER.warning(f"Non empty path {p}")
                 return False
         return True
 
     def clean(self) -> None:
-        """Clean workspace removing files and directories created inside including the workspace itself.
-
-        Raises:
-            OSError - when workspace after performing cleanup operation is still not empty.
-        """
+        """Clean workspace removing files and directories created inside including the workspace itself."""
         LOGGER.debug(f"Cleaning workspace dir {self.path}")
 
-        for child in self.path.rglob("*"):
-            rel_p = child.relative_to(self.path)
-            if len(rel_p.parts) == 0 or rel_p.parts[0].startswith("."):
-                continue
-            if child.is_dir():
-                shutil.rmtree(child, ignore_errors=True)
-            else:
-                child.unlink()
-        if not self.is_empty():
-            raise OSError(f"Could not clean {self.path} workspace")
-        if self.path.exists():
-            self.path.rmdir()
+        try:
+            for child in self.path.rglob("*"):
+                rel_p = child.relative_to(self.path)
+                if len(rel_p.parts) == 0 or rel_p.parts[0].startswith("."):
+                    continue
+                if child.is_dir():
+                    LOGGER.debug(f"Cleaning workspace dir {child}")
+                    shutil.rmtree(child, ignore_errors=True)
+                else:
+                    LOGGER.debug(f"Cleaning workspace file {child}")
+                    child.unlink()
+            if not self.is_empty():
+                raise OSError(f"Could not clean {self.path} workspace")
+            if self.path.exists():
+                LOGGER.debug(f"Removing workspace dir {self.path}")
+                self.path.rmdir()
+        except OSError as e:
+            warnings.warn(
+                f"Could not clean workspace {self.path}. {e}",
+                CleanupWarning,
+                stacklevel=1,
+            )

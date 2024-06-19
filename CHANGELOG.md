@@ -16,7 +16,10 @@ limitations under the License.
 
 # Changelog
 
-## Unreleased
+## 0.5.8 (2024-06-27)
+
+- New: PyTriton workspace clean raises warning ``CleanupWarning`` instead of ``OSError`` for file system failures
+- Fix: Set NumPy version upper limit ``<2.0.0``
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 
