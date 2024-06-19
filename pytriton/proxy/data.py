@@ -42,6 +42,7 @@ from typing import Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
+from .telemetry import get_span_dict, start_span_from_remote
 from .types import Request, Requests, Response, Responses
 
 LOGGER = logging.getLogger(__name__)
@@ -853,12 +854,14 @@ class Base64SerializerDeserializer(BaseRequestsResponsesSerializerDeserializer):
             Serialized requests
         """
         serialized_requests = self._serialize_named_tensors_lists(requests)
-        requests = {
-            "requests": [
-                {"data": serialized_request, "parameters": request.parameters}
-                for request, serialized_request in zip(requests, serialized_requests)
-            ]
-        }
+        requests_list = []
+        for request, serialized_request in zip(requests, serialized_requests):
+            serialized_request = {"data": serialized_request, "parameters": request.parameters}
+            if request.span is not None:
+                serialized_request["span"] = get_span_dict(request.span)
+            requests_list.append(serialized_request)
+
+        requests = {"requests": requests_list}
         requests = json.dumps(requests).encode("utf-8")
         return requests
 
@@ -875,14 +878,18 @@ class Base64SerializerDeserializer(BaseRequestsResponsesSerializerDeserializer):
         requests_data = [request["data"] for request in requests["requests"]]
         requests_data = self._deserialized_named_tensors_lists(requests_data)
 
-        requests = [
-            Request(
-                data=request_data,
-                parameters=request.get("parameters"),
-            )
-            for request, request_data in zip(requests["requests"], requests_data)
-        ]
-        return requests
+        deserialized_requests = []
+        for request, request_data in zip(requests["requests"], requests_data):
+            kwargs = {"data": request_data, "parameters": request.get("parameters")}
+            # FIXME: move span creation above just after json.loads
+            if "span" in request:
+                span_dict = request["span"]
+                span = start_span_from_remote(span_dict, "proxy_inference_callable")
+                kwargs["span"] = span
+            request_wrapped = Request(**kwargs)
+            deserialized_requests.append(request_wrapped)
+
+        return deserialized_requests
 
     def free_requests_resources(self, requests_payload: bytes):
         """Free resources used by requests."""
@@ -981,12 +988,14 @@ class TensorStoreSerializerDeserializer(BaseRequestsResponsesSerializerDeseriali
             Serialized requests
         """
         serialized_requests = self._serialize_named_tensors_lists(requests)
-        requests = {
-            "requests": [
-                {"data": serialized_request, "parameters": request.parameters}
-                for request, serialized_request in zip(requests, serialized_requests)
-            ]
-        }
+        requests_list = []
+        for request, serialized_request in zip(requests, serialized_requests):
+            serialized_request = {"data": serialized_request, "parameters": request.parameters}
+            if request.span is not None:
+                serialized_request["span"] = get_span_dict(request.span)
+            requests_list.append(serialized_request)
+
+        requests = {"requests": requests_list}
         return json.dumps(requests).encode("utf-8")
 
     def deserialize_requests(self, requests_payload: bytes) -> Requests:
@@ -999,16 +1008,23 @@ class TensorStoreSerializerDeserializer(BaseRequestsResponsesSerializerDeseriali
             List of deserialized requests
         """
         requests = json.loads(requests_payload)
-        return [
-            Request(
-                data={
-                    input_name: self._tensor_store.get(tensor_id)
-                    for input_name, tensor_id in request.get("data", {}).items()
-                },
-                parameters=request.get("parameters"),
-            )
-            for request in requests["requests"]
-        ]
+        deserialized_requests = []
+        for request in requests["requests"]:
+            kwargs = {}
+            if "span" in request:
+                span_dict = request["span"]
+                span = start_span_from_remote(span_dict, "proxy_inference_callable")
+                kwargs["span"] = span
+            request_data = {
+                input_name: self._tensor_store.get(tensor_id)
+                for input_name, tensor_id in request.get("data", {}).items()
+            }
+            kwargs["data"] = request_data
+            kwargs["parameters"] = request.get("parameters")
+            request_wrapped = Request(**kwargs)
+            deserialized_requests.append(request_wrapped)
+
+        return deserialized_requests
 
     def free_requests_resources(self, requests_payload: bytes):
         """Free resources used by requests."""

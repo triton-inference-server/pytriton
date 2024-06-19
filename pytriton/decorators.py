@@ -30,6 +30,7 @@ from pytriton.constants import TRITON_CONTEXT_FIELD_NAME
 from pytriton.exceptions import PyTritonBadParameterError, PyTritonRuntimeError, PyTritonValidationError
 from pytriton.model_config.triton_model_config import TritonModelConfig
 from pytriton.proxy.data import _serialize_byte_tensor
+from pytriton.proxy.telemetry import start_span_from_span
 
 
 class _WrappedWithWrapper(NamedTuple):
@@ -190,6 +191,8 @@ def batch(wrapped, instance, args, kwargs):
         ValueError: If the output tensors have different than expected batch sizes. Expected batch size is
             calculated as a sum of batch sizes of all requests.
     """
+    telemetry_name = "pytriton-batch-decorator-span"
+
     req_list = args[0]
     input_names = req_list[0].keys()
 
@@ -205,7 +208,12 @@ def batch(wrapped, instance, args, kwargs):
     args = args[1:]
     new_kwargs = dict(kwargs)
     new_kwargs.update(inputs)
-    outputs = wrapped(*args, **new_kwargs)
+    spans = [start_span_from_span(request.span, telemetry_name) for request in req_list if request.span is not None]
+    try:
+        outputs = wrapped(*args, **new_kwargs)
+    finally:
+        for span in spans:
+            span.end()
 
     def _split_result(_result):
         outputs = convert_output(_result, wrapped, instance)

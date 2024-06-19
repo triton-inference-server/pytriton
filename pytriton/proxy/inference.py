@@ -26,6 +26,7 @@ import typing
 
 from pytriton.exceptions import PyTritonUnrecoverableError
 from pytriton.proxy.communication import PyTritonResponseFlags, RequestsServerClient
+from pytriton.proxy.telemetry import end_span
 from pytriton.proxy.types import Requests, Responses, ResponsesNoneOrError, Scope
 from pytriton.proxy.validators import TritonResultsValidator
 
@@ -168,6 +169,7 @@ class RequestsResponsesConnector(threading.Thread, BaseRequestsResponsesConnecto
         requests_id = scope["requests_id"]
         queue = self._responses_queues[requests_id] = asyncio.Queue()
         loop = asyncio.get_running_loop()
+        requests = None
 
         def _wait_for_inference_fn(timeout_s: float):
             with self._run_inference_condition:
@@ -208,6 +210,10 @@ class RequestsResponsesConnector(threading.Thread, BaseRequestsResponsesConnecto
             flags = PyTritonResponseFlags.ERROR | PyTritonResponseFlags.EOS
             await send(scope, flags, error_msg)
         finally:
+            if requests is not None:
+                for request in requests:
+                    end_span(request.span)
+
             self._serializer_deserializer.free_requests_resources(requests_payload)
             self._responses_queues.pop(requests_id)
             LOGGER.debug(f"Finished handling requests for {scope['requests_id'].hex()}")

@@ -40,7 +40,9 @@ The distinct capabilities of PyTriton are summarized in the feature matrix:
 | Performance            | You can benefit from `dynamic batching <https://triton-inference-server.github.io/py |
 | optimization           | triton/latest/inference_callables/decorators/#batch>`_, response cache, model        |
 |                        | pipelining, `clusters <https://triton-inference-server.github.io/pytriton/latest/    |
-|                        | guides/deploying_in_clusters/>`_, and GPU/CPU inference.                             |
+|                        | guides/deploying_in_clusters/>`_, performance `tracing <https://triton-inference-    |
+|                        | server.github.io/pytriton/latest/guides/distributed_tracing/>`_, and GPU/CPU         |
+|                        | inference.                                                                           |
 +------------------------+--------------------------------------------------------------------------------------+
 | Decorators             | You can use batching `decorators <https://triton-inference-server.github.io/pytriton |
 |                        | /latest/inference_callables/decorators/>`_ to handle batching  and other             |

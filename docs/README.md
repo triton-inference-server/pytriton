@@ -202,6 +202,8 @@ used to profile models served through PyTriton. We have prepared an example of
 using the Perf Analyzer to profile the BART PyTorch model. The example code can be found
 in [examples/perf_analyzer](../examples/perf_analyzer).
 
+Open Telemetry is a set of APIs, libraries, agents, and instrumentation to provide observability for cloud-native software. We have prepared an
+[guide](guides/distributed_tracing.md) on how to use Open Telemetry with PyTriton.
 
 ## What next?
 

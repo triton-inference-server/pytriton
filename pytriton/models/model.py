@@ -16,13 +16,14 @@
 import base64
 import copy
 import enum
+import json
 import logging
 import os
 import pathlib
 import shutil
 import threading
 import typing
-from typing import Callable, Optional, Sequence, Union
+from typing import Callable, List, Optional, Sequence, Union
 
 from pytriton.decorators import TritonContext
 from pytriton.exceptions import PyTritonValidationError
@@ -69,7 +70,7 @@ def _inject_triton_context(triton_context: TritonContext, model_callable: Callab
 class Model:
     """Model definition."""
 
-    SCRIPT_FILES_TO_COPY = ["communication.py", "data.py", "model.py", "types.py"]
+    SCRIPT_FILES_TO_COPY = ["communication.py", "data.py", "model.py", "types.py", "telemetry.py"]
 
     def __init__(
         self,
@@ -82,6 +83,7 @@ class Model:
         workspace: Workspace,
         triton_context: TritonContext,
         strict: bool,
+        trace_config: Optional[List[str]] = None,
     ):
         """Create Python model with required data.
 
@@ -95,6 +97,7 @@ class Model:
             workspace: workspace for storing artifacts
             triton_context: Triton context
             strict: Enable strict validation of model outputs
+            trace_config: List of trace config parameters
 
         Raises:
             PyTritonValidationError if one or more of provided values are incorrect.
@@ -107,6 +110,7 @@ class Model:
         self._requests_respones_connectors = []
         self._observers_lock = threading.Lock()
         self._strict = strict
+        self._trace_config = trace_config
 
         self.infer_functions = [inference_fn] if isinstance(inference_fn, Callable) else inference_fn
         if not isinstance(self.infer_functions, (Sequence, Callable)):
@@ -271,6 +275,9 @@ class Model:
             ModelConfig object with configuration for Python model deployment
         """
         if not self._triton_model_config:
+            backend_parameters = {"workspace-path": self._workspace.path.as_posix()}
+            if self._trace_config:
+                backend_parameters["trace-config"] = base64.b64encode(json.dumps(self._trace_config).encode()).decode()
             triton_model_config = TritonModelConfig(
                 model_name=self.model_name,
                 model_version=self.model_version,
@@ -278,7 +285,7 @@ class Model:
                 batcher=self.config.batcher,
                 max_batch_size=self.config.max_batch_size,
                 decoupled=self.config.decoupled,
-                backend_parameters={"workspace-path": self._workspace.path.as_posix()},
+                backend_parameters=backend_parameters,
                 instance_group={DeviceKind.KIND_CPU: len(self.infer_functions)},
             )
             inputs = []

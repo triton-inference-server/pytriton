@@ -16,7 +16,9 @@ limitations under the License.
 
 # Changelog
 
-## Unreleased
+## 0.5.7 (2024-06-19)
+
+- New: Open Telemetry propagation support for tracing
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 

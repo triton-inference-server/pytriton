@@ -57,6 +57,7 @@ from pytriton.exceptions import PyTritonValidationError
 from pytriton.model_config.tensor import Tensor
 from pytriton.models.manager import ModelManager
 from pytriton.models.model import Model, ModelConfig, ModelEvent
+from pytriton.proxy.telemetry import build_proxy_tracer_from_triton_config, get_telemetry_tracer, set_telemetry_tracer
 from pytriton.server.python_backend_config import PythonBackendConfig
 from pytriton.server.triton_server import TritonServer
 from pytriton.server.triton_server_config import TritonServerConfig
@@ -251,6 +252,10 @@ class TritonConfig:
             is_optional = typing_inspect.is_optional_type(field_type)
             if is_optional:
                 field_type = field_type.__args__[0]
+            if hasattr(field_type, "__origin__") and field_type.__origin__ is list:
+                return list(_value) if _value is not None else None
+            elif isinstance(_value, str) and isinstance(field_type, type) and issubclass(field_type, list):
+                return _value.split(",")
             return field_type(_value)
 
         config_with_casted_values = {
@@ -275,7 +280,29 @@ class TritonConfig:
             TritonConfig class instantiated from environment variables.
         """
         prefix = "PYTRITON_TRITON_CONFIG_"
-        config = {name[len(prefix) :].lower(): value for name, value in os.environ.items() if name.startswith(prefix)}
+        config = {}
+        list_pattern = re.compile(r"^(.+?)_(\d+)$")
+
+        for name, value in os.environ.items():
+            if name.startswith(prefix):
+                key = name[len(prefix) :].lower()
+                match = list_pattern.match(key)
+                if match:
+                    list_key, index = match.groups()
+                    index = int(index)
+                    if list_key not in config:
+                        config[list_key] = []
+                    if len(config[list_key]) <= index:
+                        config[list_key].extend([None] * (index + 1 - len(config[list_key])))
+                    config[list_key][index] = value
+                else:
+                    config[key] = value
+
+        # Remove None values from lists (in case of non-sequential indexes)
+        for key in config:
+            if isinstance(config[key], list):
+                config[key] = [item for item in config[key] if item is not None]
+
         return cls.from_dict(config)
 
 
@@ -385,6 +412,7 @@ class TritonBase:
         model_version: int = 1,
         config: Optional[ModelConfig] = None,
         strict: bool = False,
+        trace_config: Optional[List[str]] = None,
     ) -> None:
         """Create a model with given name and inference callable binding into Triton Inference Server.
 
@@ -401,8 +429,27 @@ class TritonBase:
             model_version: Version of model
             config: Model configuration for Triton Inference Server deployment
             strict: Enable strict validation between model config outputs and inference function result
+            trace_config: List of trace config parameters
         """
         self._validate_model_name(model_name)
+        model_kwargs = {}
+        if trace_config is None:
+            triton_config = getattr(self, "_config", None)
+            if triton_config is not None:
+                trace_config = getattr(triton_config, "trace_config", None)
+                if trace_config is not None:
+                    LOGGER.info(f"Using trace config from TritonConfig: {trace_config}")
+                    model_kwargs["trace_config"] = trace_config
+        else:
+            model_kwargs["trace_config"] = trace_config
+        telemetry_tracer = get_telemetry_tracer()
+
+        # Automatically set telemetry tracer if not set at the proxy side
+        if telemetry_tracer is None and trace_config is not None:
+            LOGGER.info("Setting telemetry tracer from TritonConfig")
+            telemetry_tracer = build_proxy_tracer_from_triton_config(trace_config)
+            set_telemetry_tracer(telemetry_tracer)
+
         model = Model(
             model_name=model_name,
             model_version=model_version,
@@ -413,6 +460,7 @@ class TritonBase:
             workspace=self._workspace,
             triton_context=self._triton_context,
             strict=strict,
+            **model_kwargs,
         )
         model.on_model_event(self._on_model_event)
 

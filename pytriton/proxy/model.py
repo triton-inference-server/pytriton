@@ -43,6 +43,7 @@ from .data import (  # pytype: disable=import-error
     Base64SerializerDeserializer,
     TensorStoreSerializerDeserializer,
 )
+from .telemetry import TracableModel  # pytype: disable=import-error
 from .types import Request, Response, ResponsesOrError  # pytype: disable=import-error
 
 LOGGER = logging.getLogger(__name__)
@@ -112,28 +113,41 @@ class TritonRequestsServer:
         """
         self._server.shutdown()
 
-    def push(self, requests_id: bytes, triton_requests):
+    def push(self, requests_id: bytes, triton_requests, spans=None):
         """Push requests to TritonRequestsServer queue.
 
         Args:
             requests_id: id of requests
             triton_requests: list of Triton requests
+            spans: list of OpenTelemetry spans
         """
         self._server.wait_till_running()  # wait until loop is up and running, raise RuntimeError if server is stopping or not launched yet
-        return asyncio.run_coroutine_threadsafe(
-            self._send_requests(requests_id, triton_requests), self._server.server_loop
-        )
+        kwargs = {"requests_id": requests_id, "triton_requests": triton_requests}
+        if spans is not None:
+            kwargs["spans"] = spans
+        return asyncio.run_coroutine_threadsafe(self._send_requests(**kwargs), self._server.server_loop)
 
-    def _wrap_request(self, triton_request, inputs) -> Request:
+    def _wrap_request(self, triton_request, inputs, span=None) -> Request:
         request = {}
         for input_name in inputs:
             input_tensor = pb_utils.get_input_tensor_by_name(triton_request, input_name)
             if input_tensor is not None:
                 request[input_name] = input_tensor.as_numpy()
-        return Request(data=request, parameters=json.loads(triton_request.parameters()))
+        kwargs = {}
+        if span is not None:
+            kwargs["span"] = span
+        return Request(data=request, parameters=json.loads(triton_request.parameters()), **kwargs)
 
-    async def _send_requests(self, requests_id: bytes, triton_requests) -> ConcurrentFuture:
-        requests = [self._wrap_request(triton_request, self._model_inputs_names) for triton_request in triton_requests]
+    async def _send_requests(self, requests_id: bytes, triton_requests, spans=None) -> ConcurrentFuture:
+        requests = triton_requests
+        if spans is None:
+            spans = [None] * len(triton_requests)
+        requests_with_spans = zip(triton_requests, spans)
+
+        requests = [
+            self._wrap_request(triton_request, self._model_inputs_names, span)
+            for triton_request, span in requests_with_spans
+        ]
         requests_payload = self._serializer_deserializer.serialize_requests(requests)
         # will return when socket.send_multipart returns
         responses_future = ConcurrentFuture()
@@ -339,6 +353,7 @@ class TritonPythonModel:
         self._frontend = None
         self._requests = None
         self._id_counter = 0
+        self._tracable_model = None
 
     def initialize(self, args):
         """Triton Inference Server Python Backend API called only once when the model is being loaded.
@@ -374,6 +389,10 @@ class TritonPythonModel:
             self._decoupled_model = model_config.get("model_transaction_policy", {}).get("decoupled", False)
 
             workspace_path = pathlib.Path(model_config["parameters"]["workspace-path"]["string_value"])
+
+            self._tracable_model = TracableModel()
+            if "trace-config" in model_config["parameters"]:
+                self._tracable_model.configure_tracing(model_config["parameters"]["trace-config"]["string_value"])
 
             LOGGER.debug(f"Model instance name: {self._model_instance_name}")
             LOGGER.debug(f"Decoupled model: {self._decoupled_model}")
@@ -443,6 +462,7 @@ class TritonPythonModel:
             pb_utils.TritonModelException: when model execution fails
         """
         try:
+            spans = self._tracable_model.start_requests_spans(triton_requests)
 
             def _generate_id():
                 self._id_counter = (self._id_counter + 1) % 2**32
@@ -454,16 +474,20 @@ class TritonPythonModel:
             self._requests[requests_id] = triton_requests
 
             # TODO: add this future to container to avoid garbage collection
-            handle_responses_task_async_future = self._requests_server.push(requests_id, triton_requests)
+            handle_responses_task_async_future = self._requests_server.push(requests_id, triton_requests, spans)
 
             if not self._decoupled_model:
                 handle_responses_concurrent_future = handle_responses_task_async_future.result()
                 triton_responses_or_error = handle_responses_concurrent_future.result()
 
+                self._tracable_model.end_requests_spans(spans, triton_responses_or_error)
+
                 if triton_responses_or_error is not None and isinstance(triton_responses_or_error, Exception):
                     raise triton_responses_or_error
             else:
                 triton_responses_or_error = None
+
+                self._tracable_model.end_requests_spans(spans, triton_responses_or_error)
 
             return triton_responses_or_error
         except Exception:

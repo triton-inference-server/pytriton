@@ -18,6 +18,8 @@ from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 
+from .telemetry import traced_span
+
 
 @dataclasses.dataclass
 class Request:
@@ -27,6 +29,8 @@ class Request:
     """Input data for the request."""
     parameters: Optional[Dict[str, Union[str, int, bool]]] = None
     """Parameters for the request."""
+    span: Optional[Any] = None
+    """Telemetry span for request"""
 
     def __getitem__(self, input_name: str) -> np.ndarray:
         """Get input data."""
@@ -59,6 +63,14 @@ class Request:
     def values(self):
         """Iterate over input data."""
         return self.data.values()
+
+    def traced_span(self, span_name):
+        """Yields Open Telemetry a span for the request.
+
+        Args:
+            span_name (str): Name of the span
+        """
+        return traced_span(self, span_name)
 
 
 Requests = List[Request]
