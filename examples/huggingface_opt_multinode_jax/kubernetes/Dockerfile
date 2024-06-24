@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-ARG FROM_IMAGE_NAME=nvcr.io/nvidia/tensorflow:24.04-tf2-py3
+ARG FROM_IMAGE_NAME=nvcr.io/nvidia/tensorflow:24.05-tf2-py3
 ARG BUILD_FROM=pypi
 
 FROM ${FROM_IMAGE_NAME} as base
