@@ -37,7 +37,7 @@ keywords = []
 license = { text = "Apache 2.0" }
 requires-python = ">=3.8,<4"
 dependencies = [
-    "numpy >= 1.21",
+    "numpy >= 1.21, <2.0.0",
     "protobuf >= 3.7",
     "pyzmq >= 23.0",
     "sh >= 1.14",
