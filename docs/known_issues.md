@@ -22,3 +22,4 @@ limitations under the License.
 - Enabling verbose logging may cause a significant performance drop in model inference.
 - GRPC ModelClient doesn't support timeouts for model configuration and model metadata requests due to a limitation in the underlying tritonclient library.
 - HTTP ModelClient may not respect the specified timeouts for model initialization and inference requests, especially when they are smaller than 1 second, resulting in longer waiting times. This issue is related to the underlying implementation of HTTP protocol.
+- L0_remote_life_cycle, L0_tritons_cohabitation tests fails with timeouts due to unknown reasons. Investigating the root cause of this issue is ongoing.
