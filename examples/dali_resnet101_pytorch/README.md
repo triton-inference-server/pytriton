@@ -89,7 +89,7 @@ To run this example, please follow these steps:
 2. Run the NVIDIA PyTorch container:
 
 ```shell
-$ docker run -it --gpus all --shm-size 8gb -v $(pwd):/dali -w /dali --net host nvcr.io/nvidia/pytorch:24.05-py3 bash
+$ docker run -it --gpus all --shm-size 8gb -v $(pwd):/dali -w /dali --net host nvcr.io/nvidia/pytorch:24.06-py3 bash
 ```
 
 3. Install PyTriton following the [installation instruction](../../README.md#installation)
