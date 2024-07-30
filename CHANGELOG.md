@@ -16,6 +16,10 @@ limitations under the License.
 
 # Changelog
 
+## 0.5.9 (2024-07-31)
+
+- Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.47.0](https://github.com/triton-inference-server/server/releases/tag/v2.47.0)
+
 ## 0.5.8 (2024-06-27)
 
 - New: PyTriton workspace clean raises warning ``CleanupWarning`` instead of ``OSError`` for file system failures
