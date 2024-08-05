@@ -19,7 +19,7 @@ limitations under the License.
 ## Overview
 
 The example presents profiling of HuggingFace BART model using [Perf
-Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md)
+Analyzer](https://github.com/triton-inference-server/perf_analyzer/blob/main/README.md)
 
 Example consists of following scripts:
 

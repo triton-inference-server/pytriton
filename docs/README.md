@@ -197,7 +197,7 @@ We introduced new alpha feature to PyTriton that allows to stream partial respon
 
 ### Profiling model
 
-The [Perf Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md) can be
+The [Perf Analyzer](https://github.com/triton-inference-server/perf_analyzer/blob/main/README.md) can be
 used to profile models served through PyTriton. We have prepared an example of
 using the Perf Analyzer to profile the BART PyTorch model. The example code can be found
 in [examples/perf_analyzer](../examples/perf_analyzer).
