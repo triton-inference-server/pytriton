@@ -1,5 +1,5 @@
 <!--
-Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ The list of example models deployments:
 
 ## Profiling models
 
-The [Perf Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md) can be
+The [Perf Analyzer](https://github.com/triton-inference-server/perf_analyzer/blob/main/README.md) can be
 used to profile the models served through PyTriton. We have prepared an example of
 using Perf Analyzer to profile BART PyTorch. See the example code in
 the [GitHub repository](../examples/perf_analyzer).
