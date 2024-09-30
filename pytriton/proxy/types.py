@@ -31,6 +31,8 @@ class Request:
     """Parameters for the request."""
     span: Optional[Any] = None
     """Telemetry span for request"""
+    requested_output_names: Optional[List[str]] = None
+    """Requested output names for the request."""
 
     def __getitem__(self, input_name: str) -> np.ndarray:
         """Get input data."""
