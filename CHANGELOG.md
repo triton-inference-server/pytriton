@@ -16,7 +16,9 @@ limitations under the License.
 
 # Changelog
 
-## Unreleased
+## 0.5.12 (2024-10-13)
+
+- New: Inference callable receives Request object with requested output names. Thanks @catwell.
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 
