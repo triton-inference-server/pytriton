@@ -993,6 +993,8 @@ class TensorStoreSerializerDeserializer(BaseRequestsResponsesSerializerDeseriali
             serialized_request = {"data": serialized_request, "parameters": request.parameters}
             if request.span is not None:
                 serialized_request["span"] = get_span_dict(request.span)
+            if request.requested_output_names is not None:
+                serialized_request["requested_output_names"] = request.requested_output_names
             requests_list.append(serialized_request)
 
         requests = {"requests": requests_list}
@@ -1015,6 +1017,8 @@ class TensorStoreSerializerDeserializer(BaseRequestsResponsesSerializerDeseriali
                 span_dict = request["span"]
                 span = start_span_from_remote(span_dict, "proxy_inference_callable")
                 kwargs["span"] = span
+            if "requested_output_names" in request:
+                kwargs["requested_output_names"] = request["requested_output_names"]
             request_data = {
                 input_name: self._tensor_store.get(tensor_id)
                 for input_name, tensor_id in request.get("data", {}).items()

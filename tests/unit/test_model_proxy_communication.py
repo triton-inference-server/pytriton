@@ -54,7 +54,7 @@ class InferenceRequest:
     def __init__(self, model_name, inputs, requested_output_names, parameters=None):
         self.model_name = model_name
         self._inputs = inputs
-        self.requested_output_names = requested_output_names
+        self._requested_output_names = requested_output_names
         self._parameters = parameters or {}
 
     def inputs(self):
@@ -65,6 +65,9 @@ class InferenceRequest:
 
     def get_response_sender(self):
         return None
+
+    def requested_output_names(self):
+        return self._requested_output_names
 
 
 def _error_infer_fn(*_, **__):

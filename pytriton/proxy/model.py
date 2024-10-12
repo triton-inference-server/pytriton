@@ -136,7 +136,12 @@ class TritonRequestsServer:
         kwargs = {}
         if span is not None:
             kwargs["span"] = span
-        return Request(data=request, parameters=json.loads(triton_request.parameters()), **kwargs)
+        return Request(
+            data=request,
+            parameters=json.loads(triton_request.parameters()),
+            requested_output_names=list(triton_request.requested_output_names()),
+            **kwargs,
+        )
 
     async def _send_requests(self, requests_id: bytes, triton_requests, spans=None) -> ConcurrentFuture:
         requests = triton_requests
