@@ -16,6 +16,12 @@ limitations under the License.
 
 # Changelog
 
+## Unreleased
+
+[//]: <> (put here on external component update with short summary what change or link to changelog)
+
+- Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.50.0](https://github.com/triton-inference-server/server/releases/tag/v2.50.0)
+
 ## 0.5.11 (2024-09-18)
 
 - Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.49.0](https://github.com/triton-inference-server/server/releases/tag/v2.49.0)
