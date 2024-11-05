@@ -323,11 +323,13 @@ class RequestsServerClient:
             send = functools.partial(self._send, socket)
 
             flag_check_interval_s = 1.0
+            recv = None
             while True:
+                if recv is None:
+                    recv = socket.recv_multipart()
                 try:
-                    requests_id, requests_payloads = await asyncio.wait_for(
-                        socket.recv_multipart(), flag_check_interval_s
-                    )
+                    requests_id, requests_payloads = await asyncio.wait_for(asyncio.shield(recv), flag_check_interval_s)
+                    recv = None
                     scope = {"requests_id": requests_id}
                     CLIENT_LOGGER.debug(f"{requests_id.hex()} received requests")
                     handle_requests_task = self._loop.create_task(self._handle_requests(scope, requests_payloads, send))
@@ -335,6 +337,10 @@ class RequestsServerClient:
                     handle_requests_task.set_name(f"handle_requests-{requests_id.hex()}")
                 except asyncio.TimeoutError:
                     if self._shutdown_event.is_set():
+                        if recv is not None:
+                            CLIENT_LOGGER.debug("Dropping not processed requests")
+                            recv.cancel()
+                            recv = None
                         break
                     continue
 
