@@ -350,8 +350,13 @@ To test this feature, you can use the following Python client based on python [r
 <!--pytest.mark.skip-->
 
 ```bash
-pip install opentelemetry-api opentelemetry-sdk opentelemetry-instrumentation-requests opentelemetry-exporter-otlp
+pip install "opentelemetry-api<=1.27.0" \
+    "opentelemetry-sdk<=1.27.0" \
+    "opentelemetry-instrumentation-requests<=1.27.0" \
+    "opentelemetry-exporter-otlp<=1.27.0"
 ```
+
+The conflict between ``tritonclient == 2.50.0`` and ``opentelemetry-api == 1.28.0`` can prevent you rom installing both. To avoid this issue, you can force telemetry to use the version ``1.27.0``.
 
 First you need to import the required packages and configure the OpenTelemetry context and instrumet requests library:
 
