@@ -155,15 +155,19 @@ class RequestsServer:
         def _all_responses_processed():
             return not any([self._handle_responses_tasks, self._responses_queues])
 
+        recv_future = None
         try:
             flag_check_interval_s = 1.0
-            # have to receive mssages untill all requestss to be processed, despite shutdown event is set
+            # have to receive messages until all requests are processed, even while shutting down
             while not self._shutdown_event.is_set() or not _all_responses_processed():
+                if recv_future is None:
+                    recv_future = self._socket.recv_multipart()
                 requests_id = b"<unknown>"
                 try:
                     requests_id, flags, responses_payload = await asyncio.wait_for(
-                        self._socket.recv_multipart(), flag_check_interval_s
+                        asyncio.shield(recv_future), flag_check_interval_s
                     )
+                    recv_future = None
                     flags = int.from_bytes(flags, byteorder="big")
                     responses_queue = self._responses_queues[requests_id]
                     responses_queue.put_nowait((flags, responses_payload))  # queue have no max_size
@@ -177,6 +181,9 @@ class RequestsServer:
         finally:
             # Received all responses, close socket
             SERVER_LOGGER.debug("Closing socket")
+            if recv_future is not None:
+                assert isinstance(recv_future, asyncio.Future)
+                recv_future.cancel()
             try:
                 if self._socket is not None:
                     self._socket.close(linger=0)
@@ -323,11 +330,16 @@ class RequestsServerClient:
             send = functools.partial(self._send, socket)
 
             flag_check_interval_s = 1.0
+            recv_future = None
             while True:
+                if recv_future is None:
+                    recv_future = socket.recv_multipart()
+                    assert isinstance(recv_future, asyncio.Future)
                 try:
                     requests_id, requests_payloads = await asyncio.wait_for(
-                        socket.recv_multipart(), flag_check_interval_s
+                        asyncio.shield(recv_future), flag_check_interval_s
                     )
+                    recv_future = None
                     scope = {"requests_id": requests_id}
                     CLIENT_LOGGER.debug(f"{requests_id.hex()} received requests")
                     handle_requests_task = self._loop.create_task(self._handle_requests(scope, requests_payloads, send))
@@ -337,6 +349,8 @@ class RequestsServerClient:
                     if self._shutdown_event.is_set():
                         break
                     continue
+            if recv_future is not None:
+                recv_future.cancel()
 
             CLIENT_LOGGER.debug("Waiting for handle_requests tasks to finish")
             async with self._handle_requests_tasks_condition:
