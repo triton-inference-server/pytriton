@@ -20,6 +20,7 @@ limitations under the License.
 
 - Fix: OpenTelemetry version enforced as 1.27.0 to avoid compatibility issues with tritonclient.
 - Fix: Timeout error in async wait removed. Thanks @catwell.
+- Fix: Invalid call for ``shutdown_default_executor`` at Python 3.8 removed.
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 
