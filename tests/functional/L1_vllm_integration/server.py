@@ -95,7 +95,6 @@ if __name__ == "__main__":
                 Tensor(name="prompt", dtype=bytes, shape=(1,)),
                 Tensor(name="n", dtype=np.int32, shape=(1,)),
                 Tensor(name="best_of", dtype=np.int32, shape=(1,)),
-                Tensor(name="use_beam_search", dtype=np.bool_, shape=(1,)),
                 Tensor(name="temperature", dtype=np.float32, shape=(1,)),
                 Tensor(name="top_p", dtype=np.float32, shape=(1,)),
                 Tensor(name="max_tokens", dtype=np.int32, shape=(1,)),
