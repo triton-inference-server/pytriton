@@ -333,7 +333,9 @@ class InferenceHandler(threading.Thread):
             try:
                 _cancel_all_tasks(self._loop)
                 self._loop.run_until_complete(self._loop.shutdown_asyncgens())
-                self._loop.run_until_complete(self._loop.shutdown_default_executor())
+                # shutdown default executor was introduced in Python 3.9
+                if hasattr(self._loop, "shutdown_default_executor"):
+                    self._loop.run_until_complete(self._loop.shutdown_default_executor())
             finally:
                 asyncio.set_event_loop(None)
                 self._loop.close()
