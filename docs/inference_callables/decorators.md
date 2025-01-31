@@ -253,16 +253,15 @@ def infer_fn(mandatory_input, temperature):
 The `@triton_context` decorator provides an additional argument called `triton_context`,
 from which you can read the model config.
 
- ```python
- from pytriton.decorators import triton_context
-
+```python
+from pytriton.decorators import triton_context
 
 @triton_context
 def infer_fn(input_list, **kwargs):
     model_config = kwargs['triton_context'].model_config
     # perform inference using some information from model_config
     pass
- ```
+```
 
 ## Stacking multiple decorators
 
