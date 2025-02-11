@@ -78,7 +78,7 @@ class ModelManager:
         if key in self._models:
             raise PyTritonInvalidOperationError("Cannot add model with the same name twice.")
 
-        LOGGER.debug(f"Adding {model.model_name} ({model.model_version}) to registry under {key}.")
+        LOGGER.debug("Adding %s (%s) to registry under %s.", model.model_name, model.model_version, key)
         self._models[key] = model
 
         _is_model_store_local = self._model_store_path is not None
@@ -115,11 +115,11 @@ class ModelManager:
             except (socket.timeout, OSError, InferenceServerException):
                 pass
             except Exception as ex:
-                LOGGER.error(f"Unexpected exception during server live check: {ex}")
+                LOGGER.error("Unexpected exception during server live check: %s", ex)
                 raise ex
 
             for name, model in self._models.items():
-                LOGGER.debug(f"Clean model {name}.")
+                LOGGER.debug("Clean model %s.", name)
                 model.clean()
                 if server_live:
                     client.unload_model(model.model_name)
@@ -136,7 +136,7 @@ class ModelManager:
 
     def _load_model(self, model: Model, local_model_store=False):
         """Prepare model config and required files dict and load model to Triton server."""
-        LOGGER.debug(f"Creating model {model.model_name} with version {model.model_version}.")
+        LOGGER.debug("Creating model %s with version %s.", model.model_name, model.model_version)
         config = None if local_model_store else json.dumps(model.get_model_config())
         files = None if local_model_store else model.get_proxy_model_files()
         with ModelClient(

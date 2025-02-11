@@ -49,11 +49,11 @@ class Workspace:
             PYTRITON_HOME.mkdir(parents=True, exist_ok=True)
             self._tmp_dir = tempfile.TemporaryDirectory(dir=PYTRITON_HOME, prefix="workspace_")
             self._workspace_path = pathlib.Path(self._tmp_dir.name).resolve()
-            LOGGER.debug(f"Workspace path {self._workspace_path}")
+            LOGGER.debug("Workspace path %s", self._workspace_path)
         else:
             self._tmp_dir = None
             self._workspace_path = pathlib.Path(workspace_path).resolve()
-            LOGGER.debug(f"Workspace path {self._workspace_path}")
+            LOGGER.debug("Workspace path %s", self._workspace_path)
             self._workspace_path.mkdir(parents=True)
 
         self.model_store_path = self._workspace_path / "model-store"
@@ -88,13 +88,13 @@ class Workspace:
         for p in all_files:
             rel_p = p.relative_to(self.path)
             if rel_p.parts and not rel_p.parts[0].startswith("."):
-                LOGGER.warning(f"Non empty path {p}")
+                LOGGER.warning("Non empty path %s", p)
                 return False
         return True
 
     def clean(self) -> None:
         """Clean workspace removing files and directories created inside including the workspace itself."""
-        LOGGER.debug(f"Cleaning workspace dir {self.path}")
+        LOGGER.debug("Cleaning workspace dir %s", self.path)
 
         try:
             for child in self.path.rglob("*"):
@@ -102,15 +102,15 @@ class Workspace:
                 if len(rel_p.parts) == 0 or rel_p.parts[0].startswith("."):
                     continue
                 if child.is_dir():
-                    LOGGER.debug(f"Cleaning workspace dir {child}")
+                    LOGGER.debug("Cleaning workspace dir %s", child)
                     shutil.rmtree(child, ignore_errors=True)
                 else:
-                    LOGGER.debug(f"Cleaning workspace file {child}")
+                    LOGGER.debug("Cleaning workspace file %s", child)
                     child.unlink()
             if not self.is_empty():
                 raise OSError(f"Could not clean {self.path} workspace")
             if self.path.exists():
-                LOGGER.debug(f"Removing workspace dir {self.path}")
+                LOGGER.debug("Removing workspace dir %s", self.path)
                 self.path.rmdir()
         except OSError as e:
             warnings.warn(

@@ -47,12 +47,12 @@ def main():
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=log_level, format=DEFAULT_LOG_FORMAT)
     logging.captureWarnings(True)
-    LOGGER.debug(f"CLI args: {args}")
+    LOGGER.debug("CLI args: %s", args)
 
     random.seed(args.seed)
 
     triton_config = TritonConfig(grpc_port=find_free_port(), http_port=find_free_port(), metrics_port=find_free_port())
-    LOGGER.debug(f"Using {triton_config}")
+    LOGGER.debug("Using %s", triton_config)
 
     @batch
     def _throw_division_error(**_):

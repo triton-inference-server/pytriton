@@ -51,15 +51,15 @@ def verify_output(output):
 
     for match_string in matches_strings:
         if match_string not in output:
-            raise ValueError(f"Couldn't find expected result: {match_string}")
+            raise ValueError("Couldn't find expected result: %s", match_string)
         else:
-            LOGGER.info(f"Found expected result: {match_string}")
+            LOGGER.info("Found expected result: %s", match_string)
 
     for match_string in negative_matches_strings:
         if match_string in output:
-            raise ValueError(f"Found unexpected result: {match_string}")
+            raise ValueError("Found unexpected result: %s", match_string)
         else:
-            LOGGER.info(f"Didn't find unexpected result: {match_string}")
+            LOGGER.info("Didn't find unexpected result: %s", match_string)
 
     LOGGER.info("All checks passed")
 
@@ -99,7 +99,7 @@ def main():
 
     timeout = elapsed_s >= args.timeout_s and check_thread.is_alive()
     if timeout:
-        LOGGER.error(f"Timeout occurred (timeout_s={args.timeout_s})")
+        LOGGER.error("Timeout occurred (timeout_s=%s)", args.timeout_s)
         sys.exit(-2)
 
     verify_output(check_thread.output)

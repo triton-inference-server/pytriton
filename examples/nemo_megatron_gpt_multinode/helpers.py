@@ -113,11 +113,11 @@ def download_hf_model(repo_id: str, filename: typing.Optional[str] = None) -> pa
 
     lock_path = lock_dir / f"{filename}.lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    LOGGER.info(f"Lock file {lock_path}")
+    LOGGER.info("Lock file %s", lock_path)
     lock = filelock.FileLock(lock_path)
 
     with lock:
-        LOGGER.info(f"Downloading model from https://huggingface.co/{repo_id} filename={filename}")
+        LOGGER.info("Downloading model from https://huggingface.co/%s filename=%s", repo_id, filename)
         model_path = huggingface_hub.hf_hub_download(repo_id, filename=filename)  # set $HF_HOME to set cache dir
         return pathlib.Path(model_path)
 
@@ -190,7 +190,7 @@ def load_model(
     model_path: pathlib.Path, trainer, *, prompt_learning_model_path: typing.Optional[pathlib.Path] = None
 ) -> torch.nn.Module:
     worker_name = _get_worker_name()
-    LOGGER.debug(f"Loading {model_path} on {worker_name}")
+    LOGGER.debug("Loading %s on %s", model_path, worker_name)
 
     save_restore_connector = NLPSaveRestoreConnector()
     if model_path.is_dir():
@@ -260,13 +260,19 @@ def setup_distributed_environment(trainer):
 
     hostname = socket.gethostname()
     LOGGER.info(
-        f"global={app_state.global_rank}/{app_state.world_size} "
-        f"local={app_state.local_rank} @ {hostname}:{app_state.device_id} / "
-        f"dp={app_state.data_parallel_rank}/{app_state.data_parallel_size} "
-        f"tp={app_state.tensor_model_parallel_rank}/{app_state.tensor_model_parallel_size} "
-        f"pp={app_state.pipeline_model_parallel_rank}/{app_state.pipeline_model_parallel_size} "
-        "vpp="
-        f"{getattr(app_state, 'virtual_pipeline_model_parallel_rank', None)}/"
-        f"{getattr(app_state, 'virtual_pipeline_model_parallel_size', None)}"
+        "global=%d/%d local=%d @ %s:%d / dp=%d/%d tp=%d/%d pp=%d/%d vpp=%s/%s",
+        app_state.global_rank,
+        app_state.world_size,
+        app_state.local_rank,
+        hostname,
+        app_state.device_id,
+        app_state.data_parallel_rank,
+        app_state.data_parallel_size,
+        app_state.tensor_model_parallel_rank,
+        app_state.tensor_model_parallel_size,
+        app_state.pipeline_model_parallel_rank,
+        app_state.pipeline_model_parallel_size,
+        getattr(app_state, "virtual_pipeline_model_parallel_rank", None),
+        getattr(app_state, "virtual_pipeline_model_parallel_size", None),
     )
     return app_state

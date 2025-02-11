@@ -169,14 +169,14 @@ class Model:
             OSError: when model repository not exists
         """
         LOGGER.debug(
-            f"Generating model and config for {self.model_name} and {self.model_version} to {model_repository}"
+            "Generating model and config for %s and %s to %s", self.model_name, self.model_version, model_repository
         )
 
         model_catalog = model_repository / self.model_name
 
         config_file_path = model_catalog / "config.pbtxt"
         if config_file_path.exists():
-            LOGGER.warning(f"The config file {config_file_path} is going to be overridden.")
+            LOGGER.warning("The config file %s is going to be overridden.", config_file_path)
 
         triton_model_config = self._get_triton_model_config()
         generator = ModelConfigGenerator(config=triton_model_config)

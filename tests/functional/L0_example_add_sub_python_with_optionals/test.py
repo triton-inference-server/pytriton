@@ -101,7 +101,7 @@ def main():
 
     timeout = elapsed_s >= args.timeout_s and client_thread.is_alive() and server_thread.is_alive()
     if timeout:
-        LOGGER.error(f"Timeout occurred (timeout_s={args.timeout_s})")
+        LOGGER.error("Timeout occurred (timeout_s=%s)", args.timeout_s)
         sys.exit(-2)
 
     verify_client_output(client_thread.output)

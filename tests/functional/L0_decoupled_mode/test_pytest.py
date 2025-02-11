@@ -100,7 +100,7 @@ class TritonInstance:
             _LOGGER.debug("Triton server not running.")
             pass
         self.triton = Triton(config=self.config)
-        _LOGGER.debug(f"Binding {self.model_name} model.")
+        _LOGGER.debug("Binding %s model.", self.model_name)
         self.triton.bind(
             model_name=self.model_name,
             infer_func=self.infer_function,
@@ -132,11 +132,11 @@ class TritonInstance:
                     inference_timeout_s=_SMALL_TIMEOUT,
                     lazy_init=False,
                 ) as client:
-                    _LOGGER.info(f"Triton server still running. {client.model_config}")
+                    _LOGGER.info("Triton server still running. %s", client.model_config)
             except PyTritonClientTimeoutError:
                 _LOGGER.debug("Triton server not running.")
                 break
-            _LOGGER.debug(f"Triton server still alive, so sleeping for {_SMALL_TIMEOUT}s.")
+            _LOGGER.debug("Triton server still alive, so sleeping for %ss.", _SMALL_TIMEOUT)
             time.sleep(_SMALL_TIMEOUT)
         _LOGGER.info("Triton server stopped.")
 
@@ -145,39 +145,39 @@ class TritonInstance:
 def triton_decoupled_server(find_free_ports):
     @batch
     def _infer_fn(**inputs):  # noqa: N803
-        _LOGGER.debug(f"Inputs: {inputs}")
+        _LOGGER.debug("Inputs: %s", inputs)
         sleep_time = inputs["INPUT_1"].squeeze().item()
         response_counter = inputs["INPUT_2"].squeeze().item()
         if sleep_time < 0:
             raise ValueError("Sleep time must be positive.")
         if response_counter < 0:
             response_counter = -response_counter
-            _LOGGER.info(f"Sleeper will raise ValueError after {response_counter} responses.")
+            _LOGGER.info("Sleeper will raise ValueError after %s responses.", response_counter)
             for _ in range(response_counter):
-                _LOGGER.info(f"Will sleep {sleep_time}s")
+                _LOGGER.info("Will sleep %ss", sleep_time)
                 time.sleep(sleep_time)
                 return_value = {
                     "OUTPUT_1": inputs["INPUT_1"],
                     "OUTPUT_2": inputs["INPUT_2"],
                 }
-                _LOGGER.debug(f"Yield value {return_value}")
+                _LOGGER.debug("Yield value %s", return_value)
                 yield return_value
             time.sleep(sleep_time)
-            _LOGGER.info(f"Will sleep {sleep_time}s")
+            _LOGGER.info("Will sleep %ss", sleep_time)
             raise ValueError("Response counter must be positive.")
         else:
-            _LOGGER.info(f"Sleeper will succed after {response_counter} responses.")
+            _LOGGER.info("Sleeper will succed after %s responses.", response_counter)
             for _ in range(response_counter):
-                _LOGGER.info(f"Will sleep {sleep_time}s")
+                _LOGGER.info("Will sleep %ss", sleep_time)
                 time.sleep(sleep_time)
                 return_value = {
                     "OUTPUT_1": inputs["INPUT_1"],
                     "OUTPUT_2": inputs["INPUT_2"],
                 }
-                _LOGGER.debug(f"Yield value {return_value}")
+                _LOGGER.debug("Yield value %s", return_value)
                 yield return_value
 
-    _LOGGER.debug(f"Using ports: grpc={find_free_ports}")
+    _LOGGER.debug("Using ports: grpc=%s", find_free_ports)
     with TritonInstance(**find_free_ports, model_name="Sleeper", infer_function=_infer_fn, decoupled=True) as triton:
         yield triton
 
@@ -186,20 +186,20 @@ def triton_decoupled_server(find_free_ports):
 def triton_coupled_server(find_free_ports):
     @batch
     def _infer_fn(**inputs):  # noqa: N803
-        _LOGGER.debug(f"Inputs: {inputs}")
+        _LOGGER.debug("Inputs: %s", inputs)
         sleep_time = inputs["INPUT_1"].squeeze().item()
         if sleep_time < 0:
             raise ValueError("Sleep time must be positive.")
-        _LOGGER.info(f"Will sleep {sleep_time}s")
+        _LOGGER.info("Will sleep %ss", sleep_time)
         time.sleep(sleep_time)
         return_value = {
             "OUTPUT_1": inputs["INPUT_1"],
             "OUTPUT_2": inputs["INPUT_2"],
         }
-        _LOGGER.debug(f"Yield value {return_value}")
+        _LOGGER.debug("Yield value %s", return_value)
         return return_value
 
-    _LOGGER.debug(f"Using ports: grpc={find_free_ports}")
+    _LOGGER.debug("Using ports: grpc=%s", find_free_ports)
     with TritonInstance(**find_free_ports, model_name="Sleeper", infer_function=_infer_fn, decoupled=False) as triton:
         yield triton
 
@@ -207,7 +207,10 @@ def triton_coupled_server(find_free_ports):
 @pytest.fixture(scope="function")
 def grpc_decoupled_client_server(triton_decoupled_server):
     _LOGGER.debug(
-        f"Preparing client for {triton_decoupled_server.grpc_url} with init timeout {_GARGANTUAN_TIMEOUT} and inference timeout {_SMALL_TIMEOUT}."
+        "Preparing client for %s with init timeout %s and inference timeout %s.",
+        triton_decoupled_server.grpc_url,
+        _GARGANTUAN_TIMEOUT,
+        _SMALL_TIMEOUT,
     )
     yield DecoupledModelClient(
         url=triton_decoupled_server.grpc_url,
@@ -220,7 +223,10 @@ def grpc_decoupled_client_server(triton_decoupled_server):
 @pytest.fixture(scope="function")
 def grpc_decoupled_client_coupled_server(triton_coupled_server):
     _LOGGER.debug(
-        f"Preparing client for {triton_coupled_server.grpc_url} with init timeout {_GARGANTUAN_TIMEOUT} and inference timeout {_SMALL_TIMEOUT}."
+        "Preparing client for %s with init timeout %s and inference timeout %s.",
+        triton_coupled_server.grpc_url,
+        _GARGANTUAN_TIMEOUT,
+        _SMALL_TIMEOUT,
     )
     yield DecoupledModelClient(
         url=triton_coupled_server.grpc_url,
@@ -233,7 +239,10 @@ def grpc_decoupled_client_coupled_server(triton_coupled_server):
 @pytest.fixture(scope="function")
 def grpc_coupled_client_decoupled_server(triton_decoupled_server):
     _LOGGER.debug(
-        f"Preparing client for {triton_decoupled_server.grpc_url} with init timeout {_GARGANTUAN_TIMEOUT} and inference timeout {_SMALL_TIMEOUT}."
+        "Preparing client for %s with init timeout %s and inference timeout %s.",
+        triton_decoupled_server.grpc_url,
+        _GARGANTUAN_TIMEOUT,
+        _SMALL_TIMEOUT,
     )
     yield ModelClient(
         url=triton_decoupled_server.grpc_url,
@@ -246,7 +255,10 @@ def grpc_coupled_client_decoupled_server(triton_decoupled_server):
 @pytest.fixture(scope="function")
 def http_coupled_client_decoupled_server(triton_decoupled_server):
     _LOGGER.debug(
-        f"Preparing client for {triton_decoupled_server.grpc_url} with init timeout {_GARGANTUAN_TIMEOUT} and inference timeout {_SMALL_TIMEOUT}."
+        "Preparing client for %s with init timeout %s and inference timeout %s.",
+        triton_decoupled_server.grpc_url,
+        _GARGANTUAN_TIMEOUT,
+        _SMALL_TIMEOUT,
     )
     yield ModelClient(
         url=triton_decoupled_server.http_url,

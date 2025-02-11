@@ -66,17 +66,17 @@ def main():
         ["William Shakespeare was a great writer"],
     ])
     sequence = np.char.encode(sequence, "utf-8")
-    logger.info(f"Sequence: {sequence}")
+    logger.info("Sequence: %s", sequence)
 
     with ModelClient(args.url, "BART", init_timeout_s=args.init_timeout_s) as client:
         for req_idx in range(1, args.iterations + 1):
-            logger.info(f"Sending request ({req_idx}).")
+            logger.info("Sending request (%d).", req_idx)
             result_dict = client.infer_batch(sequence)
             for output_name, output_data in result_dict.items():
                 output_data = np.array2string(
                     output_data, threshold=np.inf, max_line_width=np.inf, separator=","
                 ).replace("\n", "")
-                logger.info(f"{output_name}: {output_data} for request ({req_idx}).")
+                logger.info("%s: %s for request (%d).", output_name, output_data, req_idx)
 
 
 if __name__ == "__main__":

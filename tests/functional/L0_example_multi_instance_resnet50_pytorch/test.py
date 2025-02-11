@@ -42,7 +42,7 @@ def verify_client_output(client_output):
         if not output_array:
             raise ValueError(f"Could not find {expected_pattern} in client output")
         else:
-            LOGGER.info(f'Found "{expected_pattern}" in client output')
+            LOGGER.info('Found "%s" in client output', expected_pattern)
 
 
 def main():
@@ -93,13 +93,13 @@ def main():
             server_thread.process.send_signal(signal.SIGINT)
 
     if client_thread.returncode != 0:
-        LOGGER.warning(f"Client returned {client_thread.returncode}")
+        LOGGER.warning("Client returned %d", client_thread.returncode)
     if server_thread.returncode not in [0, -2]:  # -2 is returned when process finished after receiving SIGINT signal
         raise RuntimeError(f"Server returned {server_thread.returncode}")
 
     timeout = elapsed_s >= args.timeout_s and client_thread.is_alive() and server_thread.is_alive()
     if timeout:
-        LOGGER.error(f"Timeout occurred (timeout_s={args.timeout_s})")
+        LOGGER.error("Timeout occurred (timeout_s=%d)", args.timeout_s)
         sys.exit(-2)
 
     verify_client_output(client_thread.output)

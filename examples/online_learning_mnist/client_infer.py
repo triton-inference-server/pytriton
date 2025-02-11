@@ -53,7 +53,11 @@ def main():
 
                 test_loss /= len(test_loader.dataset)
                 LOGGER.info(
-                    f"\nTest set: Average loss: {test_loss:.4f}, Accuracy: {correct}/{len(test_loader.dataset)} ({100.0 * correct / len(test_loader.dataset):.0f}%)\n"
+                    "\nTest set: Average loss: %.4f, Accuracy: %d/%d (%.0f%%)\n",
+                    test_loss,
+                    correct,
+                    len(test_loader.dataset),
+                    100.0 * correct / len(test_loader.dataset),
                 )
 
 

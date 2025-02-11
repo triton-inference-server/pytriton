@@ -39,14 +39,14 @@ def main():
 
     input1_batch = torch.randn(128, 20).cpu().detach().numpy()
 
-    logger.info(f"Input: {input1_batch.tolist()}")
+    logger.info("Input: %s", input1_batch.tolist())
 
     with ModelClient(args.url, "Linear") as client:
         logger.info("Sending request")
         result_dict = client.infer_batch(input1_batch)
 
     for output_name, output_batch in result_dict.items():
-        logger.info(f"{output_name}: {output_batch.tolist()}")
+        logger.info("%s: %s", output_name, output_batch.tolist())
 
 
 if __name__ == "__main__":

@@ -124,16 +124,18 @@ def futures_stress_test(test_time_s: int, init_timeout_s: int, batch_size: int, 
                                     previous_number_of_requests = number_of_processed_requests
                                     time_left_s = max(should_stop_at_s - time.time(), 0.0)
                                     logger.info(
-                                        f"Processed {number_of_processed_requests} batches time left: {time_left_s:0.1f}s \n."
-                                        f"Result: {len(result)}."
+                                        "Processed %d batches time left: %.1fs \n. Result: %d.",
+                                        number_of_processed_requests,
+                                        time_left_s,
+                                        len(result),
                                     )
                         time_left_s = max(should_stop_at_s - time.time(), 0.0)
                         if previous_time_left - time_left_s > 10:
                             previous_time_left = time_left_s
-                            logger.info(f"Time left: {time_left_s:0.1f}s")
+                            logger.info("Time left: %.1fs", time_left_s)
                         if time_left_s <= 0:
                             break
-                logger.info(f"Test finished. Processed {number_of_processed_requests} requests")
+                logger.info("Test finished. Processed %d requests", number_of_processed_requests)
 
         finally:
             if triton_log_path.exists():
@@ -229,17 +231,19 @@ async def asyncio_stress_test(test_time_s: int, init_timeout_s: int, batch_size:
                                     previous_number_of_requests = number_of_processed_requests
                                     time_left_s = max(should_stop_at_s - time.time(), 0.0)
                                     logger.info(
-                                        f"Processed {number_of_processed_requests} batches time left: {time_left_s:0.1f}s \n."
-                                        f"Result: {len(result)}."
+                                        "Processed %d batches time left: %.1fs \n. Result: %d.",
+                                        number_of_processed_requests,
+                                        time_left_s,
+                                        len(result),
                                     )
                         time_left_s = max(should_stop_at_s - time.time(), 0.0)
                         if previous_time_left - time_left_s > 10:
                             previous_time_left = time_left_s
-                            logger.info(f"Time left: {time_left_s:0.1f}s")
+                            logger.info("Time left: %.1fs", time_left_s)
                         if time_left_s <= 0:
                             done, not_done = await asyncio.wait(not_done, return_when=asyncio.ALL_COMPLETED)
                             break
-                logger.info(f"Test finished. Processed {number_of_processed_requests} requests")
+                logger.info("Test finished. Processed %d requests", number_of_processed_requests)
 
         finally:
             if triton_log_path.exists():
@@ -258,8 +262,8 @@ def _create_fake_bert_fn(model_name: str) -> Callable:
 
         outputs_len = random.randint(20, 128)
         result = np.zeros([input_ids.shape[0], outputs_len, VOCABULARY_SIZE], dtype=np.float32)
-        logger.debug(f"input_ids: {input_ids.shape}")
-        logger.debug(f"attention_mask: {attention_mask.shape}")
+        logger.debug("input_ids: %s", input_ids.shape)
+        logger.debug("attention_mask: %s", attention_mask.shape)
         return {"logits": result}
 
     return _infer_fn

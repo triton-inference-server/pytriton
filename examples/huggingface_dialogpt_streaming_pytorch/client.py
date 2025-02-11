@@ -30,7 +30,7 @@ def main():
         "--url",
         default="grpc://localhost:8001",
         help=(
-            "Url to Triton server (ex. grpc://localhost:8001)." "GRPC protocol is only supported with decoupled models"
+            "Url to Triton server (ex. grpc://localhost:8001). GRPC protocol is only supported with decoupled models"
         ),
         required=False,
     )

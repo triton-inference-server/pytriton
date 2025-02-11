@@ -137,7 +137,25 @@ indent-width = 4
 target-version = "py38"
 
 [tool.ruff.lint]
-select = ["B", "C", "C4", "C90", "D", "E", "F", "I", "N", "W", "T", "T10", "T20", "UP", "CPY"]
+select = [
+    "B",     # flake8-bugbear: bug-focused rules
+    "C",     # mccabe: complexity checker
+    "C4",    # flake8-comprehensions: list/set/dict comprehension rules
+    "C90",   # mccabe: cyclomatic complexity
+    "CPY",   # flake8-copyright: copyright header rules
+    "D",     # pydocstyle: docstring rules
+    "E",     # pycodestyle: error rules
+    "F",     # Pyflakes: error detection
+    "G",     # flake8-logging-format: logging format rules
+    "I",     # isort: import sorting
+    "LOG",   # flake8-logging: extended logging format rules
+    "N",     # pep8-naming: naming conventions
+    "T",     # flake8-print: print statement rules
+    "T10",   # flake8-debugger: debug statement rules
+    "T20",   # flake8-print: print statement rules (additional)
+    "UP",    # pyupgrade: upgradeable syntax rules
+    "W",     # pycodestyle: warning rules
+]
 ignore = ["E266", "E501", "N818"]
 exclude = []
 
@@ -162,13 +180,3 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "lf"
-
-[tool.vulture]
-exclude = []
-ignore_decorators = []
-ignore_names = []
-make_whitelist = true
-min_confidence = 80
-paths = ["pytriton"]
-sort_by_size = true
-verbose = false

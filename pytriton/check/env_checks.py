@@ -49,7 +49,7 @@ def get_platform_info(logger):
         logger: logger instance
     """
     logger.info("Checking OS version")
-    logger.info("Script is running in docker:" + str(pathlib.Path("/.dockerenv").exists()))
+    logger.info("Script is running in docker:%s", str(pathlib.Path("/.dockerenv").exists()))
 
     os_release_path = pathlib.Path("/etc/os-release")
     if os_release_path.exists():
@@ -60,22 +60,22 @@ def get_platform_info(logger):
             for line in os_release.split("\n"):
                 if "PRETTY_NAME" in line:
                     os_version = line.split("=")[1].strip()
-                    logger.info(f"OS version: {os_version}")
+                    logger.info("OS version: %s", os_version)
     else:
         logger.warning("OS release file not found (not available on some systems")
 
     logger.info("Get platform info")
-    logger.info(f"Platform: {platform.platform()}")
-    logger.info(f"System: {platform.system()}")
-    logger.info(f"Release: {platform.release()}")
-    logger.info(f"Version: {platform.version()}")
-    logger.info(f"Machine: {platform.machine()}")
-    logger.info(f"Processor: {platform.processor()}")
-    logger.info(f"Python version: {platform.python_version()}")
-    logger.info(f"Python implementation: {platform.python_implementation()}")
-    logger.info(f"Python compiler: {platform.python_compiler()}")
-    logger.info(f"Python build: {platform.python_build()}")
-    logger.info(f"libc_ver: {platform.libc_ver()}")
+    logger.info("Platform: %s", platform.platform())
+    logger.info("System: %s", platform.system())
+    logger.info("Release: %s", platform.release())
+    logger.info("Version: %s", platform.version())
+    logger.info("Machine: %s", platform.machine())
+    logger.info("Processor: %s", platform.processor())
+    logger.info("Python version: %s", platform.python_version())
+    logger.info("Python implementation: %s", platform.python_implementation())
+    logger.info("Python compiler: %s", platform.python_compiler())
+    logger.info("Python build: %s", platform.python_build())
+    logger.info("libc_ver: %s", platform.libc_ver())
 
 
 def check_psutil_stats(logger):
@@ -115,7 +115,12 @@ def get_listening_processes(logger):
         if listening_socket.pid is not None and listening_socket.pid in processes:
             process_name = processes[listening_socket.pid]
         logger.info(
-            f"Process ID: {listening_socket.pid}, Name: {process_name}, Local Address: {listening_socket.laddr}, Remote Address: {listening_socket.raddr}, Status: {listening_socket.status}"
+            "Process ID: %s, Name: %s, Local Address: %s, Remote Address: %s, Status: %s",
+            listening_socket.pid,
+            process_name,
+            listening_socket.laddr,
+            listening_socket.raddr,
+            listening_socket.status,
         )
 
 
@@ -155,7 +160,7 @@ def check_compiler_and_clib(logger):
     try:
         logger.info(os.confstr("CS_GNU_LIBC_VERSION"))
     except AttributeError as e:
-        logger.error(f"Failed to get glibc version {e}")
+        logger.error("Failed to get glibc version %s", e)
 
 
 def log_env_variables(logger):

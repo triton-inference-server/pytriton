@@ -27,7 +27,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 batch_size = 2
 a_batch = np.ones((batch_size, 1), dtype=np.float32)
 
-logger.info(f"a: {a_batch.tolist()}")
+logger.info("a: %s", a_batch.tolist())
 
 with ModelClient("localhost", "Multiply2") as client2:
     with ModelClient("localhost", "Multiply4") as client4:
@@ -35,6 +35,6 @@ with ModelClient("localhost", "Multiply2") as client2:
         result4_batch = client4.infer_batch(a_batch)
 
 for output_name, data_batch in result2_batch.items():
-    logger.info(f"Multiply2/{output_name}: {data_batch.tolist()}")
+    logger.info("Multiply2/%s: %s", output_name, data_batch.tolist())
 for output_name, data_batch in result4_batch.items():
-    logger.info(f"Multiply4/{output_name}: {data_batch.tolist()}")
+    logger.info("Multiply4/%s: %s", output_name, data_batch.tolist())

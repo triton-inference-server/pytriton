@@ -51,7 +51,7 @@ def verify_client_output(client_output):
     expected_matches = ["San Francisco is a city of more than 1 million people"]
     for expected_match in expected_matches:
         if expected_match not in client_output:
-            raise ValueError(f"Couldn't find expected result: {expected_match}. Got: {client_output}")
+            raise ValueError("Couldn't find expected result: %s. Got: %s", expected_match, client_output)
     LOGGER.info("Results matches expected results")
 
 
@@ -79,7 +79,7 @@ def main():
         install_thread.join()
 
     if install_thread.returncode != 0:
-        raise RuntimeError(f"Install thread returned {install_thread.returncode}")
+        raise RuntimeError("Install thread returned %d", install_thread.returncode)
 
     start_time = time.time()
     elapsed_s = 0
@@ -115,11 +115,11 @@ def main():
     if client_streaming_thread.returncode != 0:
         raise RuntimeError(f"Client streaming returned {client_streaming_thread.returncode}")
     if server_thread.returncode not in [0, -2]:  # -2 is returned when process finished after receiving SIGINT signal
-        raise RuntimeError(f"Server returned {server_thread.returncode}")
+        raise RuntimeError("Server returned %d", server_thread.returncode)
 
     timeout = elapsed_s >= args.timeout_s and client_thread.is_alive() and server_thread.is_alive()
     if timeout:
-        LOGGER.error(f"Timeout occurred (timeout_s={args.timeout_s})")
+        LOGGER.error("Timeout occurred (timeout_s=%d)", args.timeout_s)
         sys.exit(-2)
 
     verify_client_output(client_thread.output)

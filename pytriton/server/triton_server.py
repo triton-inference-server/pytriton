@@ -128,7 +128,7 @@ class TritonServer:
         else:
             env = self._get_env()
 
-            LOGGER.debug(f"Triton Server binary {self._server_path}. Environment:\n{json.dumps(env, indent=4)}")
+            LOGGER.debug("Triton Server binary %s. Environment:\n%s", self._server_path, json.dumps(env, indent=4))
             tritonserver_cmd, *rest = self._server_path.as_posix().split(" ", 1)
 
             import sh
@@ -161,7 +161,7 @@ class TritonServer:
         """Send the SIGINT signal to running process and wait until server finished."""
         if self.is_alive():
             LOGGER.debug(
-                f"Stopping Triton Inference server - sending SIGINT signal and wait {SERVER_OUTPUT_TIMEOUT_SECS}s"
+                "Stopping Triton Inference server - sending SIGINT signal and wait %ss", SERVER_OUTPUT_TIMEOUT_SECS
             )
             self._tritonserver_running_cmd.process.signal(signal.SIGINT)
             try:
@@ -169,16 +169,16 @@ class TritonServer:
                 self._tritonserver_running_cmd.wait(timeout=SERVER_OUTPUT_TIMEOUT_SECS)
             except Exception:
                 message = traceback.format_exc()
-                LOGGER.debug(f"Error message: \n{message}")
+                LOGGER.debug("Error message: \n%s", message)
                 try:
                     if self.is_alive():
                         LOGGER.debug("Timeout waiting for server. Trying to kill process.")
                         self._tritonserver_running_cmd.process.kill()
                         self._tritonserver_running_cmd.wait(timeout=SERVER_OUTPUT_TIMEOUT_SECS)
                 except Exception:
-                    LOGGER.debug(f"Could not kill triton server pid={self._tritonserver_running_cmd.pid}")
+                    LOGGER.debug("Could not kill triton server pid=%d", self._tritonserver_running_cmd.pid)
                     message = traceback.format_exc()
-                    LOGGER.debug(f"Error message: \n{message}")
+                    LOGGER.debug("Error message: \n%s", message)
 
     def register_on_exit(self, callback: Callable) -> None:
         """Register callback executed on process exit.
@@ -269,7 +269,7 @@ class TritonServer:
         """
         if not success:
             LOGGER.warning("Triton Inference Server exited with failure. Please wait.")
-            LOGGER.debug(f"Triton Inference Server exit code {exit_code}")
+            LOGGER.debug("Triton Inference Server exit code %d", exit_code)
         else:
             LOGGER.debug("Triton Inference Server stopped")
         with self._on_exit_lock:
@@ -277,4 +277,4 @@ class TritonServer:
                 try:
                     callback(success, exit_code)
                 except Exception as e:
-                    LOGGER.debug(f"Error during calling on_exit callback; {e}")
+                    LOGGER.debug("Error during calling on_exit callback; %s", e)

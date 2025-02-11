@@ -227,7 +227,7 @@ class TritonServerConfig:
             self._server_args[kebab_cased_key] = value
         else:
             raise PyTritonError(
-                f"The argument {key!r} to the Triton Inference " "Server is not supported by the pytriton."
+                f"The argument {key!r} to the Triton Inference Server is not supported by the pytriton."
             )
 
     def __contains__(self, key: str) -> bool:

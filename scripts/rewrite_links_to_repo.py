@@ -47,7 +47,7 @@ def on_page_markdown(markdown: str, config, page: mkdocs.structure.pages.Page, *
     docs_dir = pathlib.Path(config.docs_dir)
     src_path = pathlib.Path(page.file.abs_src_path)
     for md_path in _extract_external_link(markdown, src_path, docs_dir):
-        logger.info(f"[{src_path}] replacing {md_path} -> {_replace(md_path, src_path)}")
+        logger.info("[%s] replacing %s -> %s", src_path, md_path, _replace(md_path, src_path))
         markdown = markdown.replace(
             md_path,
             _replace(md_path, src_path),

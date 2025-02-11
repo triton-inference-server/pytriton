@@ -69,15 +69,15 @@ def infer_add_sub_model():
     a_batch = np.ones((batch_size, 1), dtype=np.float32)
     b_batch = np.ones((batch_size, 1), dtype=np.float32)
 
-    logger.info(f"a: {a_batch.tolist()}")
-    logger.info(f"b: {b_batch.tolist()}")
+    logger.info("a: %s", a_batch.tolist())
+    logger.info("b: %s", b_batch.tolist())
 
     with ModelClient("localhost", "AddSub") as client:
         logger.info("Sending inference request")
         result_batch = client.infer_batch(a_batch, b_batch)
 
     for output_name, data_batch in result_batch.items():
-        logger.info(f"{output_name}: {data_batch.tolist()}")
+        logger.info("%s: %s", output_name, data_batch.tolist())
 
 
 def serve_triton(workspace: pathlib.Path):
@@ -111,7 +111,7 @@ def add_sub_example_thread(workspace: pathlib.Path, logger: logging.Logger):
             0,
             -2,
         ]:
-            logger.error(f"Server failed - return code {server_thread.returncode}")
+            logger.error("Server failed - return code %d", server_thread.returncode)
 
 
 def add_sub_example(workspace: pathlib.Path, logger: logging.Logger):

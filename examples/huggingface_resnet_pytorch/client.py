@@ -30,20 +30,20 @@ logger = logging.getLogger("examples.huggingface_bart_pytorch.client")
 def infer_model(thread_idx, args, dataset):
     with ModelClient(args.url, "ResNet", init_timeout_s=args.init_timeout_s) as client:
         image = dataset["image"][0]
-        logger.info(f"Image: {image}")
+        logger.info("Image: %s", image)
 
         output = io.BytesIO()
         image.save(output, format="JPEG")
         image = np.frombuffer(output.getbuffer(), dtype=np.uint8)
 
-        logger.info(f"Running inference requests in thread {thread_idx}.")
+        logger.info("Running inference requests in thread %d.", thread_idx)
 
         for req_idx in range(1, args.iterations + 1):
-            logger.debug(f"Sending request ({req_idx}) in thread {thread_idx}.")
+            logger.debug("Sending request (%d) in thread %d.", req_idx, thread_idx)
             result_data = client.infer_sample(image)
-            logger.debug(f"Result: {result_data} for request ({req_idx}) in thread {thread_idx}.")
+            logger.debug("Result: %s for request (%d) in thread %d.", result_data, req_idx, thread_idx)
 
-        logger.info(f"Last result: {result_data} for request ({req_idx}) in thread {thread_idx}.")
+        logger.info("Last result: %s for request (%d) in thread %d.", result_data, req_idx, thread_idx)
 
 
 def main():

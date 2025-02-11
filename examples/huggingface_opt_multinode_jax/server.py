@@ -48,10 +48,10 @@ LOGGER.setLevel(level=logging.INFO)
 def run(model, params, number_of_gpus, max_batch_size, server_ip, port, number_of_nodes, rank):
     params_spec = get_params_spec(model.config.num_hidden_layers, params)
 
-    LOGGER.info(f"Available devices: {jax.local_devices()}.")
+    LOGGER.info("Available devices: %s", jax.local_devices())
     mesh_devices = jax.local_devices()[:number_of_gpus]
 
-    LOGGER.info(f"Selected devices: {mesh_devices}.")
+    LOGGER.info("Selected devices: %s", mesh_devices)
     params = shard_params(model, params, params_spec, mesh_devices)
 
     LOGGER.info("Initialize model")
@@ -96,9 +96,9 @@ def run(model, params, number_of_gpus, max_batch_size, server_ip, port, number_o
             with Mesh(np.array(mesh_devices), (MODEL_PARALLEL,)):
                 outputs = np.array(infer(params, input_ids, max_len))
 
-            LOGGER.debug(f"Result: {outputs}")
+            LOGGER.debug("Result: %s", outputs)
             decoded = tokenizer.batch_decode(outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-            LOGGER.debug(f"Decoded result: {decoded}")
+            LOGGER.debug("Decoded result: %s", decoded)
 
             res = [np.array([decoded])]
             return res
@@ -142,15 +142,15 @@ def run(model, params, number_of_gpus, max_batch_size, server_ip, port, number_o
                     except ConnectionRefusedError:
                         pass
 
-            LOGGER.debug(f"{input_ids}, {max_len}")
+            LOGGER.debug("%s, %s", input_ids, max_len)
             with Mesh(np.array(mesh_devices), (MODEL_PARALLEL,)):
                 infer(params, input_ids, max_len)
 
     if rank == 0:
-        LOGGER.info(f"Starting server at rank {rank}")
+        LOGGER.info("Starting server at rank %d", rank)
         _server()
     else:
-        LOGGER.info(f"Starting worker at rank {rank}")
+        LOGGER.info("Starting worker at rank %d", rank)
         _worker()
 
 
@@ -221,13 +221,13 @@ def main():
     number_of_nodes = args.number_of_nodes
     rank = args.rank
 
-    LOGGER.info(f"Head url: {head_url}")
-    LOGGER.info(f"Number of nodes: {number_of_nodes}")
-    LOGGER.info(f"Host rank: {rank}")
+    LOGGER.info("Head url: %s", head_url)
+    LOGGER.info("Number of nodes: %d", number_of_nodes)
+    LOGGER.info("Host rank: %d", rank)
 
     jax.distributed.initialize(head_url, number_of_nodes, rank)
-    LOGGER.info(f"{jax.devices()=}")
-    LOGGER.info(f"{jax.local_devices()=}")
+    LOGGER.info("jax.devices: %s", jax.devices())
+    LOGGER.info("jax.local_devices: %s", jax.local_devices())
 
     with tempfile.TemporaryDirectory() as tempdir:
         cache_dir = args.cache_dir
@@ -235,13 +235,13 @@ def main():
             cache_dir = tempdir
 
         cache_dir = pathlib.Path(cache_dir)
-        LOGGER.info(f"Cache location: {cache_dir}")
+        LOGGER.info("Cache location: %s", cache_dir)
 
         lock_file = cache_dir / "lock" / "jax_opt.lock"
         lock_file.parent.mkdir(parents=True, exist_ok=True)
 
         lock = filelock.FileLock(lock_file.as_posix())
-        LOGGER.info(f"Lock in {lock_file}")
+        LOGGER.info("Lock in %s", lock_file)
         with lock:
             model, params = get_model(args.model_name, cache_dir)
 

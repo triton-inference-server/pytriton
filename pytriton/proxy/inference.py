@@ -216,7 +216,7 @@ class RequestsResponsesConnector(threading.Thread, BaseRequestsResponsesConnecto
 
             self._serializer_deserializer.free_requests_resources(requests_payload)
             self._responses_queues.pop(requests_id)
-            LOGGER.debug(f"Finished handling requests for {scope['requests_id'].hex()}")
+            LOGGER.debug("Finished handling requests for %s", scope["requests_id"].hex())
 
     def preprocess(self, scope: Scope, requests_payload: bytes) -> Requests:
         """Preprocess requests before running inference on them.
@@ -386,7 +386,7 @@ class InferenceHandler(threading.Thread):
 
     async def _handle_requests(self, scope: Scope, requests: Requests):
         requests_id = scope["requests_id"]
-        LOGGER.debug(f"Performing inference on requests={requests_id.hex()}")
+        LOGGER.debug("Performing inference on requests=%s", requests_id.hex())
 
         responses = None
         try:
@@ -398,17 +398,19 @@ class InferenceHandler(threading.Thread):
             error_msg = traceback.format_exc()
             if isinstance(e, PyTritonUnrecoverableError):
                 LOGGER.error(
-                    f"Unrecoverable error thrown during handling requests={requests_id}. "
+                    "Unrecoverable error thrown during handling requests=%s. "
                     "Shutting down Triton Inference Server. "
-                    f"{error_msg}"
+                    "%s",
+                    requests_id,
+                    error_msg,
                 )
                 self._notify_inference_handler_events_observers(InferenceHandlerEvent.UNRECOVERABLE_ERROR, error_msg)
                 self.stop()
             else:
-                LOGGER.warning(f"Exception while performing inference on requests={requests_id.hex()}: {error_msg}")
+                LOGGER.warning("Exception while performing inference on requests=%s: %s", requests_id.hex(), error_msg)
             self._requests_responses_connector.send(scope, PyTritonResponseFlags.ERROR | PyTritonResponseFlags.EOS, e)
 
-        LOGGER.debug(f"Finished inference on requests={requests_id.hex()}")
+        LOGGER.debug("Finished inference on requests=%s", requests_id.hex())
 
     def _notify_inference_handler_events_observers(
         self,

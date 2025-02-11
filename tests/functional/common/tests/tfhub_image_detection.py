@@ -76,21 +76,25 @@ def tfhub_image_detection(test_time_s: int, init_timeout_s: int, batch_size: int
                         if idx > 0 and idx % 10 == 0:
                             time_left_s = max(should_stop_at_s - time.time(), 0.0)
                             logger.debug(
-                                f"Processed {idx} batches time left: {time_left_s:0.1f}s "
-                                f"most common labels: {classes_counter.most_common(5)} "
-                                f"expected common labels: {expected_5_most_common_coco_labels}"
+                                "Processed %d batches time left: %.1fs "
+                                "most common labels: %s "
+                                "expected common labels: %s",
+                                idx,
+                                time_left_s,
+                                classes_counter.most_common(5),
+                                expected_5_most_common_coco_labels,
                             )
 
                             most_common = tuple(clazz for clazz, n in classes_counter.most_common(5))
-                            assert (
-                                len(set(most_common) ^ set(expected_5_most_common_coco_labels)) <= 4
-                            ), f"difference on {set(most_common) ^ set(expected_5_most_common_coco_labels)}"
+                            assert len(set(most_common) ^ set(expected_5_most_common_coco_labels)) <= 4, (
+                                "difference on %s" % (set(most_common) ^ set(expected_5_most_common_coco_labels))
+                            )
                             if time_left_s <= 0:
                                 break
 
         finally:
             if triton_log_path.exists():
-                logger.info("-" * 32 + " triton logs " + "-" * 32)
+                logger.info("%s triton logs %s", "-" * 32, "-" * 32)
                 triton_logs_logger = logger.getChild("triton_logs")
                 stdout_handler = logging.StreamHandler()
                 stdout_handler.setFormatter(logging.Formatter("        %(message)s"))

@@ -42,7 +42,6 @@ import pathlib
 import re
 import shutil
 import sys
-import threading
 import threading as th
 import typing
 from typing import Any, Callable, Dict, List, Optional, Sequence, Union
@@ -243,8 +242,10 @@ class TritonConfig:
         unknown_config_parameters = {name: value for name, value in config.items() if name not in fields}
         for name, value in unknown_config_parameters.items():
             LOGGER.warning(
-                f"Ignoring {name}={value} as could not find matching config field. "
-                f"Available fields: {', '.join(map(str, fields))}"
+                "Ignoring %s=%s as could not find matching config field. Available fields: %s",
+                name,
+                value,
+                ", ".join(map(str, fields)),
             )
 
         def _cast_value(_field, _value):
@@ -363,8 +364,9 @@ class _LogLevelChecker:
                 log_verbose_level = int(log_settings.get("log_verbose_level", 0))
             if log_verbose_level > 0:
                 LOGGER.warning(
-                    f"Triton Inference Server is running with enabled verbose logs (log_verbose_level={log_verbose_level}). "
-                    "It may affect inference performance."
+                    "Triton Inference Server is running with enabled verbose logs (log_verbose_level=%d). "
+                    "It may affect inference performance.",
+                    log_verbose_level,
                 )
 
 
@@ -438,7 +440,7 @@ class TritonBase:
             if triton_config is not None:
                 trace_config = getattr(triton_config, "trace_config", None)
                 if trace_config is not None:
-                    LOGGER.info(f"Using trace config from TritonConfig: {trace_config}")
+                    LOGGER.info("Using trace config from TritonConfig: %s", trace_config)
                     model_kwargs["trace_config"] = trace_config
         else:
             model_kwargs["trace_config"] = trace_config
@@ -573,8 +575,9 @@ class TritonBase:
                 wait_for_server_ready(client, timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S)
         except TimeoutError as e:
             LOGGER.warning(
-                f"Could not verify locally if Triton Inference Server is ready using {self._url}. "
-                "Please, check the server logs for details."
+                "Could not verify locally if Triton Inference Server is ready using %s. "
+                "Please, check the server logs for details.",
+                self._url,
             )
             raise TimeoutError("Triton Inference Server is not ready after timeout.") from e
 
@@ -592,27 +595,26 @@ class TritonBase:
                     client.wait_for_model(timeout_s=WAIT_FORM_MODEL_TIMEOUT_S)
         except TimeoutError:
             LOGGER.warning(
-                f"Could not verify locally if models are ready using {self._url}. "
-                "Please, check the server logs for details."
+                "Could not verify locally if models are ready using %s. Please, check the server logs for details.",
+                self._url,
             )
 
         for model in self._model_manager.models:
-            LOGGER.info(f"Infer function available as model: `{MODEL_URL.format(model_name=model.model_name)}`")
-            LOGGER.info(f"  Status:         `GET  {MODEL_READY_URL.format(model_name=model.model_name)}`")
-            LOGGER.info(f"  Model config:   `GET  {MODEL_CONFIG_URL.format(model_name=model.model_name)}`")
-            LOGGER.info(f"  Inference:      `POST {MODEL_INFER_URL.format(model_name=model.model_name)}`")
+            LOGGER.info("Infer function available as model: `%s`", MODEL_URL.format(model_name=model.model_name))
+            LOGGER.info("  Status:         `GET  %s`", MODEL_READY_URL.format(model_name=model.model_name))
+            LOGGER.info("  Model config:   `GET  %s`", MODEL_CONFIG_URL.format(model_name=model.model_name))
+            LOGGER.info("  Inference:      `POST %s`", MODEL_INFER_URL.format(model_name=model.model_name))
 
         LOGGER.info(
-            """Read more about configuring and serving models in """
-            """documentation: https://triton-inference-server.github.io/pytriton."""
+            "Read more about configuring and serving models in "
+            "documentation: https://triton-inference-server.github.io/pytriton."
         )
-        LOGGER.info(f"(Press CTRL+C or use the command `kill -SIGINT {os.getpid()}` to send a SIGINT signal and quit)")
+        LOGGER.info("(Press CTRL+C or use the command `kill -SIGINT %d` to send a SIGINT signal and quit)", os.getpid())
 
     def _on_model_event(self, model: Model, event: ModelEvent, context: typing.Optional[typing.Any] = None):
-        LOGGER.info(f"Received {event} from {model}; context={context}")
-
+        LOGGER.info("Received %s from %s; context=%s", event, model, context)
         if event in [ModelEvent.RUNTIME_TERMINATING, ModelEvent.RUNTIME_TERMINATED]:
-            threading.Thread(target=self.stop).start()
+            th.Thread(target=self.stop).start()
 
     @classmethod
     def _validate_model_name(cls, model_name: str) -> None:
@@ -771,7 +773,7 @@ class Triton(TritonBase):
             triton_inference_server_path,
             ignore=shutil.ignore_patterns("python_backend_stubs", "triton_python_backend_stub"),
         )
-        LOGGER.debug(f"Triton Inference Server binaries copied to {triton_inference_server_path} without stubs.")
+        LOGGER.debug("Triton Inference Server binaries copied to %s without stubs.", triton_inference_server_path)
 
         major = sys.version_info[0]
         minor = sys.version_info[1]
@@ -780,10 +782,10 @@ class Triton(TritonBase):
         src_stub_path = get_stub_path(version)
         dst_stub_path = triton_inference_server_path / "backends" / "python" / "triton_python_backend_stub"
 
-        LOGGER.debug(f"Copying stub for version {version} from {src_stub_path} to {dst_stub_path}")
+        LOGGER.debug("Copying stub for version %s from %s to %s", version, src_stub_path, dst_stub_path)
         shutil.copy(src_stub_path, dst_stub_path)
 
-        LOGGER.debug(f"Triton Inference Server binaries ready in {triton_inference_server_path}")
+        LOGGER.debug("Triton Inference Server binaries ready in %s", triton_inference_server_path)
 
         self._triton_server_config["backend_directory"] = (triton_inference_server_path / "backends").as_posix()
         if "cache_directory" not in self._triton_server_config:

@@ -224,7 +224,7 @@ class BatchResponsesHandler:
                         for request, response in zip(triton_requests, responses)
                     ]
             except asyncio.CancelledError:
-                LOGGER.warning(f"Cancelled responses handler for requests={requests_id.hex()}")
+                LOGGER.warning(f"Cancelled responses handler for requests={requests_id.hex()}")  # noqa: G004
                 triton_responses_or_error = pb_utils.TritonModelException(  # pytype: disable=module-attr
                     "Cancelled responses handler"
                 )
@@ -302,7 +302,7 @@ class DecoupledResponsesHandler:
                 ]
                 await asyncio.gather(*send_responses_futures)
             except asyncio.CancelledError:
-                LOGGER.warning(f"Cancelled responses handler for requests={requests_id.hex()}")
+                LOGGER.warning(f"Cancelled responses handler for requests={requests_id.hex()}")  # noqa: G004
                 triton_flags = pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL
                 triton_response = pb_utils.InferenceResponse(  # pytype: disable=module-attr
                     error=pb_utils.TritonError(error="Cancelled responses handler")  # pytype: disable=module-attr
@@ -399,11 +399,11 @@ class TritonPythonModel:
             if "trace-config" in model_config["parameters"]:
                 self._tracable_model.configure_tracing(model_config["parameters"]["trace-config"]["string_value"])
 
-            LOGGER.debug(f"Model instance name: {self._model_instance_name}")
-            LOGGER.debug(f"Decoupled model: {self._decoupled_model}")
-            LOGGER.debug(f"Workspace path: {workspace_path}")
-            LOGGER.debug(f"Model inputs: {self._model_inputs}")
-            LOGGER.debug(f"Model outputs: {self._model_outputs}")
+            LOGGER.debug(f"Model instance name: {self._model_instance_name}")  # noqa: G004
+            LOGGER.debug(f"Decoupled model: {self._decoupled_model}")  # noqa: G004
+            LOGGER.debug(f"Workspace path: {workspace_path}")  # noqa: G004
+            LOGGER.debug(f"Model inputs: {self._model_inputs}")  # noqa: G004
+            LOGGER.debug(f"Model outputs: {self._model_outputs}")  # noqa: G004
 
             # init serializer/deserializer
             data_socket = workspace_path / f"{model_name}-data.sock"
@@ -423,7 +423,8 @@ class TritonPythonModel:
 
             else:
                 inference_handler_config = get_config_from_handshake_server(handshake_socket)
-                LOGGER.debug(f"Loaded configuration from {handshake_socket}")
+                LOGGER.debug(f"Loaded configuration from {handshake_socket}")  # noqa: G004
+
                 authkey = base64.decodebytes(inference_handler_config["authkey"].encode("ascii"))
                 self._serializer_deserializer.connect(data_socket, authkey=authkey)
 
@@ -432,7 +433,7 @@ class TritonPythonModel:
 
             server_socket_path = workspace_path / f"{self._model_instance_name}-server.sock"
             handler_class = DecoupledResponsesHandler if self._decoupled_model else BatchResponsesHandler
-            LOGGER.debug(f"Using {handler_class.__name__} for handling responses")
+            LOGGER.debug(f"Using {handler_class.__name__} for handling responses")  # noqa: G004
             self._requests_server = TritonRequestsServer(
                 url=f"ipc://{server_socket_path.as_posix()}",
                 responses_handle_fn=handler_class(
@@ -501,19 +502,19 @@ class TritonPythonModel:
 
     def finalize(self) -> None:
         """Finalize the model cleaning the buffers."""
-        LOGGER.debug(f"[{self._model_instance_name}] Finalizing backend instance")
-        LOGGER.debug(f"[{self._model_instance_name}] Closing requests server")
+        LOGGER.debug(f"[{self._model_instance_name}] Finalizing backend instance")  # noqa: G004
+        LOGGER.debug(f"[{self._model_instance_name}] Closing requests server")  # noqa: G004
         self._requests_server.shutdown()
         self._requests_server_thread.join()
 
-        LOGGER.debug(f"[{self._model_instance_name}] Closing requests/responses serializer/deserializer")
+        LOGGER.debug(f"[{self._model_instance_name}] Closing requests/responses serializer/deserializer")  # noqa: G004
         self._serializer_deserializer.close()
         self._serializer_deserializer = None
 
-        LOGGER.debug(f"[{self._model_instance_name}] Closing handshake server")
+        LOGGER.debug(f"[{self._model_instance_name}] Closing handshake server")  # noqa: G004
         if self._handshake_server:
             self._handshake_server.close()
             self._handshake_server = None
 
-        LOGGER.debug(f"[{self._model_instance_name}] Finalized.")
+        LOGGER.debug(f"[{self._model_instance_name}] Finalized.")  # noqa: G004
         self._model_instance_name = None

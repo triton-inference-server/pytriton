@@ -29,7 +29,7 @@ MANYLINUX_GLIBC_VERSIONS = ["2.5", "2.12", "2.17", "2.24", "2.27", "2.28", "2.31
 
 
 def _glibc_library_version(file_path: Union[pathlib.Path, str]) -> Set[str]:
-    LOGGER.info(f"Collecting GLIBC version for {file_path}")
+    LOGGER.info("Collecting GLIBC version for %s", file_path)
     cmd = f"objdump -T {file_path} | grep GLIBC_ | sed 's/.*GLIBC_\\([.0-9]*\\).*/\\1/g' | sort -u"
     proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, _ = proc.communicate()
@@ -45,7 +45,7 @@ def _glibc_library_version(file_path: Union[pathlib.Path, str]) -> Set[str]:
 
     # Split versions string to list and update set
     versions = set(output.splitlines())
-    LOGGER.info(f"Collected versions: {versions}")
+    LOGGER.info("Collected versions: %s", versions)
     return versions
 
 
@@ -68,7 +68,7 @@ def glibc_to_manylinux_version():
         file_glibc_versions = _glibc_library_version(file_path)
         glibc_versions.update(file_glibc_versions)
 
-    LOGGER.info(f"Collected GLIBC versions {glibc_versions}")
+    LOGGER.info("Collected GLIBC versions %s", glibc_versions)
 
     # Convert GLIBC and Manylinux version to semver supported comparison
     glibc_version = max(map(parse, glibc_versions))
@@ -80,7 +80,7 @@ def glibc_to_manylinux_version():
     # Convert to wheel name format
     manylinux_version = str(manylinux_glibc).replace(".", "_")
 
-    LOGGER.info(f"Selected manylinux versions {manylinux_version}")
+    LOGGER.info("Selected manylinux versions %s", manylinux_version)
     # Print output to collect value in shell
     print(manylinux_version)  # noqa: T201
 

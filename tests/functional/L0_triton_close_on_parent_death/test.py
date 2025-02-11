@@ -76,7 +76,7 @@ def main():
         assert server_thread.is_alive()
 
         children_processes = server_thread.process.children(recursive=True)
-        LOGGER.info(f"Sending SEGFAULT to server script process ({server_thread.process})")
+        LOGGER.info("Sending SEGFAULT to server script process (%s)", server_thread.process)
         server_thread.process.send_signal(signal.SIGSEGV)
 
         def _process_running_and_not_zombie(_process):
@@ -99,7 +99,7 @@ def main():
         )
 
     if timeout:
-        LOGGER.error(f"Timeout occurred (timeout_s={args.timeout_s})")
+        LOGGER.error("Timeout occurred (timeout_s=%s)", args.timeout_s)
         sys.exit(-2)
     else:
         LOGGER.info("All processed terminated")

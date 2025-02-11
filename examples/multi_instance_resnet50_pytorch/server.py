@@ -37,7 +37,7 @@ class _InferFuncWrapper:
 
     @batch
     def __call__(self, image: np.ndarray):
-        logger.debug(f"Image data: {image.shape} ({image.size})")
+        logger.debug("Image data: %s (%d)", image.shape, image.size)
 
         image = torch.from_numpy(image).to(self._device)
         with torch.inference_mode():
@@ -89,7 +89,7 @@ def main():
 
     devices = [DEVICE] * args.number_of_instances
     with Triton() as triton:
-        logger.info(f"Loading ResNet50 PyTorch model on devices: {devices}")
+        logger.info("Loading ResNet50 PyTorch model on devices: %s", devices)
         triton.bind(
             model_name="ResNet50",
             infer_func=_infer_function_factory(devices),

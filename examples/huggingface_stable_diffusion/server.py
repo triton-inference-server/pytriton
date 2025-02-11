@@ -51,8 +51,8 @@ def _infer_fn(
     img_size: np.int64,
 ):
     prompts = [np.char.decode(p.astype("bytes"), "utf-8").item() for p in prompt]
-    LOGGER.debug(f"Prompts: {prompts}")
-    LOGGER.debug(f"Image Size: {img_size}x{img_size}")
+    LOGGER.debug("Prompts: %s", prompts)
+    LOGGER.debug("Image Size: %dx%d", img_size, img_size)
 
     outputs = []
     for idx, image in enumerate(
@@ -64,9 +64,9 @@ def _infer_fn(
     ):
         raw_data = _encode_image_to_base64(image)
         outputs.append([raw_data])
-        LOGGER.debug(f"Generated result for prompt `{prompts[idx]}` with size {len(raw_data)}")
+        LOGGER.debug("Generated result for prompt `%s` with size %d", prompts[idx], len(raw_data))
 
-    LOGGER.debug(f"Prepared batch response of size: {len(outputs)}")
+    LOGGER.debug("Prepared batch response of size: %d", len(outputs))
     return {"image": np.array(outputs)}
 
 

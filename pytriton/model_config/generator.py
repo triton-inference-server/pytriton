@@ -73,10 +73,10 @@ class ModelConfigGenerator:
 
         # https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto
         model_config = self.get_config()
-        LOGGER.debug(f"Generated Triton config:\n{json.dumps(model_config, indent=4)}")
+        LOGGER.debug("Generated Triton config:\n%s", json.dumps(model_config, indent=4))
 
         config_payload = json_format.ParseDict(model_config, model_config_pb2.ModelConfig())
-        LOGGER.debug(f"Generated Triton config payload:\n{config_payload}")
+        LOGGER.debug("Generated Triton config payload:\n%s", config_payload)
 
         config_path = pathlib.Path(config_path)
         config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -91,7 +91,7 @@ class ModelConfigGenerator:
         with config_path.open("wb") as cfg:
             cfg.write(model_config_bytes)
 
-        LOGGER.debug(f"Generated config stored in {config_path}")
+        LOGGER.debug("Generated config stored in %s", config_path)
 
         return config_payload
 

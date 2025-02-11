@@ -75,7 +75,7 @@ def set_telemetry_tracer(tracer):
     global _open_telemetry_tracer
     if _open_telemetry_tracer is not None:
         raise ValueError("Telemetry tracer is already set")
-    LOGGER.debug(f"Setting telemetry tracer: {tracer}")
+    LOGGER.debug(f"Setting telemetry tracer: {tracer}")  # noqa: G004
     _open_telemetry_tracer = tracer
 
 
@@ -179,8 +179,8 @@ def parse_trace_config(trace_config_list: List[str]):
                 key, val = part.split("=")
                 resource_attributes[key] = val
 
-    LOGGER.debug(f"OpenTelemetry URL: {url}")
-    LOGGER.debug(f"Resource Attributes: {resource_attributes}")
+    LOGGER.debug(f"OpenTelemetry URL: {url}")  # noqa: G004
+    LOGGER.debug(f"Resource Attributes: {resource_attributes}")  # noqa: G004
 
     resource = Resource(attributes=resource_attributes)
     return url, resource
@@ -227,9 +227,9 @@ def build_proxy_tracer_from_triton_config(trace_config):
         OpenTelemetry tracer
     """
     raise_if_no_telemetry()
-    LOGGER.debug(f"Building OpenTelmetry tracer from config: {trace_config}")
+    LOGGER.debug(f"Building OpenTelmetry tracer from config: {trace_config}")  # noqa: G004
     url, resource = parse_trace_config(trace_config)
-    LOGGER.debug(f"Creating OpenTelemetry tracer with URL: {url}")
+    LOGGER.debug(f"Creating OpenTelemetry tracer with URL: {url}")  # noqa: G004
     opentelemetry.trace.set_tracer_provider(
         TracerProvider(
             resource=resource,
@@ -289,7 +289,7 @@ class TracableModel:
 
             trace_config_json = base64.b64decode(trace_config).decode("utf-8")
             trace_config_list = json.loads(trace_config_json)
-            LOGGER.debug(f"Configuring tracing with {trace_config_list}")
+            LOGGER.debug(f"Configuring tracing with {trace_config_list}")  # noqa: G004
 
             url, resource = parse_trace_config(trace_config_list)
 

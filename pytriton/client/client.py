@@ -239,7 +239,9 @@ class BaseModelClient:
         triton_client_init_kwargs = self._get_init_extra_args()
 
         _LOGGER.debug(
-            f"Creating InferenceServerClient for {self._triton_url.with_scheme} with {triton_client_init_kwargs}"
+            "Creating InferenceServerClient for %s with %s",
+            self._triton_url.with_scheme,
+            triton_client_init_kwargs,
         )
         return self._triton_client_lib.InferenceServerClient(self._url, **triton_client_init_kwargs)
 
@@ -426,7 +428,7 @@ class ModelClient(BaseModelClient):
             self._general_client = None
             self._infer_client = None
         except Exception as e:
-            _LOGGER.error(f"Error while closing ModelClient resources: {e}")
+            _LOGGER.error("Error while closing ModelClient resources: %s", e)
             raise e
 
     def wait_for_model(self, timeout_s: float):
@@ -727,7 +729,7 @@ class ModelClient(BaseModelClient):
     @_run_once_per_lib
     def _monkey_patch_client(self):
         """Monkey patch InferenceServerClient to catch error in __del__."""
-        _LOGGER.info(f"Patch ModelClient {self._triton_url.scheme}")
+        _LOGGER.info("Patch ModelClient %s", self._triton_url.scheme)
         if not hasattr(self._triton_client_lib.InferenceServerClient, "__del__"):
             return
 
@@ -867,9 +869,9 @@ class DecoupledModelClient(ModelClient):
         return self._create_response_iterator()
 
     def _response_callback(self, response, error):
-        _LOGGER.debug(f"Received response from Triton Inference Server: {response}")
+        _LOGGER.debug("Received response from Triton Inference Server: %s", response)
         if error:
-            _LOGGER.error(f"Error occurred during inference request. Message: {error}")
+            _LOGGER.error("Error occurred during inference request. Message: %s", error)
             self._queue.put(error)
         else:
             actual_response = response.get_response()
@@ -1028,7 +1030,7 @@ class AsyncioModelClient(BaseModelClient):
             PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
             KeyboardInterrupt: If hosting process receives SIGINT
         """
-        _LOGGER.debug(f"Waiting for model {self._model_name} to be ready")
+        _LOGGER.debug("Waiting for model %s to be ready", self._model_name)
         try:
             await asyncio.wait_for(
                 asyncio_wait_for_model_ready(
@@ -1050,7 +1052,7 @@ class AsyncioModelClient(BaseModelClient):
         try:
             if not self._model_config:
                 kwargs = self._get_model_config_extra_args()
-                _LOGGER.debug(f"Obtaining model config for {self._model_name}")
+                _LOGGER.debug("Obtaining model config for %s", self._model_name)
 
                 self._model_config = await asyncio.wait_for(
                     asyncio_get_model_config(
@@ -1062,7 +1064,7 @@ class AsyncioModelClient(BaseModelClient):
                     ),
                     self._init_timeout_s,
                 )
-                _LOGGER.debug(f"Obtained model config for {self._model_name}")
+                _LOGGER.debug("Obtained model config for %s", self._model_name)
             return self._model_config
         except asyncio.TimeoutError as e:
             message = f"Timeout while waiting for model {self._model_name} to be ready for {self._init_timeout_s}s"
@@ -1117,9 +1119,9 @@ class AsyncioModelClient(BaseModelClient):
         _verify_parameters(parameters)
         _verify_parameters(headers)
 
-        _LOGGER.debug(f"Running inference for {self._model_name}")
+        _LOGGER.debug("Running inference for %s", self._model_name)
         model_config = await self.model_config
-        _LOGGER.debug(f"Model config for {self._model_name} obtained")
+        _LOGGER.debug("Model config for %s obtained", self._model_name)
 
         model_supports_batching = model_config.max_batch_size > 0
         if model_supports_batching:
@@ -1128,9 +1130,9 @@ class AsyncioModelClient(BaseModelClient):
             elif named_inputs:
                 named_inputs = {name: data[np.newaxis, ...] for name, data in named_inputs.items()}
 
-        _LOGGER.debug(f"Running _infer for {self._model_name}")
+        _LOGGER.debug("Running _infer for %s", self._model_name)
         result = await self._infer(inputs or named_inputs, parameters, headers)
-        _LOGGER.debug(f"_infer for {self._model_name} finished")
+        _LOGGER.debug("_infer for %s finished", self._model_name)
         if model_supports_batching:
             result = {name: data[0] for name, data in result.items()}
 
@@ -1185,20 +1187,20 @@ class AsyncioModelClient(BaseModelClient):
         _verify_parameters(parameters)
         _verify_parameters(headers)
 
-        _LOGGER.debug(f"Running inference for {self._model_name}")
+        _LOGGER.debug("Running inference for %s", self._model_name)
         model_config = await self.model_config
-        _LOGGER.debug(f"Model config for {self._model_name} obtained")
+        _LOGGER.debug("Model config for %s obtained", self._model_name)
 
         model_supports_batching = model_config.max_batch_size > 0
         if not model_supports_batching:
-            _LOGGER.error(f"Model {model_config.model_name} doesn't support batching")
+            _LOGGER.error("Model %s doesn't support batching", model_config.model_name)
             raise PyTritonClientModelDoesntSupportBatchingError(
                 f"Model {model_config.model_name} doesn't support batching - use infer_sample method instead"
             )
 
-        _LOGGER.debug(f"Running _infer for {self._model_name}")
+        _LOGGER.debug("Running _infer for %s", self._model_name)
         result = await self._infer(inputs or named_inputs, parameters, headers)
-        _LOGGER.debug(f"_infer for {self._model_name} finished")
+        _LOGGER.debug("_infer for %s finished", self._model_name)
         return result
 
     async def _wait_and_init_model_config(self, init_timeout_s: float):
@@ -1213,23 +1215,23 @@ class AsyncioModelClient(BaseModelClient):
         """
         try:
             should_finish_before_s = time.time() + init_timeout_s
-            _LOGGER.debug(f"Waiting for model {self._model_name} to be ready")
+            _LOGGER.debug("Waiting for model %s to be ready", self._model_name)
 
             await asyncio.wait_for(self.wait_for_model(init_timeout_s), init_timeout_s)
-            _LOGGER.debug(f"Model {self._model_name} is ready")
+            _LOGGER.debug("Model %s is ready", self._model_name)
             self._model_ready = True
 
             timeout_s = max(0.0, should_finish_before_s - time.time())
-            _LOGGER.debug(f"Obtaining model config for {self._model_name}")
+            _LOGGER.debug("Obtaining model config for %s", self._model_name)
             self._model_config = await asyncio.wait_for(
                 asyncio_get_model_config(
                     self._general_client, self._model_name, self._model_version, timeout_s=timeout_s
                 ),
                 timeout_s,
             )
-            _LOGGER.debug(f"Model config for {self._model_name} obtained")
+            _LOGGER.debug("Model config for %s obtained", self._model_name)
         except asyncio.TimeoutError as e:
-            _LOGGER.error(f"Timeout exceeded while waiting for model {self._model_name} to be ready")
+            _LOGGER.error("Timeout exceeded while waiting for model %s to be ready", self._model_name)
             raise PyTritonClientTimeoutError(
                 f"Timeout exceeded while waiting for model {self._model_name} to be ready"
             ) from e
@@ -1248,7 +1250,7 @@ class AsyncioModelClient(BaseModelClient):
 
     async def _execute_infer(self, model_config, inputs_wrapped, outputs_wrapped, parameters, headers) -> Any:
         try:
-            _LOGGER.debug(f"Sending InferRequest for {self._model_name}")
+            _LOGGER.debug("Sending InferRequest for %s", self._model_name)
             kwargs = self._get_infer_extra_args()
             response = await self._infer_client.infer(
                 model_name=self._model_name,
@@ -1274,19 +1276,19 @@ class AsyncioModelClient(BaseModelClient):
                 raise PyTritonClientTimeoutError(message) from e
             else:
                 raise PyTritonClientInferenceServerError(message) from e
-        _LOGGER.debug(f"Received InferResponse for {self._model_name}")
+        _LOGGER.debug("Received InferResponse for %s", self._model_name)
         outputs = {output_spec.name: response.as_numpy(output_spec.name) for output_spec in model_config.outputs}
         return outputs
 
     async def _infer(self, inputs: _IOType, parameters, headers):
         if self._model_ready:
-            _LOGGER.debug(f"Waiting for model {self._model_name} config")
+            _LOGGER.debug("Waiting for model %s config", self._model_name)
             await self._wait_and_init_model_config(self._init_timeout_s)
-            _LOGGER.debug(f"Model wait finished for {self._model_name}")
+            _LOGGER.debug("Model wait finished for %s", self._model_name)
 
-        _LOGGER.debug(f"Obtaining config for {self._model_name}")
+        _LOGGER.debug("Obtaining config for %s", self._model_name)
         model_config = await self.model_config
-        _LOGGER.debug(f"Model config for {self._model_name} obtained")
+        _LOGGER.debug("Model config for %s obtained", self._model_name)
         if model_config.decoupled:
             raise PyTritonClientInferenceServerError(
                 "Model config is decoupled. Use DecouploedAsyncioModelClient instead."
@@ -1423,9 +1425,9 @@ class AsyncioDecoupledModelClient(AsyncioModelClient):
         _verify_parameters(parameters)
         _verify_parameters(headers)
 
-        _LOGGER.debug(f"Running inference for {self._model_name}")
+        _LOGGER.debug("Running inference for %s", self._model_name)
         model_config = await self.model_config
-        _LOGGER.debug(f"Model config for {self._model_name} obtained")
+        _LOGGER.debug("Model config for %s obtained", self._model_name)
 
         model_supports_batching = model_config.max_batch_size > 0
         if model_supports_batching:
@@ -1434,9 +1436,9 @@ class AsyncioDecoupledModelClient(AsyncioModelClient):
             elif named_inputs:
                 named_inputs = {name: data[np.newaxis, ...] for name, data in named_inputs.items()}
 
-        _LOGGER.debug(f"Running _infer for {self._model_name}")
+        _LOGGER.debug("Running _infer for %s", self._model_name)
         result = self._infer(inputs or named_inputs, parameters, headers)
-        _LOGGER.debug(f"_infer for {self._model_name} finished")
+        _LOGGER.debug("_infer for %s finished", self._model_name)
 
         async for item in result:
             if model_supports_batching:
@@ -1494,20 +1496,20 @@ class AsyncioDecoupledModelClient(AsyncioModelClient):
         _verify_parameters(parameters)
         _verify_parameters(headers)
 
-        _LOGGER.debug(f"Running inference for {self._model_name}")
+        _LOGGER.debug("Running inference for %s", self._model_name)
         model_config = await self.model_config
-        _LOGGER.debug(f"Model config for {self._model_name} obtained")
+        _LOGGER.debug("Model config for %s obtained", self._model_name)
 
         model_supports_batching = model_config.max_batch_size > 0
         if not model_supports_batching:
-            _LOGGER.error(f"Model {model_config.model_name} doesn't support batching")
+            _LOGGER.error("Model %s doesn't support batching", model_config.model_name)
             raise PyTritonClientModelDoesntSupportBatchingError(
                 f"Model {model_config.model_name} doesn't support batching - use infer_sample method instead"
             )
 
-        _LOGGER.debug(f"Running _infer for {self._model_name}")
+        _LOGGER.debug("Running _infer for %s", self._model_name)
         result = self._infer(inputs or named_inputs, parameters, headers)
-        _LOGGER.debug(f"_infer for {self._model_name} finished")
+        _LOGGER.debug("_infer for %s finished", self._model_name)
         async for item in result:
             yield item
 
@@ -1515,11 +1517,11 @@ class AsyncioDecoupledModelClient(AsyncioModelClient):
         # stream_infer siletly consumes all errors raised inside async_request_iterator and raises CancelledError
         error_raised_inside_async_request_iterator = set()
         try:
-            _LOGGER.debug(f"Sending InferRequest for {self._model_name}")
+            _LOGGER.debug("Sending InferRequest for %s", self._model_name)
             kwargs = self._get_infer_extra_args()
 
             async def async_request_iterator(errors):
-                _LOGGER.debug(f"Begin creating InferRequestHeader for {self._model_name}")
+                _LOGGER.debug("Begin creating InferRequestHeader for %s", self._model_name)
                 try:
                     yield {
                         "model_name": self._model_name,
@@ -1531,17 +1533,17 @@ class AsyncioDecoupledModelClient(AsyncioModelClient):
                         "sequence_end": True,
                     }
                 except Exception as e:
-                    _LOGGER.error(f"Error occurred while creating InferRequestHeader for {self._model_name}")
+                    _LOGGER.error("Error occurred while creating InferRequestHeader for %s", self._model_name)
                     errors.add(e)
                     raise e
-                _LOGGER.debug(f"End creating InferRequestHeader for {self._model_name}")
+                _LOGGER.debug("End creating InferRequestHeader for %s", self._model_name)
 
             response_iterator = self._infer_client.stream_infer(
                 inputs_iterator=async_request_iterator(error_raised_inside_async_request_iterator),
                 headers=headers,
                 **kwargs,
             )
-            _LOGGER.debug(f"End preparing InferRequest for {self._model_name}")
+            _LOGGER.debug("End preparing InferRequest for %s", self._model_name)
             while True:
                 try:
                     try:
@@ -1554,7 +1556,7 @@ class AsyncioDecoupledModelClient(AsyncioModelClient):
                         _LOGGER.error(message)
                         raise PyTritonClientTimeoutError(message) from e
                     result, error = response
-                    _LOGGER.debug(f"Received InferResponse for {self._model_name}")
+                    _LOGGER.debug("Received InferResponse for %s", self._model_name)
                     if error is not None:
                         raise error
                     else:
@@ -1564,7 +1566,7 @@ class AsyncioDecoupledModelClient(AsyncioModelClient):
                     yield partial_output
                 except StopAsyncIteration:
                     break
-            _LOGGER.debug(f"End receiving InferResponse for {self._model_name}")
+            _LOGGER.debug("End receiving InferResponse for %s", self._model_name)
 
         except asyncio.exceptions.TimeoutError as e:
             # HTTP aio client raises asyncio.exceptions.TimeoutError for timeout errors
@@ -1581,23 +1583,23 @@ class AsyncioDecoupledModelClient(AsyncioModelClient):
             else:
                 raise PyTritonClientInferenceServerError(message) from e
         except asyncio.exceptions.CancelledError as e:
-            _LOGGER.error(f"CancelledError occurred while streaming inference for {self._model_name}")
+            _LOGGER.error("CancelledError occurred while streaming inference for %s", self._model_name)
             # stream_infer siletly consumes all errors raised inside async_request_iterator and raises CancelledError
             if len(error_raised_inside_async_request_iterator) > 0:
-                _LOGGER.error(f"Re-raising error raised inside async_request_iterator for {self._model_name} ")
+                _LOGGER.error("Re-raising error raised inside async_request_iterator for %s ", self._model_name)
                 raise error_raised_inside_async_request_iterator.pop() from None
             else:
                 raise e
 
     async def _infer(self, inputs: _IOType, parameters, headers):
         if self._model_ready:
-            _LOGGER.debug(f"Waiting for model {self._model_name} config")
+            _LOGGER.debug("Waiting for model %s config", self._model_name)
             await self._wait_and_init_model_config(self._init_timeout_s)
-            _LOGGER.debug(f"Model wait finished for {self._model_name}")
+            _LOGGER.debug("Model wait finished for %s", self._model_name)
 
-        _LOGGER.debug(f"Obtaining config for {self._model_name}")
+        _LOGGER.debug("Obtaining config for %s", self._model_name)
         model_config = await self.model_config
-        _LOGGER.debug(f"Model config for {self._model_name} obtained")
+        _LOGGER.debug("Model config for %s obtained", self._model_name)
         if not model_config.decoupled:
             raise PyTritonClientInferenceServerError("Model config is coupled. Use AsyncioModelClient instead.")
 
@@ -1920,7 +1922,7 @@ class FuturesModelClient:
                 _LOGGER.debug("No need to create new thread")
 
     def _client_request_executor(self, client, request, name):
-        _LOGGER.debug(f"Running {name} for {self._model_name}")
+        _LOGGER.debug("Running %s for %s", name, self._model_name)
         if name == _INFER_SAMPLE:
             inputs, parameters, headers, named_inputs = request
             result = client.infer_sample(
@@ -1948,7 +1950,7 @@ class FuturesModelClient:
         return result
 
     def _create_client(self, lazy_init):
-        _LOGGER.debug(f"Creating ModelClient lazy_init={lazy_init}")
+        _LOGGER.debug("Creating ModelClient lazy_init=%s", lazy_init)
         return ModelClient(
             self._url,
             self._model_name,
@@ -1994,7 +1996,7 @@ class FuturesModelClient:
                                 _LOGGER.debug("Setting existing client")
                                 self._existing_client = client
                             except Exception as e:
-                                _LOGGER.warning(f"Error {e} occurred during init for {self._model_name}")
+                                _LOGGER.warning("Error %s occurred during init for %s", e, self._model_name)
                     continue
                 try:
                     if client is None:
@@ -2010,11 +2012,11 @@ class FuturesModelClient:
                         while True:
                             try:
                                 result = self._client_request_executor(client, request, name)
-                                _LOGGER.debug(f"Finished {name} for {self._model_name}")
+                                _LOGGER.debug("Finished %s for %s", name, self._model_name)
                                 future.set_result(result)
                                 self._queue.task_done()
                             except Exception as e:
-                                _LOGGER.error(f"Error {e} occurred during {name} for {self._model_name}")
+                                _LOGGER.error("Error %s occurred during %s for %s", e, name, self._model_name)
                                 future.set_exception(e)
                                 self._queue.task_done()
                                 break
@@ -2024,7 +2026,7 @@ class FuturesModelClient:
                                 self._queue.task_done()
                                 return
                 except Exception as e:
-                    _LOGGER.error(f"Error {e} occurred during {name} for {self._model_name}")
+                    _LOGGER.error("Error %s occurred during %s for %s", e, name, self._model_name)
                     future.set_exception(e)
                     self._queue.task_done()
                 finally:

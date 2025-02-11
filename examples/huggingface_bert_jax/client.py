@@ -26,7 +26,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 init_timeout_s = 600  # increase default timeout to let model download from HF hub
 sequence = np.array([b"Hello, my dog is cute"])
 
-logger.info(f"Input: {sequence}")
+logger.info("Input: %s", sequence)
 logger.info("Sending request")
 with ModelClient("localhost", "BERT", init_timeout_s=init_timeout_s) as client:
     result_dict = client.infer_sample(sequence)
@@ -34,4 +34,4 @@ with ModelClient("localhost", "BERT", init_timeout_s=init_timeout_s) as client:
 
 for output_name, output_data in result_dict.items():
     output_data = np.array2string(output_data, max_line_width=np.inf, separator=",").replace("\n", "")
-    logger.info(f"{output_name}: {output_data}")
+    logger.info("%s: %s", output_name, output_data)

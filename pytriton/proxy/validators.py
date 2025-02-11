@@ -74,16 +74,16 @@ def _validate_outputs(model_config, model_outputs, outputs, strict: bool, reques
             f"({len(outputs)}) does not match number of requests ({requests_number}) received from Triton."
         )
 
-    LOGGER.debug(f"Number of responses: {len(outputs)}")
+    LOGGER.debug("Number of responses: %d", len(outputs))
     for response_idx, response in enumerate(outputs):
-        LOGGER.debug(f"Response #{response_idx}")
+        LOGGER.debug("Response #%d", response_idx)
         if not isinstance(response, dict):
             raise ValueError(
                 f"Outputs returned by `{model_config.model_name}` model callable "
                 f"must be list of response dicts with numpy arrays. Got response={response} instead."
             )
         for name, value in response.items():
-            LOGGER.debug(f"    {name}: {value} shape={value.shape} dtype={value.dtype}")
+            LOGGER.debug("    %s: %s shape=%s dtype=%s", name, value, value.shape, value.dtype)
             _validate_output_data(model_config, name, value)
             if strict:
                 _validate_output_dtype_and_shape(model_config, model_outputs, name, value)

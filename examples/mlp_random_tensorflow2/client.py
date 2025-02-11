@@ -27,10 +27,10 @@ batch_size = 16
 image_size = (224, 224, 3)
 images_batch = np.random.uniform(size=(batch_size,) + image_size).astype(np.float32)
 
-logger.info(f"Input: {images_batch}")
+logger.info("Input: %s", images_batch)
 
 with ModelClient("localhost", "MLP") as client:
     logger.info("Sending request")
     result_dict = client.infer_batch(images_batch)
 
-logger.info(f"results: {result_dict}")
+logger.info("results: %s", result_dict)

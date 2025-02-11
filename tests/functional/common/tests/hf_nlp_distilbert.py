@@ -112,8 +112,10 @@ def huggingface_distilbert(test_time_s: int, init_timeout_s: int, batch_size: in
                                 if number_of_processed_requests > 0 and number_of_processed_requests % 10 == 0:
                                     time_left_s = max(should_stop_at_s - time.time(), 0.0)
                                     logger.debug(
-                                        f"Processed {number_of_processed_requests} batches time left: {time_left_s:0.1f}s \n."
-                                        f"Result: {len(result)}."
+                                        "Processed %d batches time left: %.1fs \n Result: %d.",
+                                        number_of_processed_requests,
+                                        time_left_s,
+                                        len(result),
                                     )
                         time_left_s = max(should_stop_at_s - time.time(), 0.0)
                         if time_left_s <= 0:
@@ -122,7 +124,7 @@ def huggingface_distilbert(test_time_s: int, init_timeout_s: int, batch_size: in
 
         finally:
             if triton_log_path.exists():
-                logger.info("-" * 32 + " triton logs " + "-" * 32)
+                logger.info("%s triton logs %s", "-" * 32, "-" * 32)
                 triton_logs_logger = logger.getChild("triton_logs")
                 stdout_handler = logging.StreamHandler()
                 stdout_handler.setFormatter(logging.Formatter("        %(message)s"))
@@ -144,8 +146,8 @@ def _create_hf_tensorflow_distilbert_base_uncased_fn(model_name: str) -> Callabl
 
     @batch
     def _infer_fn(input_ids, attention_mask):
-        logger.debug(f"input_ids: {input_ids.shape}")
-        logger.debug(f"attention_mask: {attention_mask.shape}")
+        logger.debug("input_ids: %s", input_ids.shape)
+        logger.debug("attention_mask: %s", attention_mask.shape)
         device = "/GPU:0"  # change this to the GPU device you want to use
         with tf.device(device):
             result = model(input_ids, attention_mask)

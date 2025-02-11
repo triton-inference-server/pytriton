@@ -61,14 +61,14 @@ def main():
     root_logger = logging.getLogger()
     root_logger.addHandler(handler)
 
-    LOGGER.debug(f"CLI args: {args}")
+    LOGGER.debug("CLI args: %s", args)
 
     random.seed(args.seed)
 
     triton_config = TritonConfig(
         grpc_port=find_free_port(), http_port=find_free_port(), metrics_port=find_free_port(), log_verbose=4
     )
-    LOGGER.debug(f"Using {triton_config}")
+    LOGGER.debug("Using %s", triton_config)
 
     @batch
     def infer_fn(**inputs):

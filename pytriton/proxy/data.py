@@ -237,7 +237,7 @@ class BlockDescriptor:
 class _SharedMemorySegment:
     def __init__(self, size):
         self.shared_memory = multiprocessing.shared_memory.SharedMemory(create=True, size=size)
-        multiprocessing.util.debug(f"Created {self.shared_memory.name} of size {self.shared_memory.size}")
+        multiprocessing.util.debug("Created %s of size %d", self.shared_memory.name, self.shared_memory.size)
         self.used_blocks: List[BlockDescriptor] = []
         self.used_blocks_lock = threading.RLock()
         self.free_blocks = [BlockDescriptor(self.shared_memory.name, offset=0, size=size)]
@@ -443,7 +443,7 @@ class _FileLock:
         try:
             self._file_path.unlink(missing_ok=True)
         except OSError as e:
-            LOGGER.warning(f"Could not remove lock file {self._file_path}; {e}")
+            LOGGER.warning(f"Could not remove lock file {self._file_path}; {e}")  # noqa: G004
 
 
 class _Popen(multiprocessing.popen_spawn_posix.Popen):
@@ -570,9 +570,13 @@ class TensorStore:
 
             address = pathlib.Path(self._remote_blocks_store_manager.address)
             self._wait_for_address(address)
-            LOGGER.debug(
-                f"Started remote block store at {address} (pid={self._remote_blocks_store_manager._process.pid})"  # pytype: disable=attribute-error
+
+            pid = (
+                self._remote_blocks_store_manager._process.pid
+                if hasattr(self._remote_blocks_store_manager, "_process")
+                else None
             )
+            LOGGER.debug(f"Started remote block store at {address} (pid={pid})")  # noqa: G004
 
     def connect(self, timeout_s: Optional[float] = None):
         """Connect to remote block store."""
@@ -582,9 +586,9 @@ class TensorStore:
             self._wait_for_address(address, timeout_s)
             self._remote_blocks_store_manager.connect()
             self._remote_blocks_store = self._remote_blocks_store_manager.blocks()  # pytype: disable=attribute-error
-            LOGGER.debug(f"Connected to remote block store at {address})")
+            LOGGER.debug(f"Connected to remote block store at {address}")  # noqa: G004
         else:
-            LOGGER.debug(f"Already connectd to remote block store at {self.address}")
+            LOGGER.debug(f"Already connectd to remote block store at {self.address}")  # noqa: G004
 
     def _wait_for_address(self, address, timeout_s: Optional[float] = None):
         should_stop_at = time.time() + timeout_s if timeout_s is not None else None
@@ -682,7 +686,8 @@ class TensorStore:
                 self._remote_blocks_store.release_block(tensor_id)
         except OSError:  # thrown when remote process is already closed
             LOGGER.warning(
-                f"Failed to release block {tensor_id} on remote process at {self.address}. Probably remote process is already closed"
+                f"Failed to release block {tensor_id} on remote process at {self.address}. "  # noqa: G004
+                "Probably remote process is already closed"
             )
 
     def _copy_frames(
@@ -722,7 +727,7 @@ class TensorStore:
         """Free resources used by TensorStore object."""
         from multiprocessing.resource_tracker import register, unregister
 
-        LOGGER.debug(f"TensorStore is being closed (is_started={self.is_started()})")
+        LOGGER.debug(f"TensorStore is being closed (is_started={self.is_started()})")  # noqa: G004
 
         gc.collect()
         with self._handled_blocks_lock:
@@ -733,11 +738,11 @@ class TensorStore:
         with self._shm_segments_lock:
             while self._shm_segments:
                 _, shm = self._shm_segments.popitem()
-                LOGGER.debug(f"Closing shared memory {shm.name}")
+                LOGGER.debug(f"Closing shared memory {shm.name}")  # noqa: G004
                 try:
                     shm.close()
                 except Exception as e:
-                    LOGGER.warning(f"Failed to close shared memory {shm.name}: {e}")
+                    LOGGER.warning(f"Failed to close shared memory {shm.name}: {e}")  # noqa: G004
                 finally:
                     if not self.is_started():
                         register(shm._name, "shared_memory")  # pytype: disable=attribute-error
@@ -745,15 +750,15 @@ class TensorStore:
 
         if self.is_started():
             if self._remote_blocks_store is not None:
-                LOGGER.debug(f"Releasing all resources on remote process at {self.address}")
+                LOGGER.debug(f"Releasing all resources on remote process at {self.address}")  # noqa: G004
                 try:
                     self._remote_blocks_store.close()
                 except FileNotFoundError:  # thrown when remote process is already closed
                     pass
             self._remote_blocks_store = None
-            LOGGER.debug(f"Shutting down side process of data store at {self.address}")
+            LOGGER.debug(f"Shutting down side process of data store at {self.address}")  # noqa: G004
             self._remote_blocks_store_manager.shutdown()
-        LOGGER.debug(f"TensorStore at {self.address} closed")
+        LOGGER.debug(f"TensorStore at {self.address} closed")  # noqa: G004
 
     def is_started(self) -> bool:
         """Check if remote block store was started by this instance.
@@ -1127,11 +1132,8 @@ class TensorStoreSerializerDeserializer(BaseRequestsResponsesSerializerDeseriali
                 debug_status = get_debug_status(self._tensor_store)
                 used_blocks = [block for segment in debug_status["segments"] for block in segment["used_blocks"]]
                 if used_blocks:
-                    LOGGER.debug(f"TensorStore used blocks while closing: {used_blocks}")
-                    # raise RuntimeError(
-                    #     f"TensorStore at {self._tensor_store.address} is still running. Used blocks: {used_blocks}"
-                    # )
-                LOGGER.debug(f"Closing TensorStore process at {self._tensor_store.address}")
+                    LOGGER.debug(f"TensorStore used blocks while closing: {used_blocks}")  # noqa: G004
+                LOGGER.debug(f"Closing TensorStore process at {self._tensor_store.address}")  # noqa: G004
 
             self._tensor_store.close()
             self._tensor_store = None

@@ -102,13 +102,13 @@ class ScriptThread(threading.Thread):
         """Starts the script thread."""
         if flag is None:
             flag = threading.Event()
-        self._logger.info(f"Starting {self.name} script with \"{' '.join(self.cmd)}\" cmd")
+        self._logger.info('Starting %s script with "%s" cmd', self.name, " ".join(self.cmd))
         self._process_spawned_or_spawn_error_flag = flag
         super().start()
 
     def stop(self):
         """Sets the active flag to False to stop the script thread."""
-        self._logger.info(f"Stopping {self.name} script")
+        self._logger.info("Stopping %s script", self.name)
         self.active = False
 
     def run(self):
@@ -142,7 +142,7 @@ class ScriptThread(threading.Thread):
                     _read_outputs(self.process, self._logger, self._output)
                 _read_outputs(self.process, self._logger, self._output)
                 self.returncode = process.wait()  # pytype: disable=name-error
-                self._logger.info(f"{self.name} process finished with {self.returncode}")
+                self._logger.info("%s process finished with %d", self.name, self.returncode)
 
             self.active = False
             self._process = None
@@ -212,7 +212,7 @@ class ProcessMonitoring:
             logging.WARNING: self._logger.warning,
             logging.ERROR: self._logger.error,
         }[loglevel]
-        self._log(f"Initial list of children processes: {self._children_processes}")
+        self._log("Initial list of children processes: %s", self._children_processes)
         self._remove_color = remove_color
         pattern = r"\x1b\[.*?m"
         self._ansi_escape = re.compile(pattern)
@@ -252,14 +252,14 @@ class ProcessMonitoring:
                 result = pyspy_cmd("dump", "-ll", "--nonblocking", "-p", str(process.pid))
                 if self._remove_color:
                     result = self._ansi_escape.sub("", str(result))
-                self._log(f"Dump stack trace for process (pid={process.pid}) with cmd {process.cmdline()}")
+                self._log("Dump stack trace for process (pid=%d) with cmd %s", process.pid, process.cmdline())
                 for custom_monitor in self._custom_monitors:
                     custom_monitor(process.pid)
                 self._log(result)
             except psutil.NoSuchProcess as e:
-                self._log(f"Error during handling process: {e}")
+                self._log("Error during handling process: %s", e)
             except sh.ErrorReturnCode_1 as e:
-                self._log(f"Error during calling py-spy process: {e}")
+                self._log("Error during calling py-spy process: %s", e)
 
     def _dump_child_processes(self):
         import psutil
@@ -267,9 +267,9 @@ class ProcessMonitoring:
         self._log("==== Dump process info (with its children)")
         for process in [self._process] + self.children:
             try:
-                self._log(f"{process} parent={process.parent()} ")
+                self._log("%s parent=%s", process, process.parent())
             except psutil.NoSuchProcess:
-                self._log(f"{process} is missing in process table")
+                self._log("%s is missing in process table", process)
 
     @property
     def children(self):
@@ -500,7 +500,7 @@ class TestMonitoringContext:
                     pid = os.getpid()
 
                 process = psutil.Process(pid)
-                logger.debug(f"MONITOR RAM USAGE ({pid}): {process.memory_info()}")
+                logger.debug("MONITOR RAM USAGE (%d): %s", pid, process.memory_info())
 
             custom_monitors.append(monitor_ram_usage)
 
@@ -509,7 +509,7 @@ class TestMonitoringContext:
                     pid = os.getpid()
 
                 process = psutil.Process(pid)
-                logger.debug(f"MONITOR FILE DESCRIPTORS ({pid}): {process.num_fds()}")
+                logger.debug("MONITOR FILE DESCRIPTORS (%d): %d", pid, process.num_fds())
 
             custom_monitors.append(monitor_file_descriptors)
 
@@ -518,7 +518,7 @@ class TestMonitoringContext:
                     pid = os.getpid()
 
                 process = psutil.Process(pid)
-                logger.debug(f"MONITOR CPU USAGE ({pid}): {process.cpu_percent()}")
+                logger.debug("MONITOR CPU USAGE (%d): %f", pid, process.cpu_percent())
 
             custom_monitors.append(monitor_cpu_usage)
 
@@ -527,7 +527,7 @@ class TestMonitoringContext:
                     pid = os.getpid()
 
                 process = psutil.Process(pid)
-                logger.debug(f"MONITOR THREADS ({pid}): {process.num_threads()}")
+                logger.debug("MONITOR THREADS (%d): %d", pid, process.num_threads())
 
             custom_monitors.append(monitor_threads)
 
@@ -536,7 +536,7 @@ class TestMonitoringContext:
                     pid = os.getpid()
 
                 process = psutil.Process(pid)
-                logger.debug(f"MONITOR PROCESS DICT ({pid}): {process.as_dict()}")
+                logger.debug("MONITOR PROCESS DICT (%d): %s", pid, process.as_dict())
 
             custom_monitors.append(monitor_process_dict)
         if args.process_monitoring_interval is not None:

@@ -101,10 +101,10 @@ def _run_test(init_timeout_s, verbose, seed, signal_value, test_timeout_s):
         elapsed_s = time.time() - start_time_s
 
         children_processes = server_thread.process.children(recursive=True)
-        LOGGER.info(f"Found children processes: {children_processes}")
+        LOGGER.info("Found children processes: %s", children_processes)
 
         _check_resources_allocated(initial_shared_memory_files)
-        LOGGER.info(f"Sending {signal_value} to server script process ({server_thread.process})")
+        LOGGER.info("Sending %s to server script process (%s)", signal_value, server_thread.process)
         server_thread.process.send_signal(signal_value)
 
         LOGGER.info("Waiting for server script and all its children processes to finish")
@@ -124,7 +124,7 @@ def _run_test(init_timeout_s, verbose, seed, signal_value, test_timeout_s):
         )
 
         if timeout:
-            LOGGER.error(f"Timeout occurred (timeout_s={test_timeout_s})")
+            LOGGER.error("Timeout occurred (timeout_s=%s)", test_timeout_s)
             sys.exit(-2)
         else:
             LOGGER.info("All processed terminated")

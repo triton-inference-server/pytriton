@@ -27,26 +27,26 @@ batch_size = 2
 a_batch = np.array([[1.0], [2.0]], dtype=np.float32)
 b_batch = np.array([[2.0], [3.0]], dtype=np.float32)
 
-logger.info(f"a: {a_batch.tolist()}")
-logger.info(f"b: {b_batch.tolist()}")
+logger.info("a: %s", a_batch.tolist())
+logger.info("b: %s", b_batch.tolist())
 
 with ModelClient("localhost", "AddSub", model_version="1") as client:
     logger.info("Sending inference request")
     result_batch = client.infer_batch(a_batch, b_batch)
 
     for output_name, data_batch in result_batch.items():
-        logger.info(f"{output_name}: {data_batch.tolist()}")
+        logger.info("%s: %s", output_name, data_batch.tolist())
 
 with ModelClient("localhost", "Mul") as client:
     logger.info("Sending inference request")
     result_batch = client.infer_batch(a_batch, b_batch)
 
     for output_name, data_batch in result_batch.items():
-        logger.info(f"{output_name}: {data_batch.tolist()}")
+        logger.info("%s: %s", output_name, data_batch.tolist())
 
 with ModelClient("localhost", "Power") as client:
     logger.info("Sending inference request")
     result_batch = client.infer_batch(a_batch, b_batch)
 
     for output_name, data_batch in result_batch.items():
-        logger.info(f"{output_name}: {data_batch.tolist()}")
+        logger.info("%s: %s", output_name, data_batch.tolist())

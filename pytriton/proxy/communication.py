@@ -132,13 +132,13 @@ class RequestsServer:
         """Coroutine for handling messages from InferenceHandler."""
         self._server_loop = asyncio.get_running_loop()
         try:
-            SERVER_LOGGER.debug(f"Binding socket to url='{self._url}'")
+            SERVER_LOGGER.debug(f"Binding socket to url='{self._url}'")  # noqa: G004
             self._zmq_context = zmq.asyncio.Context()
             self._socket = self._zmq_context.socket(zmq.DEALER)
             self._socket.bind(self._url)
         except (TypeError, zmq.error.ZMQError) as e:
             raise ValueError(
-                f"Error occurred during binding socket to url='{self._url}' (e: {e})." "RequestsServer will be closed."
+                f"Error occurred during binding socket to url='{self._url}' (e: {e}). RequestsServer will be closed."
             ) from e
 
         _set_current_task_name("handle_messages")
@@ -174,7 +174,7 @@ class RequestsServer:
                 except asyncio.TimeoutError:
                     continue
                 except KeyError:
-                    SERVER_LOGGER.warning(f"Received response for unknown requests {requests_id.hex()}. Ignoring it.")
+                    SERVER_LOGGER.warning(f"Received response for unknown requests {requests_id.hex()}. Ignoring it.")  # noqa: G004
                 except asyncio.CancelledError:
                     SERVER_LOGGER.info("Received CancelledError")
                     self._shutdown_event.set()
@@ -189,14 +189,14 @@ class RequestsServer:
                     self._socket.close(linger=0)
                     self._socket = None
             except zmq.error.ZMQError as e:
-                SERVER_LOGGER.error(f"Error occurred during closing socket (e: {e}).")
+                SERVER_LOGGER.error(f"Error occurred during closing socket (e: {e}).")  # noqa: G004
 
             try:
                 if self._zmq_context is not None:
                     self._zmq_context.term()
                     self._zmq_context = None
             except zmq.error.ZMQError as e:
-                SERVER_LOGGER.error(f"Error occurred during closing zmq context (e: {e}).")
+                SERVER_LOGGER.error(f"Error occurred during closing zmq context (e: {e}).")  # noqa: G004
 
             self._server_loop = None
 
@@ -206,7 +206,7 @@ class RequestsServer:
 
             SERVER_LOGGER.debug("Socket for handle_messages task closed")
             self._shutdown_event.clear()
-            SERVER_LOGGER.debug(f"Leaving handle_messages task from {type(self).__name__}")
+            SERVER_LOGGER.debug(f"Leaving handle_messages task from {type(self).__name__}")  # noqa: G004
 
     def shutdown(self):
         """Close RequestsServer.
@@ -236,11 +236,9 @@ class RequestsServer:
             RuntimeError: if RequestsServer is shutting down or requests_id is already pending
         """
         if self._shutdown_event.is_set():
-            SERVER_LOGGER.debug(f"Cannot send requests while {type(self).__name__} is {self._state.name}")
             raise RuntimeError(f"Cannot send requests while {type(self).__name__} is {self._state.name}")
 
         if requests_id in self._responses_queues or requests_id in self._handle_responses_tasks:
-            SERVER_LOGGER.debug(f"Cannot send requests with id {requests_id.hex()} as such id is already pending")
             raise RuntimeError(f"Cannot send requests with id {requests_id.hex()} as such id is already pending")
 
         _set_current_task_name(f"send_requests-{requests_id.hex()}")
@@ -310,7 +308,7 @@ class RequestsServerClient:
 
         Don't wait for handle_requests coroutine to finish.
         """
-        CLIENT_LOGGER.debug(f"Closing {type(self).__name__} {self._name}")
+        CLIENT_LOGGER.debug("Closing %s %s", type(self).__name__, self._name)
         self._shutdown_event.set()
 
     async def handle_requests(self):
@@ -322,7 +320,7 @@ class RequestsServerClient:
         socket = None
         self._loop = asyncio.get_running_loop()
         try:
-            CLIENT_LOGGER.debug(f"Connecting {name} to server listening on {self._url}")
+            CLIENT_LOGGER.debug("Connecting %s to server listening on %s", name, self._url)
             zmq_context = zmq.asyncio.Context()
             socket = zmq_context.socket(zmq.DEALER)
             socket.connect(self._url)
@@ -341,7 +339,7 @@ class RequestsServerClient:
                     )
                     recv_future = None
                     scope = {"requests_id": requests_id}
-                    CLIENT_LOGGER.debug(f"{requests_id.hex()} received requests")
+                    CLIENT_LOGGER.debug("%s received requests", requests_id.hex())
                     handle_requests_task = self._loop.create_task(self._handle_requests(scope, requests_payloads, send))
                     self._handle_requests_tasks[requests_id] = handle_requests_task
                     handle_requests_task.set_name(f"handle_requests-{requests_id.hex()}")
@@ -359,11 +357,11 @@ class RequestsServerClient:
 
         except zmq.error.ZMQError:
             CLIENT_LOGGER.exception(
-                "Connection error occurred during reading requests. " f"{type(self).__name__} will be closed."
+                "Connection error occurred during reading requests. %s will be closed.", type(self).__name__
             )
             self._shutdown_event.set()
         except Exception:
-            CLIENT_LOGGER.exception(f"Internal {type(self).__name__}. " f"{type(self).__name__} will be closed.")
+            CLIENT_LOGGER.exception("Internal %s. %s will be closed.", type(self).__name__, type(self).__name__)
             self._shutdown_event.set()
         finally:
             try:
@@ -371,18 +369,18 @@ class RequestsServerClient:
                 if socket is not None:
                     socket.close(linger=socket_close_timeout_ms)
             except zmq.error.ZMQError as e:
-                CLIENT_LOGGER.error(f"Error occurred during closing socket (e: {e}).")
+                CLIENT_LOGGER.error("Error occurred during closing socket (e: %s).", e)
 
             try:
                 if zmq_context is not None:
                     zmq_context.term()
             except zmq.error.ZMQError as e:
-                CLIENT_LOGGER.error(f"Error occurred during closing zmq context (e: {e}).")
+                CLIENT_LOGGER.error("Error occurred during closing zmq context (e: %s).", e)
 
-            CLIENT_LOGGER.debug(f"Socket for {name} closed")
+            CLIENT_LOGGER.debug("Socket for %s closed", name)
             self._shutdown_event.clear()
             self._loop = None
-            CLIENT_LOGGER.debug(f"Leaving {name}")
+            CLIENT_LOGGER.debug("Leaving %s", name)
 
     @property
     def name(self) -> str:
@@ -421,12 +419,12 @@ class RequestsServerClient:
             error = traceback.format_exc()
             flags = PyTritonResponseFlags.ERROR | PyTritonResponseFlags.EOS
             await send(scope, flags, error.encode())
-            CLIENT_LOGGER.error(f"Error occurred during handling requests {scope['requests_id'].hex()}\n{error}")
+            CLIENT_LOGGER.error("Error occurred during handling requests %s\n%s", scope["requests_id"].hex(), error)
         finally:
             async with self._handle_requests_tasks_condition:
                 self._handle_requests_tasks.pop(scope["requests_id"], None)
                 self._handle_requests_tasks_condition.notify()
-            CLIENT_LOGGER.debug(f"Finished handling requests {scope['requests_id'].hex()}")
+            CLIENT_LOGGER.debug("Finished handling requests %s", scope["requests_id"].hex())
 
     async def _send(self, socket, scope, flags, requests_payload):
         """Send requests to RequestsServer.
@@ -489,7 +487,7 @@ class HandshakeServer(threading.Thread):
                 except asyncio.CancelledError:
                     pass
         except Exception as e:
-            SERVER_LOGGER.error(f"Error occurred during running handshake server (e: {e})")
+            SERVER_LOGGER.error(f"Error occurred during running handshake server (e: {e})")  # noqa: G004
             self._error_from_thread = e
 
     def close(self):
@@ -512,12 +510,12 @@ class HandshakeServer(threading.Thread):
                 writer.write(self._config_payload)
                 await writer.drain()
             else:
-                SERVER_LOGGER.warning(f"Unknown request {request_name} from {peername}")
+                SERVER_LOGGER.warning(f"Unknown request {request_name} from {peername}")  # noqa: G004
 
         except asyncio.TimeoutError:
-            SERVER_LOGGER.debug(f"Timeout occurred during handling request from {peername}")
+            SERVER_LOGGER.debug(f"Timeout occurred during handling request from {peername}")  # noqa: G004
         except Exception as e:
-            SERVER_LOGGER.error(f"Error occurred during handling request from {peername} (e: {e})")
+            SERVER_LOGGER.error(f"Error occurred during handling request from {peername} (e: {e})")  # noqa: G004
         finally:
             writer.close()
             await writer.wait_closed()
@@ -540,7 +538,7 @@ def get_config_from_handshake_server(socket_path: pathlib.Path, timeout_s: float
     should_stop_before_s = time.time() + timeout_s
     sock = None
     try:
-        LOGGER.debug(f"Waiting for config file {socket_path}")
+        LOGGER.debug(f"Waiting for config file {socket_path}")  # noqa: G004
         while not socket_path.exists() and time.time() < should_stop_before_s:
             time.sleep(0.001)
 

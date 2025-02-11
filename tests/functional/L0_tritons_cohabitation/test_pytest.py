@@ -58,14 +58,14 @@ def find_free_ports(not_allowed_protocol=None):
 def triton_server_builder(ports):
     @batch
     def _infer_fn(**inputs):  # noqa: N803
-        _LOGGER.debug(f"Inputs: {inputs}")
+        _LOGGER.debug("Inputs: %s", inputs)
         sleep_time = inputs["INPUT_1"].squeeze().item()
-        _LOGGER.info(f"Will sleep {sleep_time}s")
+        _LOGGER.info("Will sleep %ss", sleep_time)
         time.sleep(sleep_time)
         return_value = {
             "OUTPUT_1": inputs["INPUT_1"],
         }
-        _LOGGER.debug(f"Return value {return_value}")
+        _LOGGER.debug("Return value %s", return_value)
         return return_value
 
     class TritonInstance:
@@ -103,7 +103,7 @@ def triton_server_builder(ports):
 
         def __enter__(self):
             self.triton = Triton(config=self.config)
-            _LOGGER.debug(f"Binding {self.model_name} model.")
+            _LOGGER.debug("Binding %s model.", self.model_name)
             self.triton.bind(
                 model_name=self.model_name,
                 infer_func=self.infer_function,
@@ -125,7 +125,9 @@ def triton_server_builder(ports):
 
         def get_model_client(self, init_timeout_s=_GARGANTUAN_TIMEOUT, inference_timeout_s=_GARGANTUAN_TIMEOUT):
             _LOGGER.debug(
-                f"Creating model client with init_timeout_s={init_timeout_s} and inference_timeout_s={inference_timeout_s}"
+                "Creating model client with init_timeout_s=%s and inference_timeout_s=%s",
+                init_timeout_s,
+                inference_timeout_s,
             )
             return ModelClient(
                 self.http_url if self.http_port is not None else self.grpc_url,
@@ -136,7 +138,9 @@ def triton_server_builder(ports):
 
         def get_model_futures_client(self, init_timeout_s=_GARGANTUAN_TIMEOUT, inference_timeout_s=_GARGANTUAN_TIMEOUT):
             _LOGGER.debug(
-                f"Creating futures model client with init_timeout_s={init_timeout_s} and inference_timeout_s={inference_timeout_s}"
+                "Creating futures model client with init_timeout_s=%s and inference_timeout_s=%s",
+                init_timeout_s,
+                inference_timeout_s,
             )
             return FuturesModelClient(
                 self.http_url if self.http_port is not None else self.grpc_url,
@@ -145,7 +149,7 @@ def triton_server_builder(ports):
                 inference_timeout_s=inference_timeout_s,
             )
 
-    _LOGGER.debug(f"Using ports: {ports}")
+    _LOGGER.debug("Using ports: %s", ports)
     with TritonInstance(
         model_name="Sleeper",
         infer_function=_infer_fn,
@@ -215,12 +219,12 @@ def second_client(second_triton_server, client_type):
 
 @pytest.fixture(scope="session")
 def input_sleep_large():
-    _LOGGER.debug(f"Preparing input array with value {_LARGE_TIMEOUT}.")
+    _LOGGER.debug("Preparing input array with value %s.", _LARGE_TIMEOUT)
     yield np.array([[_LARGE_TIMEOUT]], dtype=np.float64)
 
 
 def test_infer_sample_success_single(first_client, input_sleep_large, client_type):
-    _LOGGER.debug(f"Testing async grpc_client with input {input_sleep_large}.")
+    _LOGGER.debug("Testing async grpc_client with input %s", input_sleep_large)
     with first_client as first_client:
         if client_type == "ModelClient":
             first = first_client.infer_sample(input_sleep_large)
@@ -238,7 +242,7 @@ def test_infer_sample_success_single(first_client, input_sleep_large, client_typ
 
 
 def test_infer_sample_success_cohabit(first_client, second_client, input_sleep_large, client_type):
-    _LOGGER.debug(f"Testing async grpc_client with input {input_sleep_large}.")
+    _LOGGER.debug("Testing async grpc_client with input %s", input_sleep_large)
     with first_client as first_client:
         with second_client as second_client:
             if client_type == "ModelClient":

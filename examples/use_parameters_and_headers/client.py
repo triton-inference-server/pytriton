@@ -27,8 +27,8 @@ batch_size = 2
 a_batch = np.ones((batch_size, 1), dtype=np.float32) * 2
 b_batch = np.ones((batch_size, 1), dtype=np.float32)
 
-logger.info(f"a: {a_batch.tolist()}")
-logger.info(f"b: {b_batch.tolist()}")
+logger.info("a: %s", a_batch.tolist())
+logger.info("b: %s", b_batch.tolist())
 
 with ModelClient("localhost", "ParamsAndHeaders") as client:
     logger.info("Sending inference request")
@@ -37,4 +37,4 @@ with ModelClient("localhost", "ParamsAndHeaders") as client:
     )
 
 for output_name, data_batch in result_batch.items():
-    logger.info(f"{output_name}: {data_batch.tolist()}")
+    logger.info("%s: %s", output_name, data_batch.tolist())

@@ -49,10 +49,10 @@ class MyTritonThread(threading.Thread):
             self.triton_config = TritonConfig(
                 grpc_port=self.args.grpc_port, http_port=self.args.http_port, metrics_port=find_free_port()
             )
-            LOGGER.debug(f"Using {self.triton_config}")
+            LOGGER.debug("Using %s", self.triton_config)
             self.triton = Triton(config=self.triton_config)
             model_spec = ADD_SUB_PYTHON_MODEL
-            LOGGER.debug(f"Using {model_spec}")
+            LOGGER.debug("Using %s", model_spec)
             self.triton.bind(
                 model_name=model_spec.name,
                 infer_func=model_spec.create_infer_fn(),
@@ -92,7 +92,7 @@ def main():
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=log_level, format=DEFAULT_LOG_FORMAT)
     logging.captureWarnings(True)
-    LOGGER.debug(f"CLI args: {args}")
+    LOGGER.debug("CLI args: %s", args)
 
     random.seed(args.seed)
 

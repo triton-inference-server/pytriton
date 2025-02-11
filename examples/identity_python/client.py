@@ -28,8 +28,8 @@ batch_size = 4
 input1_batch = [[random.random(), random.random(), random.random(), random.random()]] * batch_size
 input2_batch = [[b"\xff\x00\x00\x00"]] * batch_size
 
-logger.info(f"INPUT_1: {input1_batch}")
-logger.info(f"INPUT_2: {input2_batch}")
+logger.info("INPUT_1: %s", input1_batch)
+logger.info("INPUT_2: %s", input2_batch)
 
 input1_batch = np.array(input1_batch, dtype=np.float64)
 input2_batch = np.array(input2_batch, dtype=object)  # use dtype=object to avoid trimming of `\x00` bytes by numpy
@@ -37,7 +37,7 @@ input2_batch = np.array(input2_batch, dtype=object)  # use dtype=object to avoid
 with ModelClient("localhost", "Identity") as client:
     logger.info("Sending request")
     result_dict = client.infer_batch(input1_batch, input2_batch)
-    logger.info(f"results: {result_dict}")
+    logger.info("results: %s", result_dict)
 
 for output_name, output_batch in result_dict.items():
-    logger.info(f"{output_name}: {output_batch.tolist()}")
+    logger.info("%s: %s", output_name, output_batch.tolist())

@@ -116,8 +116,8 @@ def main():
     logger = logging.getLogger("nemo.server")
 
     logger.info("Initialize trainer:")
-    logger.info(f" devices: {args.gpus}")
-    logger.info(f" nodes: {args.nodes}")
+    logger.info(" devices: %s", args.gpus)
+    logger.info(" nodes: %d", args.nodes)
 
     trainer = Trainer(
         strategy=NLPDDPStrategy(),
@@ -155,11 +155,11 @@ def main():
 
             triton.serve()
     else:
-        logger.info(f"Running worker with rank {torch.distributed.get_rank()}")
+        logger.info("Running worker with rank %d", torch.distributed.get_rank())
         while True:
             choice = torch.cuda.LongTensor(1)
             torch.distributed.broadcast(choice, 0)
-            logger.info(f"{choice}")
+            logger.info("%s", choice)
             if choice[0].item() == 0:
                 generate(model.cuda())
 

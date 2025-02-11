@@ -66,7 +66,7 @@ class ModelConfigParser:
         Returns:
             A ModelConfig object with data parsed from the dictionary
         """
-        LOGGER.debug(f"Parsing Triton config model from dict: \n{json.dumps(model_config_dict, indent=4)}")
+        LOGGER.debug("Parsing Triton config model from dict: \n%s", json.dumps(model_config_dict, indent=4))
 
         if model_config_dict.get("max_batch_size", 0) > 0:
             batching = True
@@ -88,18 +88,20 @@ class ModelConfigParser:
         backend_parameters_config = model_config_dict.get("parameters", [])
         if isinstance(backend_parameters_config, list):
             # If the backend_parameters_config is a list of strings, use them as keys with empty values
-            LOGGER.debug(f"backend_parameters_config is a list of strings: {backend_parameters_config}")
+            LOGGER.debug("backend_parameters_config is a list of strings: %s", backend_parameters_config)
             backend_parameters = {name: "" for name in backend_parameters_config}
         elif isinstance(backend_parameters_config, dict):
             # If the backend_parameters_config is a dictionary, use the key and "string_value" fields as key-value pairs
-            LOGGER.debug(f"backend_parameters_config is a dictionary: {backend_parameters_config}")
+            LOGGER.debug("backend_parameters_config is a dictionary: %s", backend_parameters_config)
             backend_parameters = {
                 name: backend_parameters_config[name]["string_value"] for name in backend_parameters_config
             }
         else:
             # Otherwise, raise an error
             LOGGER.error(
-                f"Invalid type {type(backend_parameters_config)} for backend_parameters_config: {backend_parameters_config}"
+                "Invalid type %s for backend_parameters_config: %s",
+                type(backend_parameters_config),
+                backend_parameters_config,
             )
             raise TypeError(f"Invalid type for backend_parameters_config: {type(backend_parameters_config)}")
 
@@ -141,7 +143,7 @@ class ModelConfigParser:
         """
         from tritonclient.grpc import model_config_pb2  # pytype: disable=import-error
 
-        LOGGER.debug(f"Parsing Triton config model config_path={config_path}")
+        LOGGER.debug("Parsing Triton config model config_path=%s", config_path)
 
         with config_path.open("r") as config_file:
             payload = config_file.read()

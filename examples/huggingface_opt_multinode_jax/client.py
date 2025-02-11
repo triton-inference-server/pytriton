@@ -38,18 +38,18 @@ def main():
     inputs = np.array([args.input])
     inputs = np.char.encode(inputs, "utf-8")
 
-    LOGGER.info(f"output_len.shape={output_len.shape}, inputs.shape={inputs.shape}")
+    LOGGER.info("output_len.shape=%s, inputs.shape=%s", output_len.shape, inputs.shape)
 
-    LOGGER.info(f"Initializing client to address {args.server_url}")
+    LOGGER.info("Initializing client to address %s", args.server_url)
     with ModelClient(args.server_url, model_name=TRITON_MODEL_NAME) as client:
         LOGGER.info("Sending request")
-        LOGGER.info(f" Inputs: {inputs}")
-        LOGGER.info(f" Output length: {output_len}")
+        LOGGER.info(" Inputs: %s", inputs)
+        LOGGER.info(" Output length: %s", output_len)
         result_dict = client.infer_sample(inputs, output_len)
 
     LOGGER.info("Received results:")
     for output_name, output_data in result_dict.items():
-        LOGGER.info(f"{output_name}: {[b.decode() for b in output_data.tolist()]}")
+        LOGGER.info("%s: %s", output_name, [b.decode() for b in output_data.tolist()])
 
 
 if __name__ == "__main__":

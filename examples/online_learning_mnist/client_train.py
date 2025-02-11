@@ -36,7 +36,7 @@ def main():
         for _ in range(2):
             for batch_idx, (data, target) in enumerate(train_loader):
                 if batch_idx % epoch_size == 0:
-                    LOGGER.info(f"Epoch: {epoch}")
+                    LOGGER.info("Epoch: %d", epoch)
                     epoch += 1
                 data = data.numpy()
                 target = target.numpy()

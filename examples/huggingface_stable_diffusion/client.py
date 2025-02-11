@@ -82,15 +82,15 @@ def main():
 
     with ModelClient(args.url, "StableDiffusion_1_5", init_timeout_s=args.init_timeout_s) as client:
         for req_idx in range(1, args.iterations + 1):
-            logger.debug(f"Sending request ({req_idx}).")
+            logger.debug("Sending request (%d).", req_idx)
             prompt_id = req_idx % len(prompts)
             prompt = prompts[prompt_id]
             prompt = np.array([[prompt]])
             prompt = np.char.encode(prompt, "utf-8")
-            logger.info(f"Prompt ({req_idx}): {prompt}")
-            logger.info(f"Image size ({req_idx}): {img_size}")
+            logger.info("Prompt (%d): %s", req_idx, prompt)
+            logger.info("Image size (%d): %s", req_idx, img_size)
             result_dict = client.infer_batch(prompt=prompt, img_size=img_size)
-            logger.debug(f"Result for for request ({req_idx}).")
+            logger.debug("Result for request (%d).", req_idx)
 
             for idx, image in enumerate(result_dict["image"]):
                 file_idx = req_idx + idx
@@ -101,7 +101,7 @@ def main():
                 image = Image.open(buffer)
                 with file_path.open("wb") as fp:
                     image.save(fp)
-                logger.info(f"Image saved to {file_path}")
+                logger.info("Image saved to %s", file_path)
 
 
 if __name__ == "__main__":

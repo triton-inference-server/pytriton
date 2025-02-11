@@ -39,15 +39,15 @@ def main():
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=log_level, format=DEFAULT_LOG_FORMAT)
     logging.captureWarnings(True)
-    LOGGER.debug(f"CLI args: {args}")
+    LOGGER.debug("CLI args: %s", args)
 
     random.seed(args.seed)
 
     triton_config = TritonConfig(grpc_port=args.grpc_port, http_port=args.http_port, metrics_port=find_free_port())
-    LOGGER.debug(f"Using {triton_config}")
+    LOGGER.debug("Using %s", triton_config)
     with Triton(config=triton_config) as triton:
         model_spec = ADD_SUB_PYTHON_MODEL
-        LOGGER.debug(f"Using {model_spec}")
+        LOGGER.debug("Using %s", model_spec)
         triton.bind(
             model_name=model_spec.name,
             infer_func=model_spec.create_infer_fn(),

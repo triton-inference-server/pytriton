@@ -29,8 +29,8 @@ b_batch = np.ones((batch_size, 1), dtype=np.float32)
 
 
 def main():
-    LOGGER.info(f"a: {a_batch.tolist()}")
-    LOGGER.info(f"b: {b_batch.tolist()}")
+    LOGGER.info("a: %s", a_batch.tolist())
+    LOGGER.info("b: %s", b_batch.tolist())
     with ModelClient("localhost", "AddSub") as client:
         LOGGER.info("Sending inference request")
         result_batch1 = client.infer_batch(a_batch, b_batch)
@@ -46,7 +46,7 @@ def main():
     LOGGER.info("Received inference responses")
     for result_batch in res:
         for output_name, data_batch in result_batch.items():
-            LOGGER.info(f"{output_name}: {data_batch.tolist()}")
+            LOGGER.info("%s: %s", output_name, data_batch.tolist())
         LOGGER.info("------------------------")
 
 

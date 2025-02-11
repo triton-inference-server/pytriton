@@ -273,6 +273,6 @@ def shard_params(model, init_params, params_spec, mesh_devices):
             params_spec = freeze(unflatten_dict(params_spec))
         num_params_b = np.sum([v.size for v in flatten_dict(params).values()]) / 10**9
         num_params = f"{num_params_b:.2f}B" if num_params_b > 1 else f"{num_params_b * 1000:.2f}M"
-        LOGGER.info(f"Number of params: {num_params}")
+        LOGGER.info("Number of params: %s", num_params)
 
     return params

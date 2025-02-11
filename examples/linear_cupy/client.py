@@ -29,12 +29,12 @@ BATCH_SIZE = 2
 u_batch = np.ones((BATCH_SIZE, VECTOR_SIZE), dtype=np.float64)
 v_batch = np.ones((BATCH_SIZE, VECTOR_SIZE), dtype=np.float64)
 
-logger.info(f"u: {u_batch.tolist()}")
-logger.info(f"v: {v_batch.tolist()}")
+logger.info("u: %s", u_batch.tolist())
+logger.info("v: %s", v_batch.tolist())
 
 with ModelClient("localhost", "Linear") as client:
     logger.info("Sending inference request")
     result_batch = client.infer_batch(u_batch, v_batch)
 
 for output_name, data_batch in result_batch.items():
-    logger.info(f"{output_name}: {data_batch.tolist()}")
+    logger.info("%s: %s", output_name, data_batch.tolist())

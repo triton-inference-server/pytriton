@@ -104,8 +104,8 @@ def main():
         monitoring = ProcessMonitoring(server_thread.process.pid)
 
         children_processes = server_thread.process.children(recursive=True)
-        LOGGER.info(f"Found children processes: {children_processes}")
-        LOGGER.info(f"Sending SEGINT to server script process ({server_thread.process})")
+        LOGGER.info("Found children processes: %s", children_processes)
+        LOGGER.info("Sending SEGINT to server script process (%s)", server_thread.process)
         server_thread.process.send_signal(signal.SIGINT)
 
         def _process_running_and_not_zombie(_process):
@@ -123,7 +123,7 @@ def main():
         )
 
         if timeout:
-            LOGGER.error(f"Timeout occurred (timeout_s={args.timeout_s})")
+            LOGGER.error("Timeout occurred (timeout_s=%s)", args.timeout_s)
             sys.exit(-2)
         else:
             LOGGER.info("All processed terminated")

@@ -63,7 +63,7 @@ class CheckEnvironment:
 
         self.logger = logging.getLogger(name)
         if check_workspace_exist and workspace_path is not None and workspace_path.exists():
-            self.logger.error(f"Workspace path {workspace_path} already exists")
+            self.logger.error("Workspace path %s already exists", workspace_path)
             raise typer.Exit(code=1)
         if workspace_path is None:
             self._temp_workspace = tempfile.TemporaryDirectory(prefix="pytriton_workspace_")
@@ -91,10 +91,10 @@ class CheckEnvironment:
                     output_file_base = pathlib.Path(os.getcwd()) / self.workspace_path.name
                 else:
                     output_file_base = self.workspace_path
-                self.logger.info(f"Zipping {self.workspace_path} to {output_file_base}.zip")
+                self.logger.info("Zipping %s to %s.zip", self.workspace_path, output_file_base)
                 shutil.make_archive(str(output_file_base.resolve()), "zip", str(self.workspace_path.resolve()))
             else:
-                self.logger.error(f"Workspace path {self.workspace_path} does not exist")
+                self.logger.error("Workspace path %s does not exist", self.workspace_path)
 
 
 @app.command("example-add-sub-script")
@@ -112,7 +112,7 @@ def example_add_sub_script(
         try:
             add_sub_example_thread(ce.sub_workspace, ce.logger)
         except Exception as e:
-            ce.logger.error(f"Error occurred in command: {e}")
+            ce.logger.error("Error occurred in command: %s", e)
 
 
 @app.command("example-add-sub")
@@ -130,7 +130,7 @@ def example_add_sub(
         try:
             add_sub_example(ce.sub_workspace, ce.logger)
         except Exception as e:
-            ce.logger.error(f"Error occurred in command: {e}")
+            ce.logger.error("Error occurred in command: %s", e)
 
 
 @app.command("examples")
@@ -148,13 +148,13 @@ def examples(
         try:
             add_sub_example(ce.sub_workspace, ce.logger)
         except Exception as e:
-            ce.logger.error(f"Error occurred in command: {e}")
+            ce.logger.error("Error occurred in command: %s", e)
 
     with CheckEnvironment(workspace, "example_add_sub_script", zip_results, check_workspace_exist=False) as ce:
         try:
             add_sub_example_thread(ce.sub_workspace, ce.logger)
         except Exception as e:
-            ce.logger.error(f"Error occurred in command: {e}")
+            ce.logger.error("Error occurred in command: %s", e)
 
 
 @app.command("env")
@@ -174,7 +174,7 @@ def env_check(
         try:
             env_checks(ce.logger)
         except Exception as e:
-            ce.logger.error(f"Error occurred in command: {e}")
+            ce.logger.error("Error occurred in command: %s", e)
 
 
 @app.command("check")
@@ -194,7 +194,7 @@ def check(
             env_check(ce.workspace_path / "env", False)
             examples(ce.workspace_path / "examples", False)
         except Exception as e:
-            ce.logger.error(f"Error occurred in command: {e}")
+            ce.logger.error("Error occurred in command: %s", e)
 
 
 @app.callback(invoke_without_command=True)

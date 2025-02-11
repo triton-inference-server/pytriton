@@ -69,7 +69,7 @@ def parse_http_response(models):
     models_states = {}
     _LOGGER.debug("Parsing model repository index entries:")
     for model in models:
-        _LOGGER.debug(f"    name={model.get('name')} version={model.get('version')} state={model.get('state')}")
+        _LOGGER.debug("    name=%s version=%s state=%s", model.get("name"), model.get("version"), model.get("state"))
         if not model.get("version"):
             continue
 
@@ -84,7 +84,7 @@ def parse_grpc_response(models):
     models_states = {}
     _LOGGER.debug("Parsing model repository index entries:")
     for model in models:
-        _LOGGER.debug(f"    name={model.name} version={model.version} state={model.state}")
+        _LOGGER.debug("    name=%s version=%s state=%s", model.name, model.version, model.state)
         if not model.version:
             continue
 
@@ -170,14 +170,14 @@ def get_model_config(
 
     model_version = model_version or ""
 
-    _LOGGER.debug(f"Obtaining model {model_name} config")
+    _LOGGER.debug("Obtaining model %s config", model_name)
     if isinstance(client, tritonclient.grpc.InferenceServerClient):
         response = client.get_model_config(model_name, model_version, as_json=True)
         model_config = response["config"]
     else:
         model_config = client.get_model_config(model_name, model_version)
     model_config = ModelConfigParser.from_dict(model_config)
-    _LOGGER.debug(f"Model config: {model_config}")
+    _LOGGER.debug("Model config: %s", model_config)
     return model_config
 
 
@@ -228,11 +228,11 @@ def wait_for_server_ready(
         except (RpcError, ConnectionError, socket.gaierror):  # GRPC and HTTP clients raises these errors
             return False
         except Exception as e:
-            _LOGGER.exception(f"Exception while checking server readiness: {e}")
+            _LOGGER.exception("Exception while checking server readiness: %s", e)
             raise e
 
     timeout_s = max(0.0, should_finish_before_s - time.time())
-    _LOGGER.debug(f"Waiting for server to be ready (timeout={timeout_s})")
+    _LOGGER.debug("Waiting for server to be ready (timeout=%s)", timeout_s)
     is_server_ready = _is_server_ready()
     while not is_server_ready:
         time.sleep(min(1.0, timeout_s))
@@ -268,7 +268,7 @@ def wait_for_model_ready(
 
     wait_for_server_ready(client, timeout_s=timeout_s)
     timeout_s = max(0.0, should_finish_before_s - time.time())
-    _LOGGER.debug(f"Waiting for model {model_name}/{model_version_msg} to be ready (timeout={timeout_s})")
+    _LOGGER.debug("Waiting for model %s/%s to be ready (timeout=%s)", model_name, model_version_msg, timeout_s)
     is_model_ready = client.is_model_ready(model_name, model_version)
     while not is_model_ready:
         time.sleep(min(1.0, timeout_s))
@@ -316,7 +316,7 @@ def create_client_from_url(url: str, network_timeout_s: Optional[float] = None) 
             }[url.scheme]
         )
 
-    _LOGGER.debug(f"Creating InferenceServerClient for {url.with_scheme} with {triton_client_init_kwargs}")
+    _LOGGER.debug("Creating InferenceServerClient for %s with %s", url.with_scheme, triton_client_init_kwargs)
     return triton_client_lib.InferenceServerClient(url.without_scheme, **triton_client_init_kwargs)
 
 
@@ -361,7 +361,7 @@ class TritonUrl:
             if (not parsed_url.scheme and "://" not in parsed_url.path) or (
                 sys.version_info >= (3, 9) and parsed_url.scheme and not parsed_url.netloc
             ):
-                _LOGGER.debug(f"Adding http scheme to {url}")
+                _LOGGER.debug("Adding http scheme to %s", url)
                 parsed_url = urllib.parse.urlparse(f"http://{url}")
 
             scheme = parsed_url.scheme.lower()

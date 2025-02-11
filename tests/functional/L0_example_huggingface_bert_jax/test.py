@@ -34,7 +34,7 @@ def verify_client_output(client_output):
     if not output_array:
         raise ValueError(f"Could not find {expected_pattern} in client output")
     else:
-        LOGGER.info(f'Found "{expected_pattern}" in client output')
+        LOGGER.info('Found "%s" in client output', expected_pattern)
 
 
 def main():
@@ -86,7 +86,7 @@ def main():
         raise RuntimeError(f"Server returned {server_thread.returncode}")
     timeout = elapsed_s >= args.timeout_s and client_thread.is_alive() and server_thread.is_alive()
     if timeout:
-        LOGGER.error(f"Timeout occurred (timeout_s={args.timeout_s})")
+        LOGGER.error("Timeout occurred (timeout_s=%s)", args.timeout_s)
         sys.exit(-2)
     verify_client_output(client_thread.output)
     assert not search_warning_on_too_verbose_log_level(server_thread.output)

@@ -52,7 +52,7 @@ def main():
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=log_level, format=DEFAULT_LOG_FORMAT)
     logging.captureWarnings(True)
-    LOGGER.debug(f"CLI args: {args}")
+    LOGGER.debug("CLI args: %s", args)
 
     class _InferFuncWrapper:
         def __init__(self):
@@ -75,7 +75,7 @@ def main():
         metrics_port=find_free_port(),
         cache_config=[f"local,size={1024 * 1024}"],  # 1 MB
     )
-    LOGGER.debug(f"Using {triton_config}")
+    LOGGER.debug("Using %s", triton_config)
     with Triton(config=triton_config) as triton:
         triton.bind(
             model_name="AddSub",
@@ -101,15 +101,15 @@ def main():
         url = f"{protocol}://localhost:{protocol_port}"
         with ModelClient(url, "AddSub", init_timeout_s=args.init_timeout_s) as client:
             for idx in range(10):
-                LOGGER.info(f"Sending request {idx + 1}")
+                LOGGER.info("Sending request %d", idx + 1)
                 result_batch = client.infer_batch(a_batch, b_batch)
-                LOGGER.info(f"Response obtained for {idx + 1}. Number of outputs: {len(result_batch)}")
+                LOGGER.info("Response obtained for %d. Number of outputs: %d", idx + 1, len(result_batch))
 
             LOGGER.info("Validating response.")
             np.testing.assert_allclose(result_batch["add"], a_batch + b_batch)
             np.testing.assert_allclose(result_batch["sub"], a_batch - b_batch)
 
-    LOGGER.info(f"Infer function requests count: {infer_func_wrapper.call_count}")
+    LOGGER.info("Infer function requests count: %d", infer_func_wrapper.call_count)
 
     assert infer_func_wrapper.call_count == 1
 
