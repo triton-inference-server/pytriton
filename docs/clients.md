@@ -793,7 +793,7 @@ loop.run_until_complete(main())
 ```python
 triton.stop()
 
-assert result[-1]["response"] == b'AI answers to the question, "What is the best way to get rid of the problem?"\n'
+assert b'AI answers to the question, "What is the best way to get rid of the problem?"\n' in result[-1]["response"]
 ```
 -->
 

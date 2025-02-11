@@ -131,7 +131,7 @@ import numpy as np
 from transformers import pipeline
 from pytriton.decorators import batch
 
-CLASSIFIER = pipeline("zero-shot-classification", model="facebook/bart-base", device=0)
+CLASSIFIER = pipeline("zero-shot-classification", model="facebook/bart-base", device=0, framework="pt")
 
 
 @batch
