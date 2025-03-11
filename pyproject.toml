@@ -78,7 +78,7 @@ doc = [
     "mike >= 2.0.0",
     "mkdocs-htmlproofer-plugin >= 1.1",
     "mkdocs-material >= 9.5",
-    "mkdocstrings[python] >= 0.24.0",
+    "mkdocstrings[python] < 0.28.3",
     "mkdocstrings-python >= 1.8"
 ]
 dev = [
