@@ -16,6 +16,14 @@ limitations under the License.
 
 # Changelog
 
+## Unreleased
+
+- Fix: PyTriton check fails with missing external script
+
+[//]: <> (put here on external component update with short summary what change or link to changelog)
+
+- Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.51.0](https://github.com/triton-inference-server/server/releases/tag/v2.51.0)
+
 ## 0.5.14 (2025-02-12)
 
 - Fix: Deferring log message creation until required by the active log level, improving performance.

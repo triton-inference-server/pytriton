@@ -30,7 +30,7 @@ from pytriton.triton import Triton
 
 logger = logging.getLogger("check.add_sub_example")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s: %(message)s")
-add_script_path = [sys.executable, "pytriton/check/add_sub.py"]
+add_script_path = [sys.executable, __file__]
 
 
 @batch
