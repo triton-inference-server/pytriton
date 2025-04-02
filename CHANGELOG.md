@@ -18,7 +18,8 @@ limitations under the License.
 
 ## Unreleased
 
-- Fix: PyTriton check fails with missing external script
+- fix(check): PyTriton check fails with missing external script
+- fix(build): add CMAKE_POLICY_VERSION_MINIMUM to stub build to ensure compatibility with newer versions of CMake
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 

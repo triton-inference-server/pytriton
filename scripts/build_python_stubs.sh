@@ -71,10 +71,12 @@ for version in "${PYTHON_VERSIONS[@]}"; do
   python --version
 
   echo "Preparing build files for Python version ${version}"
+  # CMAKE_POLICY_VERSION_MINIMUM=3.17 is taken from https://github.com/triton-inference-server/python_backend/blob/main/CMakeLists.txt
   cmake -DTRITON_ENABLE_GPU=ON \
     -DTRITON_BACKEND_REPO_TAG="${GIT_BRANCH_NAME}" \
     -DTRITON_COMMON_REPO_TAG="${GIT_BRANCH_NAME}" \
     -DTRITON_CORE_REPO_TAG="${GIT_BRANCH_NAME}" \
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.17 \
     -DCMAKE_INSTALL_PREFIX:PATH="$(pwd)/install" ..
 
   echo "Building triton_python_backend_stub for Python version ${version}"
