@@ -21,6 +21,7 @@ limitations under the License.
 - fix(check): PyTriton check fails with missing external script
 - fix(build): add CMAKE_POLICY_VERSION_MINIMUM to stub build script to ensure compatibility with newer versions of CMake
 - fix(docs): removed version constraints on OpenTelemetry packages to support newer versions
+- fix: PyTriton AsyncioModelClient response parsing
 
 [//]: <> (put here on external component update with short summary what change or link to changelog)
 

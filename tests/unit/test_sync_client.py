@@ -977,3 +977,46 @@ def test_grpc_client_raises_error_when_used_after_close(mocker):
 
     with pytest.raises(PyTritonClientClosedError):
         client.infer_batch(a=[a])
+
+
+def test_sync_http_client_returns_empty_dicts_when_parse_empty_response(mocker):
+    patch_http_client__server_up_and_ready(mocker)
+    patch_http_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
+
+    a = np.array([1], dtype=np.float32)
+    b = np.array([1], dtype=np.float32)
+    expected_result = {}
+    response_body = b'{"id":"0","model_name":"AddSub","model_version":"1","outputs":[]}'
+    infer_result = tritonclient.http.InferResult.from_response_body(response_body)
+
+    with ModelClient(_HTTP_LOCALHOST_URL, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name) as client:
+        mock_infer = mocker.patch.object(client._infer_client, "infer")
+        mock_infer.return_value = infer_result
+        result = client.infer_sample(a, b)
+        assert result == expected_result
+
+
+def test_sync_grpc_client_returns_empty_dicts_when_parse_empty_response(mocker):
+    patch_grpc_client__server_up_and_ready(mocker)
+    patch_grpc_client__model_up_and_ready(mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG)
+
+    a = np.array([1], dtype=np.float32)
+    b = np.array([1], dtype=np.float32)
+    expected_result = {}
+    response = mocker.stub(name="InferenceResponse")
+    response.model = "Linear"
+    response.request_id = "1"
+    response.parameters = {}
+    response.outputs = {}
+    response.error = None
+    response.final = False
+
+    infer_result = tritonclient.grpc.InferResult(response)
+
+    with ModelClient(_GRPC_LOCALHOST_URL, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name) as client:
+        mock_infer = mocker.patch.object(client._infer_client, "infer")
+        mock_infer.return_value = infer_result
+
+        inputs_dict = {"a": a, "b": b}
+        result = client.infer_sample(**inputs_dict)
+        assert result == expected_result

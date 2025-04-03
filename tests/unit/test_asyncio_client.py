@@ -21,6 +21,7 @@ from unittest.mock import ANY
 
 import numpy as np
 import pytest
+import tritonclient.http
 from tritonclient.grpc.aio import InferenceServerClient as AsyncioGrpcInferenceServerClient
 from tritonclient.http.aio import InferenceServerClient as AsyncioHttpInferenceServerClient
 
@@ -765,3 +766,51 @@ async def test_async_grpc_init_passes_timeout(mocker):
     ) as client:
         with pytest.raises(PyTritonClientTimeoutError):
             await client.wait_for_model(timeout_s=0.2)
+
+
+async def test_async_http_client_infer_sample_parse_empty_result(mocker):
+    patch_client__server_up_and_ready(mocker, AsyncioHttpInferenceServerClient)
+    patch_http_client__model_up_and_ready(
+        mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG, AsyncioHttpInferenceServerClient
+    )
+
+    a = np.array([1], dtype=np.float32)
+    b = np.array([1], dtype=np.float32)
+    expected_result = {}
+    response_body = b'{"id":"0","model_name":"AddSub","model_version":"1","outputs":[]}'
+    infer_result = tritonclient.http.InferResult.from_response_body(response_body)
+
+    async with AsyncioModelClient(HTTP_LOCALHOST_URL, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name) as client:
+        mock_infer = mocker.patch.object(client._infer_client, "infer")
+        mock_infer.return_value = infer_result
+        inputs_dict = {"a": a, "b": b}
+        result = await client.infer_sample(**inputs_dict)
+        assert result == expected_result
+
+
+async def test_async_grpc_client_infer_sample_parse_empty_result(mocker):
+    patch_client__server_up_and_ready(mocker, AsyncioGrpcInferenceServerClient)
+    patch_grpc_client__model_up_and_ready(
+        mocker, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG, AsyncioGrpcInferenceServerClient
+    )
+
+    a = np.array([1], dtype=np.float32)
+    b = np.array([1], dtype=np.float32)
+    expected_result = {}
+    expected_result = {}
+    response = mocker.stub(name="InferenceResponse")
+    response.model = "Linear"
+    response.request_id = "1"
+    response.parameters = {}
+    response.outputs = {}
+    response.error = None
+    response.final = False
+
+    infer_result = tritonclient.grpc.InferResult(response)
+
+    async with AsyncioModelClient(GRPC_LOCALHOST_URL, ADD_SUB_WITHOUT_BATCHING_MODEL_CONFIG.model_name) as client:
+        mock_infer = mocker.patch.object(client._infer_client, "infer")
+        mock_infer.return_value = infer_result
+        inputs_dict = {"a": a, "b": b}
+        result = await client.infer_sample(**inputs_dict)
+        assert result == expected_result

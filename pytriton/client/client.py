@@ -1277,7 +1277,12 @@ class AsyncioModelClient(BaseModelClient):
             else:
                 raise PyTritonClientInferenceServerError(message) from e
         _LOGGER.debug("Received InferResponse for %s", self._model_name)
-        outputs = {output_spec.name: response.as_numpy(output_spec.name) for output_spec in model_config.outputs}
+        if isinstance(response, tritonclient.http.InferResult):
+            outputs = {
+                output["name"]: response.as_numpy(output["name"]) for output in response.get_response()["outputs"]
+            }
+        else:
+            outputs = {output.name: response.as_numpy(output.name) for output in response.get_response().outputs}
         return outputs
 
     async def _infer(self, inputs: _IOType, parameters, headers):
