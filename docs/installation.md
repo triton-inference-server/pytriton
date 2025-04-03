@@ -22,7 +22,7 @@ This guide shows you how to install PyTriton for your machine learning inference
 
 Before installing PyTriton, ensure your system meets these requirements:
 
-- An operating system with glibc >= `2.35` (Ubuntu 22.04+ recommended)
+- An operating system with glibc >= `2.35`
 - Python version >= `3.8`
 - `pip >= 20.3`
 
@@ -114,7 +114,7 @@ pip install nvidia-pytriton
 
 If you prefer using Docker:
 
-1. While NVIDIA optimized containers from the [NVIDIA NGC Catalog](https://catalog.ngc.nvidia.com/containers) are recommended for optimal performance, you can use any Docker image with a compatible OS (glibc >= 2.35)
+1. While NVIDIA optimized containers from the [NVIDIA NGC Catalog](https://catalog.ngc.nvidia.com/containers) are recommended for optimal performance, you can use any Docker image with a [compatible OS](#system-requirements)
 2. For GPU acceleration, install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/overview.html)
 3. Install PyTriton inside your container using any of the methods above
 
@@ -130,6 +130,7 @@ RUN pip install nvidia-pytriton
 ## Advanced: Building from Source
 
 You can build PyTriton from source to:
+
 - Access unreleased hotfixes
 - Modify the PyTriton code
 - Ensure compatibility with various Triton Inference Server versions
