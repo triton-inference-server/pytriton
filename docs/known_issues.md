@@ -16,12 +16,21 @@ limitations under the License.
 
 # Known Issues and Limitations
 
-- There is no one-to-one match between our solution and [Triton Inference Server](https://github.com/triton-inference-server/server) features, especially in terms of supporting a user model store.
-- Running multiple scripts hosting PyTriton on the same machine or container is not feasible.
-- Deadlocks may occur in some models when employing the NCCL communication library and multiple Inference Callables are triggered concurrently. This issue can be observed when deploying multiple instances of the same model or multiple models within a single server script. Additional information about this issue can be found [here](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/communicators.html#using-multiple-nccl-communicators-concurrently).
-- Enabling verbose logging may cause a significant performance drop in model inference.
-- GRPC ModelClient doesn't support timeouts for model configuration and model metadata requests due to a limitation in the underlying tritonclient library.
-- HTTP ModelClient may not respect the specified timeouts for model initialization and inference requests, especially when they are smaller than 1 second, resulting in longer waiting times. This issue is related to the underlying implementation of HTTP protocol.
-- L0_remote_life_cycle, L0_tritons_cohabitation tests fails with timeouts due to unknown reasons.
-- Triton logs contain false nevative error ``Failed to set config modification time: model_config_content_name_ is empty``. It can be ignored.
-- ``L0_example_huggingface_bert_jax`` and ``L0_example_huggingface_opt_multinode_jax`` tests fail with missing kubernetes features in JAX.
+## Feature Limitations
+
+- **Feature Disparity**: PyTriton does not provide feature parity with [Triton Inference Server](https://github.com/triton-inference-server/server), particularly in supporting a user model store.
+- **Concurrent Execution**: Running multiple scripts hosting PyTriton on the same machine or container is not supported.
+
+## Stability and Performance Issues
+
+- **NCCL Deadlocks**: When using the NCCL communication library, deadlocks may occur if multiple Inference Callables are triggered concurrently (such as when deploying multiple instances of the same model or multiple models within a single server script). For more details, see the [NCCL documentation](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/communicators.html#using-multiple-nccl-communicators-concurrently).
+- **Logging Performance Impact**: Enabling verbose logging can significantly reduce model inference performance.
+
+## Client Limitations
+
+- **GRPC Timeout Support**: The GRPC ModelClient does not support timeouts for model configuration and model metadata requests due to limitations in the underlying tritonclient library.
+- **HTTP Timeout Handling**: The HTTP ModelClient may not correctly respect specified timeouts for model initialization and inference requests, especially for timeouts under 1 second. This is caused by the underlying HTTP protocol implementation.
+
+## Benign Issues
+
+- **False Error Messages**: Triton logs may contain a false negative error: `Failed to set config modification time: model_config_content_name_ is empty`. This message can be safely ignored.
