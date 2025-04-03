@@ -350,13 +350,13 @@ To test this feature, you can use the following Python client based on python [r
 <!--pytest.mark.skip-->
 
 ```bash
-pip install "opentelemetry-api<=1.27.0" \
-    "opentelemetry-sdk<=1.27.0" \
-    "opentelemetry-instrumentation-requests<=0.49b2" \
-    "opentelemetry-exporter-otlp<=1.27.0"
+pip install "opentelemetry-api" \
+    "opentelemetry-sdk" \
+    "opentelemetry-instrumentation-requests" \
+    "opentelemetry-exporter-otlp"
 ```
 
-The conflict between ``tritonclient == 2.50.0`` and ``opentelemetry-api == 1.28.0`` can prevent you from installing both. To avoid this issue, you can force telemetry to use the version ``1.27.0``.
+In some scenarios, there might be conflicts between certain versions of tritonclient and opentelemetry-api. If you encounter such conflicts, consider using matching versions of these packages.
 
 First you need to import the required packages and configure the OpenTelemetry context and instrumet requests library:
 
