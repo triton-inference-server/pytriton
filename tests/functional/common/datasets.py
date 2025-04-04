@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
 # limitations under the License.
 import dataclasses
 import enum
-import subprocess
 from typing import Callable, Optional
 
 
@@ -113,23 +112,7 @@ COCO_LABELS = {
 }
 
 
-def _create_tfds_coco2017_validation(batch_size: Optional[int] = None) -> Callable:
-    subprocess.run(["pip", "install", "--upgrade", "tensorflow-datasets"], check=True)
-
-    import tensorflow_datasets as tfds  # pytype: disable=import-error
-
-    return tfds.load("coco/2017", split="validation", as_supervised=True, with_info=True, batch_size=batch_size)
-
-
-TFDS_COCO2017_VALIDATION_DATASET = DatasetSpec(
-    framework=Framework.TENSORFLOW,
-    create_dataset_fn=_create_tfds_coco2017_validation,
-)
-
-
 def _create_tfds_tf_flowers(batch_size: Optional[int] = None):
-    subprocess.run(["pip", "install", "--upgrade", "tensorflow-datasets"], check=True)
-
     import tensorflow_datasets as tfds  # pytype: disable=import-error
 
     return tfds.load("tf_flowers", as_supervised=True, with_info=True, batch_size=batch_size)
@@ -141,4 +124,4 @@ TFDS_TF_FLOWERS_DATASET = DatasetSpec(
 )
 
 
-DATASETS_CATALOGUE = [TFDS_COCO2017_VALIDATION_DATASET, TFDS_TF_FLOWERS_DATASET]
+DATASETS_CATALOGUE = [TFDS_TF_FLOWERS_DATASET]

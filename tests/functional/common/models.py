@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,12 +13,11 @@
 # limitations under the License.
 import dataclasses
 import enum
-import subprocess
 from typing import Callable, Optional, Sequence
 
 import numpy as np
 
-from pytriton.decorators import batch, sample
+from pytriton.decorators import batch
 from pytriton.model_config import ModelConfig, Tensor
 
 
@@ -84,8 +83,6 @@ IDENTITY_PYTHON_MODEL = TestModelSpec(
 
 
 def _create_tfhub_tensorflow_efficientdet_lite0_detection_fn() -> Callable:
-    subprocess.run(["pip", "install", "tensorflow_hub"], check=True)
-
     import tensorflow_hub as hub  # pytype: disable=import-error
 
     detector = hub.load("https://tfhub.dev/tensorflow/efficientdet/lite0/detection/1")
@@ -130,83 +127,8 @@ EFFICIENTDET_DETECTION_TF_MODEL = TestModelSpec(
 )
 
 
-def _create_hf_pytorch_bart_fn() -> Callable:
-    subprocess.run(["pip", "install", "transformers"], check=True)
-
-    import transformers  # pytype: disable=import-error
-
-    classifier = transformers.pipeline("zero-shot-classification", model="facebook/bart-large-mnli", device=0)
-
-    @sample
-    def _hf_pytorch_bart_fn(sequence: np.ndarray, labels: np.ndarray):
-        sequence = sequence[0].decode("utf-8")
-        labels = [label.decode("utf-8") for label in labels]
-        classification_result = classifier(sequence, labels)
-        scores_batch = np.array(classification_result["scores"], dtype=np.float32)
-        return {"scores": scores_batch}
-
-    return _hf_pytorch_bart_fn
-
-
-BART_CLASSIFIER_PYTORCH_MODEL = TestModelSpec(
-    name="BARTClassifier",
-    framework=Framework.PYTORCH,
-    create_infer_fn=_create_hf_pytorch_bart_fn,
-    inputs=(Tensor(name="sequence", dtype=object, shape=(-1,)), Tensor(name="labels", dtype=object, shape=(-1,))),
-    outputs=(Tensor(name="scores", dtype=np.float32, shape=(-1,)),),
-    model_config=ModelConfig(batching=False),
-)
-
-
-def _create_hf_jax_bert_fn() -> Callable:
-    subprocess.run(
-        [
-            "pip",
-            "install",
-            "--upgrade",
-            "jax[cuda12_pip]",
-            "-f",
-            "https://storage.googleapis.com/jax-releases/jax_cuda_releases.html",
-        ],
-        check=True,
-    )
-    subprocess.run(["pip", "install", "transformers", "flax"], check=True)
-
-    import transformers  # pytype: disable=import-error
-
-    tokenizer = transformers.BertTokenizer.from_pretrained("bert-base-uncased")
-    model = transformers.FlaxBertModel.from_pretrained("bert-base-uncased")
-
-    @batch
-    def _infer_fn(**inputs: np.ndarray):
-        (sequence_batch,) = inputs.values()
-        sequence_batch = sequence_batch.tolist()
-        last_hidden_states = []
-        for sequence_item in sequence_batch:
-            # 0 needed to extract str from numpy array and deocode utf-8
-            sequence_as_str = sequence_item[0].decode("utf-8")
-            tokenized_sequence = tokenizer(sequence_as_str, return_tensors="jax")
-            results = model(**tokenized_sequence)
-            last_hidden_states.append(results.last_hidden_state)
-        last_hidden_states = np.array(last_hidden_states, dtype=np.float32)
-        return [last_hidden_states]
-
-    return _infer_fn
-
-
-BERT_JAX_MODEL = TestModelSpec(
-    name="BERTJax",
-    framework=Framework.TENSORFLOW,
-    create_infer_fn=_create_hf_jax_bert_fn,
-    inputs=(Tensor(name="sequence", dtype=object, shape=(1,)),),
-    outputs=(Tensor(name="last_hidden_state", dtype=np.float32, shape=(-1,)),),
-    model_config=ModelConfig(max_batch_size=128),
-)
-
 MODELS_CATALOGUE = [
     ADD_SUB_PYTHON_MODEL,
     IDENTITY_PYTHON_MODEL,
     EFFICIENTDET_DETECTION_TF_MODEL,
-    BART_CLASSIFIER_PYTORCH_MODEL,
-    BERT_JAX_MODEL,
 ]
