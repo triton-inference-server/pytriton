@@ -14,4 +14,4 @@
 # limitations under the License.
 set -xe
 
-pip install transformers datasets
+pip install transformers!=4.51.0 datasets

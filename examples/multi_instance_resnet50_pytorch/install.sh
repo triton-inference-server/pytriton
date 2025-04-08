@@ -16,4 +16,4 @@ set -xe
 
 apt-get update
 apt-get install -y libb64-dev
-pip install transformers nvidia-pytriton
+pip install transformers!=4.51.0 nvidia-pytriton

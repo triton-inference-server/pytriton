@@ -18,7 +18,7 @@ set -xe
 THIS_SCRIPT_PATH="$(realpath --relative-to="$(pwd)" "$0")"
 TEST_MODULE="$(dirname "${THIS_SCRIPT_PATH}"|sed 's/\//./g').test"
 
-pip install transformers datasets --upgrade
+pip install transformers!=4.51.0 datasets --upgrade
 
 python -m"${TEST_MODULE}" \
     --test-time-s 3000 \

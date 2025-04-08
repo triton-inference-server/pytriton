@@ -24,7 +24,7 @@ mkdir -p "$LOGS_DIR"
 # Set the log path with the date and time
 LOG_PATH="$LOGS_DIR/log_$(date '+%Y-%m-%d_%H-%M-%S').txt"
 
-pip install transformers datasets --upgrade
+pip install transformers!=4.51.0 datasets --upgrade
 
 python -m"${TEST_MODULE}" \
     --test-time-s 36000 \

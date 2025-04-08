@@ -14,4 +14,4 @@
 # limitations under the License.
 set -xe
 
-pip install transformers accelerate diffusers Pillow filelock
+pip install transformers!=4.51.0 accelerate diffusers Pillow filelock

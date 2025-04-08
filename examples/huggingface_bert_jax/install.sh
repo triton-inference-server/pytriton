@@ -17,4 +17,4 @@ set -xe
 # 0.4.14 raises error
 pip install --upgrade "jax[cuda12]!=0.4.14" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 # torch is required for checkpoint loading
-pip install transformers flax torch
+pip install transformers!=4.51.0 flax torch
