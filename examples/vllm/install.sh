@@ -14,4 +14,4 @@
 # limitations under the License.
 set -xe
 
-pip install "vllm>=0.2.3" "transformers!=4.51.0"
+pip install "vllm>=0.2.3" "transformers!=4.51.0" "numpy<2.0.0"
