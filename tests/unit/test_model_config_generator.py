@@ -442,7 +442,7 @@ def test_get_config_call_config_generator_methods(mocker):
     mock_set_model_signature = mocker.patch.object(ModelConfigGenerator, "_set_model_signature")
     mock_set_instance_group = mocker.patch.object(ModelConfigGenerator, "_set_instance_group")
     mock_set_backend_parameters = mocker.patch.object(ModelConfigGenerator, "_set_backend_parameters")
-
+    mock_set_model_warmup = mocker.patch.object(ModelConfigGenerator, "_set_model_warmup")
     model_config = TritonModelConfig(model_name="simple")
 
     generator = ModelConfigGenerator(model_config)
@@ -457,6 +457,7 @@ def test_get_config_call_config_generator_methods(mocker):
     assert mock_set_model_signature.called is True
     assert mock_set_instance_group.called is True
     assert mock_set_backend_parameters.called is True
+    assert mock_set_model_warmup.called is True
 
 
 def test_get_config_return_defaults_when_minimal_config_passed():
@@ -587,4 +588,15 @@ def test_to_file_save_config_to_file_when_full_config_specified():
             },
             "response_cache": {"enable": True},
             "model_transaction_policy": {"decoupled": True},
+            "model_warmup": [
+                {
+                    "name": "simple",
+                    "batch_size": 16,
+                    "inputs": {
+                        "INPUT_1": {"data_type": "TYPE_FP32", "dims": ["1"], "random_data": True},
+                        "INPUT_2": {"data_type": "TYPE_STRING", "dims": ["1"], "random_data": True},
+                    },
+                    "count": 2,
+                }
+            ],
         }

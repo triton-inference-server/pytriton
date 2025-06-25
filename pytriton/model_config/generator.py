@@ -26,7 +26,7 @@ dict or file.
 import json
 import logging
 import pathlib
-from typing import Dict, Union
+from typing import Dict, Type, Union
 
 import numpy as np
 from google.protobuf import json_format, text_format  # pytype: disable=pyi-error
@@ -47,6 +47,18 @@ except ImportError:
         grpc_client = None
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _convert_dtype_to_triton_dtype(dtype: Union[Type[np.dtype], Type[object]]) -> str:
+    if dtype in [np.object_, object, bytes, np.bytes_]:
+        dtype = "TYPE_STRING"
+    else:
+        # pytype: disable=attribute-error
+        dtype = dtype().dtype
+        # pytype: enable=attribute-error
+        dtype = f"TYPE_{client_utils.np_to_triton_dtype(dtype)}"
+
+    return dtype
 
 
 class ModelConfigGenerator:
@@ -108,6 +120,7 @@ class ModelConfigGenerator:
         self._set_model_transaction_policy(model_config)
         self._set_backend_parameters(model_config)
         self._set_response_cache(model_config)
+        self._set_model_warmup(model_config)
         return model_config
 
     def _set_batching(self, model_config: Dict) -> None:
@@ -237,13 +250,7 @@ class ModelConfigGenerator:
         """
 
         def _rewrite_io_spec(spec_: TensorSpec) -> Dict:
-            if spec_.dtype in [np.object_, object, bytes, np.bytes_]:
-                dtype = "TYPE_STRING"
-            else:
-                # pytype: disable=attribute-error
-                dtype = spec_.dtype().dtype
-                # pytype: enable=attribute-error
-                dtype = f"TYPE_{client_utils.np_to_triton_dtype(dtype)}"
+            dtype = _convert_dtype_to_triton_dtype(spec_.dtype)
 
             dims = spec_.shape
 
@@ -282,3 +289,49 @@ class ModelConfigGenerator:
             model_config["response_cache"] = {
                 "enable": self._config.response_cache.enable,
             }
+
+    def _set_model_warmup(self, model_config: Dict):
+        """Configure model warmup for model.
+
+        Args:
+            model_config: Dictionary where configuration is attached.
+        """
+        if not self._config.model_warmup:
+            return
+
+        warmup_config = self._config.model_warmup
+        model_warmup = []
+        for warmup_config in self._config.model_warmup:
+            model_warmup_item = {
+                "name": warmup_config.name,
+                "batch_size": warmup_config.batch_size,
+            }
+
+            inputs = {}
+            for input_name, input_config in warmup_config.inputs.items():
+                if not (input_config.zero_data or input_config.random_data or input_config.input_data_file):
+                    raise PyTritonBadParameterError(
+                        "One of the `zero_data`, `random_data`, or `input_data_file` must be provided for "
+                        f"warmup input `{input_name}`."
+                    )
+                shape = list(input_config.shape)
+                if not shape:
+                    raise PyTritonBadParameterError(f"Dimension for {input_name} not defined.")
+
+                input_item = {
+                    "data_type": _convert_dtype_to_triton_dtype(input_config.dtype),
+                    "dims": shape,
+                }
+                if input_config.zero_data:
+                    input_item["zero_data"] = True
+                elif input_config.random_data:
+                    input_item["random_data"] = True
+                elif input_config.input_data_file:
+                    input_item["input_data_file"] = input_config.input_data_file
+                inputs[input_name] = input_item
+
+            model_warmup_item["inputs"] = inputs
+            model_warmup_item["count"] = warmup_config.count
+            model_warmup.append(model_warmup_item)
+
+        model_config["model_warmup"] = model_warmup

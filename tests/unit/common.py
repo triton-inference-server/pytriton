@@ -13,7 +13,14 @@
 # limitations under the License.
 import numpy as np
 
-from pytriton.model_config.common import DeviceKind, DynamicBatcher, QueuePolicy, TimeoutAction
+from pytriton.model_config.common import (
+    DeviceKind,
+    DynamicBatcher,
+    ModelWarmup,
+    QueuePolicy,
+    TimeoutAction,
+    WarmupInput,
+)
 from pytriton.model_config.triton_model_config import ResponseCache, TensorSpec, TritonModelConfig
 
 full_model_config = TritonModelConfig(
@@ -55,4 +62,15 @@ full_model_config = TritonModelConfig(
         TensorSpec(name="OUTPUT_1", dtype=np.int32, shape=(1000,)),
     ],
     response_cache=ResponseCache(enable=True),
+    model_warmup=[
+        ModelWarmup(
+            name="simple",
+            batch_size=16,
+            inputs={
+                "INPUT_1": WarmupInput(dtype=np.float32, shape=(1,), random_data=True),
+                "INPUT_2": WarmupInput(dtype=np.bytes_, shape=(1,), random_data=True),
+            },
+            count=2,
+        ),
+    ],
 )

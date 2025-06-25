@@ -252,7 +252,9 @@ def test_rewrite_io_spec_return_tensor_spec_when_valid_data():
 
 
 def test_parse_from_dict_raise_error_when_invalid_data_type_in_config():
-    with pytest.raises(PyTritonModelConfigError, match="Unsupported data type `FLOAT32` for input with name `INPUT_0`"):
+    with pytest.raises(
+        PyTritonModelConfigError, match="Unsupported data type `TYPE_FLOAT32` for input with name `INPUT_0`"
+    ):
         ModelConfigParser.from_dict(model_config_dict=invalid_model_config)
 
 
