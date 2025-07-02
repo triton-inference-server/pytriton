@@ -78,3 +78,26 @@ parameters {
 response_cache {
     enable: true
 }
+model_warmup [
+{
+  name : "simple"
+  batch_size: 16
+  inputs {
+    key: "INPUT_1"
+    value: {
+      data_type: TYPE_FP32
+      dims: [ 1 ]
+      random_data: true
+    }
+  }
+  inputs {
+    key: "INPUT_2"
+    value: {
+      data_type: TYPE_STRING
+      dims: [ 1 ]
+      random_data: true
+    }
+  }
+  count: 2
+}]
+
