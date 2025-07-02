@@ -30,7 +30,10 @@ WORKDIR /workspace
 RUN git clone https://github.com/NVIDIA/TensorRT-LLM && cd TensorRT-LLM && git checkout v0.8.0 && cd ..
 
 ADD requirements.txt ./
+# Prevents externally managed packages error (PEP 668) in pip install
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 RUN pip install --no-cache-dir -r requirements.txt
+
 
 ADD ./server.py /workspace/
 ADD ./Makefile /workspace/
