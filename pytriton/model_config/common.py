@@ -15,7 +15,9 @@
 
 import dataclasses
 import enum
-from typing import Dict, Optional
+from typing import Dict, Optional, Sequence, Type, Union
+
+import numpy as np
 
 
 class DeviceKind(enum.Enum):
@@ -91,3 +93,32 @@ class DynamicBatcher:
     default_priority_level: int = 0
     default_queue_policy: Optional[QueuePolicy] = None
     priority_queue_policy: Optional[Dict[int, QueuePolicy]] = None
+
+
+@dataclasses.dataclass
+class WarmupInput:
+    """Warmup input configuration.
+
+    More in Triton Inference Server [documentation]
+    [documentation]: https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto#L1690
+    """
+
+    dtype: Union[Type[np.dtype], Type[object]]
+    shape: Sequence[int]
+    zero_data: Optional[bool] = False
+    random_data: Optional[bool] = False
+    input_data_file: Optional[str] = None
+
+
+@dataclasses.dataclass
+class ModelWarmup:
+    """Model warmup configuration.
+
+    More in Triton Inference Server [documentation]
+    [documentation]: https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto#L1683
+    """
+
+    name: str
+    batch_size: int
+    inputs: Dict[str, WarmupInput]
+    count: int

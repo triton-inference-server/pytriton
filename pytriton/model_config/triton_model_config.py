@@ -14,11 +14,11 @@
 """ModelConfig related objects."""
 
 import dataclasses
-from typing import Dict, Optional, Sequence, Type, Union
+from typing import Dict, List, Optional, Sequence, Type, Union
 
 import numpy as np
 
-from .common import DeviceKind, DynamicBatcher
+from .common import DeviceKind, DynamicBatcher, ModelWarmup
 
 
 @dataclasses.dataclass
@@ -61,6 +61,7 @@ class TritonModelConfig:
     inputs: Optional[Sequence[TensorSpec]] = None
     outputs: Optional[Sequence[TensorSpec]] = None
     response_cache: Optional[ResponseCache] = None
+    model_warmup: Optional[List[ModelWarmup]] = None
 
     @property
     def backend(self) -> str:

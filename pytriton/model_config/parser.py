@@ -29,14 +29,14 @@ class ModelConfig.
 import json
 import logging
 import pathlib
-from typing import Dict
+from typing import Dict, List, Type
 
 import numpy as np
 from google.protobuf import json_format, text_format  # pytype: disable=pyi-error
 
 from pytriton.exceptions import PyTritonModelConfigError
 
-from .common import QueuePolicy, TimeoutAction
+from .common import ModelWarmup, QueuePolicy, TimeoutAction, WarmupInput
 from .triton_model_config import DeviceKind, DynamicBatcher, ResponseCache, TensorSpec, TritonModelConfig
 
 try:
@@ -51,6 +51,33 @@ except ImportError:
         grpc_client = None
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _convert_triton_dtype_to_dtype(data_type: str) -> Type[np.dtype]:
+    """Convert Triton dtype to numpy dtype.
+
+    Args:
+        data_type: Triton dtype
+    """
+    if not data_type:
+        raise PyTritonModelConfigError("Data type not defined.")
+
+    data_type_val = data_type.split("_")
+    if len(data_type_val) != 2:
+        raise PyTritonModelConfigError(f"Invalid data type `{data_type}`. The expected name is TYPE_{type}.")
+
+    data_type = data_type_val[1]
+    if data_type == "STRING":
+        dtype = np.bytes_
+    else:
+        dtype = client_utils.triton_to_np_dtype(data_type)
+        if dtype is None:
+            raise PyTritonModelConfigError(f"Unsupported data type `{data_type}`.")
+
+        dtype = np.dtype("bool") if dtype is bool else dtype
+    # pytype: disable=bad-return-type
+    return dtype
+    # pytype: enable=bad-return-type
 
 
 class ModelConfigParser:
@@ -118,6 +145,12 @@ class ModelConfigParser:
         else:
             response_cache = None
 
+        model_warmup_config = model_config_dict.get("model_warmup")
+        if model_warmup_config:
+            model_warmup = cls._parse_model_warmup(model_warmup_config)
+        else:
+            model_warmup = None
+
         return TritonModelConfig(
             model_name=model_config_dict["name"],
             batching=batching,
@@ -129,6 +162,7 @@ class ModelConfigParser:
             decoupled=decoupled,
             backend_parameters=backend_parameters,
             response_cache=response_cache,
+            model_warmup=model_warmup,
         )
 
     @classmethod
@@ -169,25 +203,22 @@ class ModelConfigParser:
             raise PyTritonModelConfigError(f"Name for {io_type} at index {idx} not provided.")
 
         data_type = item.get("data_type")
-        if not data_type:
-            raise PyTritonModelConfigError(f"Data type for {io_type} with name `{name}` not defined.")
-
-        data_type_val = data_type.split("_")
-        if len(data_type_val) != 2:
-            raise PyTritonModelConfigError(
-                f"Invalid data type `{data_type}` for {io_type} with name `{name}` not defined. "
-                "The expected name is TYPE_{type}."
-            )
-
-        data_type = data_type_val[1]
-        if data_type == "STRING":
-            dtype = np.bytes_
-        else:
-            dtype = client_utils.triton_to_np_dtype(data_type)
-            if dtype is None:
-                raise PyTritonModelConfigError(f"Unsupported data type `{data_type}` for {io_type} with name `{name}`")
-
-            dtype = np.dtype("bool") if dtype is bool else dtype
+        try:
+            dtype = _convert_triton_dtype_to_dtype(data_type)
+        except PyTritonModelConfigError as e:
+            if "Data type not defined" in str(e):
+                raise PyTritonModelConfigError(f"Data type for {io_type} with name `{name}` not defined.") from e
+            elif "Invalid data type" in str(e):
+                raise PyTritonModelConfigError(
+                    f"Invalid data type `{data_type}` for {io_type} with name `{name}` not defined. "
+                    "The expected name is TYPE_{type}."
+                ) from e
+            elif "Unsupported data type" in str(e):
+                raise PyTritonModelConfigError(
+                    f"Unsupported data type `{data_type}` for {io_type} with name `{name}`"
+                ) from e
+            else:
+                raise e
 
         dims = item.get("dims", [])
         if not dims:
@@ -258,3 +289,52 @@ class ModelConfigParser:
             enable=bool(response_cache_config["enable"]),
         )
         return response_cache
+
+    @classmethod
+    def _parse_model_warmup(cls, model_warmup_config: List[Dict]) -> List[ModelWarmup]:
+        """Parse config for model warmup.
+
+        Args:
+            model_warmup_config: model warmup configuration
+        """
+        model_warmup = []
+        for model_warmup_item in model_warmup_config:
+            inputs = {}
+            for input_name, input_config in model_warmup_item["inputs"].items():
+                try:
+                    dtype = _convert_triton_dtype_to_dtype(input_config["data_type"])
+                except PyTritonModelConfigError as e:
+                    if "Data type not defined" in str(e):
+                        raise PyTritonModelConfigError(f"Data type for {input_name} not defined.") from e
+                    elif "Invalid data type" in str(e):
+                        raise PyTritonModelConfigError(
+                            f"Invalid data type `{input_config['data_type']}` for {input_name}."
+                        ) from e
+                    elif "Unsupported data type" in str(e):
+                        raise PyTritonModelConfigError(
+                            f"Unsupported data type `{input_config['data_type']}` for {input_name}."
+                        ) from e
+                    else:
+                        raise e
+
+                shape = tuple(int(s) for s in input_config["dims"])
+                if not shape:
+                    raise PyTritonModelConfigError(f"Dimension for {input_name} not defined.")
+
+                inputs[input_name] = WarmupInput(
+                    dtype=dtype,
+                    shape=shape,
+                    random_data=input_config.get("random_data", False),
+                    zero_data=input_config.get("zero_data", False),
+                    input_data_file=input_config.get("input_data_file", None),
+                )
+
+            model_warmup.append(
+                ModelWarmup(
+                    name=model_warmup_item["name"],
+                    batch_size=model_warmup_item["batch_size"],
+                    inputs=inputs,
+                    count=model_warmup_item["count"],
+                )
+            )
+        return model_warmup
