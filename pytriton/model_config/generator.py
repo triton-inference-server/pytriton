@@ -120,7 +120,8 @@ class ModelConfigGenerator:
         self._set_model_transaction_policy(model_config)
         self._set_backend_parameters(model_config)
         self._set_response_cache(model_config)
-        self._set_model_warmup(model_config)
+        # Note: warmup is now handled in Python before Triton loading, not in Triton config
+        # self._set_model_warmup(model_config)
         return model_config
 
     def _set_batching(self, model_config: Dict) -> None:

@@ -27,16 +27,18 @@ import json
 import logging
 import pathlib
 import socket
-import time
 from typing import Dict, Iterable, Optional, Tuple
 
+import numpy as np
 from tritonclient.grpc import InferenceServerException
 
 from pytriton.client import ModelClient
 from pytriton.client.utils import create_client_from_url, wait_for_server_ready
 from pytriton.constants import CREATE_TRITON_CLIENT_TIMEOUT_S, DEFAULT_TRITON_STARTUP_TIMEOUT_S
 from pytriton.exceptions import PyTritonInvalidOperationError
+from pytriton.model_config.common import generate_warmup_requests
 from pytriton.models.model import Model
+from pytriton.proxy.types import Request
 
 LOGGER = logging.getLogger(__name__)
 
@@ -136,82 +138,140 @@ class ModelManager:
     def _load_model_with_warmup_support(self, model: Model, local_model_store=False):
         """Load model to Triton server with proper warmup support.
 
-        This method establishes the proxy connection before warmup runs to ensure
-        warmup can work properly when configured.
+        This method performs warmup in Python before loading the model in Triton.
         """
         LOGGER.debug("Loading model %s with version %s with warmup support.", model.model_name, model.model_version)
 
         # Check if model has warmup configured
-        model_config_dict = model.get_model_config()
-        has_warmup = model_config_dict.get("model_warmup") is not None
+        has_warmup = model.config.model_warmup is not None and len(model.config.model_warmup) > 0
 
         if has_warmup and not local_model_store:
-            LOGGER.debug("Model %s has warmup configured - using warmup-safe loading sequence", model.model_name)
-            self._load_model_with_delayed_warmup(model, local_model_store)
-        else:
-            # Use original loading sequence for models without warmup or local model store
-            self._load_model(model, local_model_store)
-            model.setup()
+            LOGGER.debug("Model %s has warmup configured - performing pre-Triton warmup", model.model_name)
+            self._perform_pre_triton_warmup(model)
 
-    def _load_model_with_delayed_warmup(self, model: Model, local_model_store=False):
-        """Load model with delayed warmup to ensure proxy connection is established first.
+        # Load model normally (without warmup config in Triton)
+        self._load_model(model, local_model_store)
+        model.setup()
+
+    def _perform_pre_triton_warmup(self, model: Model):
+        """Perform warmup by calling the inference callable directly with numpy data.
 
         This method:
-        1. Temporarily removes warmup from model config
-        2. Loads model without warmup (establishes backend)
-        3. Sets up proxy connection
-        4. Reloads model with warmup enabled (warmup now works)
+        1. Generates warmup data from model warmup configuration
+        2. Calls the inference callable directly with the warmup data
+        3. This warms up the model before Triton starts loading it
         """
-        # Get the original model config
-        original_config_dict = model.get_model_config()
-        warmup_config = original_config_dict.get("model_warmup")
+        LOGGER.info("Starting pre-Triton warmup for model %s", model.model_name)
 
-        # Create a temporary config without warmup
-        temp_config_dict = original_config_dict.copy()
-        temp_config_dict.pop("model_warmup", None)
+        if not model.config.model_warmup:
+            LOGGER.debug("No warmup configuration found for model %s", model.model_name)
+            return
 
-        config_without_warmup = json.dumps(temp_config_dict)
-        files = model.get_proxy_model_files()
+        # Get the processed inputs with auto-generated names from Triton model config
+        triton_config = model._get_triton_model_config()
+        processed_inputs = triton_config.inputs or []
+        processed_outputs = triton_config.outputs or []
 
-        with ModelClient(
-            url=self._triton_url, model_name=model.model_name, model_version=str(model.model_version)
-        ) as client:
-            client.wait_for_server(timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S)
-
-            # Step 1: Load model without warmup to initialize backend
-            LOGGER.debug("Loading model %s without warmup to initialize backend", model.model_name)
-            client.load_model(config=config_without_warmup, files=files)
-
-            # Step 2: Wait a moment for backend to be fully initialized
-            time.sleep(1.0)
-
-            # Step 3: Setup proxy connection now that backend is running
-            LOGGER.debug("Setting up proxy connection for model %s", model.model_name)
-            model.setup()
-
-            # Step 4: Reset proxy connections before unloading
-            LOGGER.debug("Resetting proxy connections before reload for model %s", model.model_name)
-            model.reset_proxy_connections()
-
-            # Step 5: Unload model
-            LOGGER.debug(
-                "Unloading model %s with version %s before warmup reload", model.model_name, model.model_version
+        # Generate warmup requests from configuration
+        try:
+            warmup_requests = generate_warmup_requests(
+                model.config.model_warmup,
+                processed_inputs,  # Use processed inputs with auto-generated names
+                processed_outputs,
             )
-            client.unload_model()
 
-            # Wait for unload to complete
-            time.sleep(0.5)
+            if not warmup_requests:
+                LOGGER.debug("No warmup requests generated for model %s", model.model_name)
+                return
 
-            # Step 6: Reload with the original config including warmup
-            LOGGER.debug("Reloading model %s with warmup enabled", model.model_name)
-            original_config = json.dumps(original_config_dict)
-            client.load_model(config=original_config, files=files)
+            LOGGER.info("Generated %d warmup requests for model %s", len(warmup_requests), model.model_name)
 
-            # Step 7: Setup proxy connection again for the reloaded model
-            LOGGER.debug("Setting up proxy connection for reloaded model %s", model.model_name)
-            model.setup()
+            # Perform warmup by calling each inference function directly
+            for i, infer_function in enumerate(model.infer_functions):
+                LOGGER.debug("Warming up inference function %d for model %s", i, model.model_name)
 
-        LOGGER.debug("Model loading with warmup support completed for %s", model.model_name)
+                for j, warmup_data in enumerate(warmup_requests):
+                    LOGGER.debug(
+                        "Running warmup request %d/%d for inference function %d", j + 1, len(warmup_requests), i
+                    )
+
+                    try:
+                        # Call the inference function with the correct interface
+                        result = infer_function([Request(data=warmup_data)])
+                        LOGGER.debug("Warmup request %d completed successfully for inference function %d", j + 1, i)
+                    except Exception as e:
+                        LOGGER.warning("Warmup request %d failed for inference function %d: %s", j + 1, i, str(e))
+                        # Continue with other warmup requests even if one fails
+                        continue
+
+            LOGGER.info("Pre-Triton warmup completed for model %s", model.model_name)
+
+        except Exception as e:
+            LOGGER.error("Failed to perform pre-Triton warmup for model %s: %s", model.model_name, str(e))
+            # Don't raise the exception - warmup failure shouldn't prevent model loading
+            LOGGER.warning("Continuing with model loading despite warmup failure")
+
+    def _call_inference_function(self, infer_function, warmup_data: Dict[str, np.ndarray]):
+        """Call the inference function with the correct interface.
+
+        This method handles both decorated and undecorated inference functions by
+        trying the @batch interface first and falling back to Request objects.
+
+        Args:
+            infer_function: The inference function to call
+            warmup_data: Dictionary mapping input names to numpy arrays
+
+        Returns:
+            The result from the inference function
+        """
+        # Try calling with @batch decorator interface first (list of dict-like objects)
+        try:
+            requests = [warmup_data]  # warmup_data is already a dict with input names -> numpy arrays
+            result = infer_function(requests)
+            LOGGER.debug("Successfully called inference function with @batch interface")
+            return result
+        except Exception as batch_error:
+            LOGGER.debug("@batch interface failed, trying Request interface: %s", str(batch_error))
+
+            # Fall back to undecorated function interface (List[Request] objects)
+            try:
+                request = Request(data=warmup_data)
+                requests = [request]
+                result = infer_function(requests)
+                LOGGER.debug("Successfully called inference function with Request interface")
+                return result
+            except Exception as request_error:
+                LOGGER.error(
+                    "Both @batch and Request interfaces failed. @batch error: %s, Request error: %s",
+                    str(batch_error),
+                    str(request_error),
+                )
+                raise request_error  # Raise the last error
+
+    def _is_function_decorated_with_batch(self, func):
+        """Check if function is decorated with @batch decorator.
+
+        Args:
+            func: Function to check
+
+        Returns:
+            True if function is decorated with @batch, False otherwise
+        """
+        from pytriton.decorators import _get_wrapt_stack, batch
+
+        try:
+            # Get the stack of wrappers applied to this function
+            wrapper_stack = _get_wrapt_stack(func)
+
+            # Check if any wrapper in the stack is the batch decorator
+            for wrapped_with_wrapper in wrapper_stack:
+                if wrapped_with_wrapper.wrapper is batch:
+                    return True
+
+            return False
+        except Exception:
+            # If we can't determine the wrapper stack, assume it's not batch decorated
+            return False
 
     def _load_model(self, model: Model, local_model_store=False):
         """Original model loading method (for backwards compatibility)."""
