@@ -27,6 +27,7 @@ import json
 import logging
 import pathlib
 import socket
+import time
 from typing import Dict, Iterable, Optional, Tuple
 
 from tritonclient.grpc import InferenceServerException
@@ -86,15 +87,13 @@ class ModelManager:
             model.generate_model(self._model_store_path)
 
         if load_model:
-            self._load_model(model, _is_model_store_local)
-            model.setup()
+            self._load_model_with_warmup_support(model, _is_model_store_local)
 
     def load_models(self) -> None:
         """Load bound models to Triton server and setup loaded models."""
         for model in self._models.values():
             if not model.is_alive():
-                self._load_model(model)
-                model.setup()
+                self._load_model_with_warmup_support(model)
 
     def setup_models(self) -> None:
         """Setup loaded models."""
@@ -134,8 +133,86 @@ class ModelManager:
         key = (model.model_name.lower(), model.model_version)
         return key
 
+    def _load_model_with_warmup_support(self, model: Model, local_model_store=False):
+        """Load model to Triton server with proper warmup support.
+        
+        This method establishes the proxy connection before warmup runs to ensure
+        warmup can work properly when configured.
+        """
+        LOGGER.debug("Loading model %s with version %s with warmup support.", model.model_name, model.model_version)
+        
+        # Check if model has warmup configured
+        model_config_dict = model.get_model_config()
+        has_warmup = model_config_dict.get("model_warmup") is not None
+        
+        if has_warmup and not local_model_store:
+            LOGGER.debug("Model %s has warmup configured - using warmup-safe loading sequence", model.model_name)
+            self._load_model_with_delayed_warmup(model, local_model_store)
+        else:
+            # Use original loading sequence for models without warmup or local model store
+            self._load_model(model, local_model_store)
+            model.setup()
+
+    def _load_model_with_delayed_warmup(self, model: Model, local_model_store=False):
+        """Load model with delayed warmup to ensure proxy connection is established first.
+        
+        This method:
+        1. Temporarily removes warmup from model config
+        2. Loads model without warmup (establishes backend)
+        3. Sets up proxy connection
+        4. Reloads model with warmup enabled (warmup now works)
+        """
+        # Get the original model config
+        original_config_dict = model.get_model_config()
+        warmup_config = original_config_dict.get("model_warmup")
+        
+        # Create a temporary config without warmup
+        temp_config_dict = original_config_dict.copy()
+        temp_config_dict.pop("model_warmup", None)
+        
+        config_without_warmup = json.dumps(temp_config_dict)
+        files = model.get_proxy_model_files()
+        
+        with ModelClient(
+            url=self._triton_url, model_name=model.model_name, model_version=str(model.model_version)
+        ) as client:
+            client.wait_for_server(timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S)
+            
+            # Step 1: Load model without warmup to initialize backend
+            LOGGER.debug("Loading model %s without warmup to initialize backend", model.model_name)
+            client.load_model(config=config_without_warmup, files=files)
+            
+            # Step 2: Wait a moment for backend to be fully initialized
+            time.sleep(1.0)
+            
+            # Step 3: Setup proxy connection now that backend is running
+            LOGGER.debug("Setting up proxy connection for model %s", model.model_name)
+            model.setup()
+            
+            # Step 4: Reset proxy connections before unloading
+            LOGGER.debug("Resetting proxy connections before reload for model %s", model.model_name)
+            model.reset_proxy_connections()
+            
+            # Step 5: Unload model
+            LOGGER.debug("Unloading model %s before warmup reload", model.model_name)
+            client.unload_model(model.model_name)
+            
+            # Wait for unload to complete
+            time.sleep(0.5)
+            
+            # Step 6: Reload with the original config including warmup
+            LOGGER.debug("Reloading model %s with warmup enabled", model.model_name)
+            original_config = json.dumps(original_config_dict)
+            client.load_model(config=original_config, files=files)
+            
+            # Step 7: Setup proxy connection again for the reloaded model
+            LOGGER.debug("Setting up proxy connection for reloaded model %s", model.model_name)
+            model.setup()
+            
+        LOGGER.debug("Model loading with warmup support completed for %s", model.model_name)
+
     def _load_model(self, model: Model, local_model_store=False):
-        """Prepare model config and required files dict and load model to Triton server."""
+        """Original model loading method (for backwards compatibility)."""
         LOGGER.debug("Creating model %s with version %s.", model.model_name, model.model_version)
         config = None if local_model_store else json.dumps(model.get_model_config())
         files = None if local_model_store else model.get_proxy_model_files()

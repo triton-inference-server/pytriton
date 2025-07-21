@@ -229,6 +229,40 @@ class Model:
                     inference_handler.on_inference_handler_event(self._on_inference_handler_event)
                     inference_handler.start()
                     self._inference_handlers.append(inference_handler)
+            else:
+                LOGGER.debug("Model %s proxy connections already established", self.model_name)
+
+    def reset_proxy_connections(self) -> None:
+        """Reset proxy connections without cleaning observers.
+        
+        This method is used when a model is unloaded and needs to be reloaded
+        with a fresh proxy connection (e.g., for warmup support).
+        """
+        LOGGER.debug("Resetting proxy connections for model %s", self.model_name)
+        with self._inference_handlers_lock:
+            # Clean up existing connections
+            for inference_handler in self._inference_handlers:
+                inference_handler.stop()
+            for inference_handler in self._inference_handlers:
+                inference_handler.join()
+            self._inference_handlers.clear()
+            
+            for requests_responses_connector in self._requests_respones_connectors:
+                requests_responses_connector.close()
+            for requests_responses_connector in self._requests_respones_connectors:
+                requests_responses_connector.join()
+            self._requests_respones_connectors.clear()
+            
+        # Close serializer/deserializer connections but don't clear observers
+        self._serializer_deserializer.close()
+        
+        # Recreate serializer/deserializer for next setup
+        if os.environ.get("PYTRITON_NO_TENSORSTORE"):
+            self._serializer_deserializer = Base64SerializerDeserializer()
+        else:
+            self._serializer_deserializer = TensorStoreSerializerDeserializer()
+        
+        LOGGER.debug("Proxy connections reset complete for model %s", self.model_name)
 
     def clean(self) -> None:
         """Post unload actions to perform on model."""
