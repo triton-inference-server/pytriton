@@ -16,8 +16,9 @@ limitations under the License.
 
 # Changelog
 
-## Unreleased
+## 0.6.0 (2025-07-30)
 
+- New: Warmup functionality for Triton models. Thanks @Zhylkaaa
 - fix(check): PyTriton check fails with missing external script
 - fix(build): add CMAKE_POLICY_VERSION_MINIMUM to stub build script to ensure compatibility with newer versions of CMake
 - fix(docs): removed version constraints on OpenTelemetry packages to support newer versions
