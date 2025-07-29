@@ -68,7 +68,7 @@ def test_create_models_call_model_generate_and_setup_when_models_added(mocker):
     mocker.patch.object(model2, "is_alive").return_value = False
 
     model_manager = ModelManager(triton_url="")
-    load_model_method = mocker.patch.object(model_manager, "_load_model")
+    load_model_method = mocker.patch.object(model_manager, "_load_model_with_warmup")
 
     model_manager.add_model(model1)
     model_manager.add_model(model2)

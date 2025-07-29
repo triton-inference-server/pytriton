@@ -20,7 +20,7 @@ The dataclasses are exposed in the user API.
 """
 
 import dataclasses
-from typing import Optional
+from typing import List, Optional
 
 from pytriton.model_config import DynamicBatcher
 from pytriton.model_config.common import ModelWarmup
@@ -43,4 +43,4 @@ class ModelConfig:
     batcher: DynamicBatcher = dataclasses.field(default_factory=DynamicBatcher)
     response_cache: bool = False
     decoupled: bool = False
-    model_warmup: Optional[ModelWarmup] = None
+    model_warmup: Optional[List[ModelWarmup]] = None

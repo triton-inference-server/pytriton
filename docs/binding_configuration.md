@@ -124,3 +124,186 @@ with Triton(config=triton_config) as triton:
     )
     ...
 ```
+
+
+## Model Warm‑Up
+
+> *Added in PyTriton ≥ 0.6*
+
+Model warm‑up lets Triton issue **synthetic inference requests** immediately after a model is loaded, so that expensive one‑time initialisation (CUDA graph capture, JIT compilation, weight transfer, kernel autotuning, …) happens **before the first real user request**.
+The result is **stable and predictable latency** from the very first inference, which is critical for on‑line and multi‑tenant deployments.
+
+**Q: Does warm‑up block the process?**
+A: Yes. Triton waits synchronously; therefore warm‑up should be *fast* (≤ a few seconds) and run only the absolutely necessary shapes.
+
+
+```mermaid
+flowchart TD
+    A[Start Triton Process] --> B[Load Model Files]
+    B --> C[Instantiate Python Backend]
+    C --> D[Create Model Instances]
+    D --> E["Run Model Warm‑Up<br/>(synthetic requests)"]
+    E --> F[Model State READY]
+    F --> G[Serve Real Inference Requests]
+
+    subgraph Hidden initial latency
+        B -.cold path.- H[First real request<br/>creates buffers, JIT, etc.]
+    end
+    style H fill:#ffcccc,stroke:#aa0000,color:#000
+    style E fill:#bbf4bb,stroke:#008800,color:#000
+```
+
+Without warm‑up, the dashed *cold path* executes on the first user request (`H`).
+With warm‑up enabled, step `E` is executed automatically during start‑up, ensuring the public state becomes `READY` **only after** the costly initialisation is finished.
+
+
+### When should you warm‑up a model ?
+
+| Symptom observed without warm‑up                                       | Root cause                                                            | Warm‑up effect                                              |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------- |
+| First request is several × slower than the median p50                  | Lazy JIT / kernel compilation, CUDA graph capture, memory pool growth | Executes once during start‑up rather than during production |
+| First batch allocates large page‑locked buffers                        | Page‑locked pool not yet initialised                                  | Buffers are allocated during warm‑up                        |
+| TRT‐optimised model builds first time it is asked for a given shape    | TensorRT engine caching                                               | Required shapes are built up‑front                          |
+| Scaling to N identical replicas shows a latency spike on every replica | Per‑replica initialisation                                            | Warm‑up hides the spike and synchronises replicas           |
+
+### API reference
+
+Two data classes have been introduced in **`pytriton.model_config.common`**:
+
+<!--pytest.mark.skip-->
+```python
+@dataclasses.dataclass
+class WarmupInput:
+    dtype: Union[Type[np.dtype], Type[object]]
+    shape: Sequence[int]
+
+    # One of the three flags **must** be True.
+    zero_data: bool = False          # Fill tensor with all‑zeros
+    random_data: bool = False        # Fill with reproducible PRNG data
+    input_data_file: Optional[str]   # Load binary/NPY file from disk
+```
+
+<!--pytest.mark.skip-->
+```python
+@dataclasses.dataclass
+class ModelWarmup:
+    name: str                        # Friendly identifier (visible in logs)
+    batch_size: int                  # Per‑warm‑up request batch size
+    inputs: Dict[str, WarmupInput]   # Keyed by *input tensor name*
+    count: int                       # How many requests to send
+```
+
+`ModelConfig` has a new optional field:
+
+<!--pytest.mark.skip-->
+```python
+class ModelConfig:
+    ...
+    model_warmup: Optional[List[ModelWarmup]] = None
+```
+
+### Minimal warm‑up example
+
+```python
+import numpy as np
+from pytriton.decorators import batch
+from pytriton.triton import Triton
+from pytriton.model_config import ModelConfig, Tensor
+from pytriton.model_config.common import ModelWarmup, WarmupInput
+
+@batch
+def infer_fn(INPUT_1, INPUT_2):
+    return {"OUTPUT_1": np.ones((1,1), dtype=np.float32)}
+
+# 1. Describe the warm‑up traffic pattern
+warmup = ModelWarmup(
+    name="first-batch",
+    batch_size=1,
+    inputs={
+        "INPUT_1": WarmupInput(dtype=np.float32, shape=(1,), random_data=True),
+        "INPUT_2": WarmupInput(dtype=np.bytes_, shape=(1,), zero_data=True),
+    },
+    count=1,            # run two synthetic requests
+)
+
+# 2. Attach it to the model’s config
+config = ModelConfig(
+    max_batch_size=16,
+    model_warmup=[warmup],
+)
+
+# 3. Bind the model as usual
+triton = Triton()
+triton.bind(
+    model_name="MyModel",
+    infer_func=infer_fn,          # your @batch function
+    inputs=[
+        Tensor(dtype=np.float32, shape=(1,)),
+        Tensor(dtype=np.bytes_,  shape=(1,)),
+    ],
+    outputs=[Tensor(dtype=np.float32, shape=(1,))],
+    config=config,
+    strict=True,
+)
+triton.run()
+```
+
+
+<!--pytest-codeblocks:cont-->
+<!--
+Test server:
+
+```python
+from pytriton.client import ModelClient
+
+client = ModelClient("localhost", "MyModel")
+data_float = np.ones((1,), dtype=np.float32)
+data_bytes = np.ones((1,), dtype=np.bytes_)
+print(client.infer_sample(INPUT_1=data_float, INPUT_2=data_bytes))
+```
+-->
+
+<!--pytest-codeblocks:cont-->
+<!--
+Clean resources for code block
+
+```python
+client.close()
+triton.stop()
+```
+-->
+
+
+### Multiple warm‑up stages
+
+You may specify several `ModelWarmup` blocks to emulate different request shapes:
+
+```python
+import numpy as np
+from pytriton.model_config import ModelConfig, Tensor
+from pytriton.model_config.common import ModelWarmup, WarmupInput
+config = ModelConfig(
+    max_batch_size=32,
+    model_warmup=[
+        ModelWarmup(
+            name="bs16-seq32",
+            batch_size=16,
+            inputs={"tokens": WarmupInput(np.int32, (32,), random_data=True)},
+            count=1,
+        ),
+        ModelWarmup(
+            name="bs1-seq512",
+            batch_size=1,
+            inputs={"tokens": WarmupInput(np.int32, (512,), random_data=True)},
+            count=1,
+        ),
+    ],
+)
+```
+
+### Tips & best practices
+
+* **Keep it realistic** – warm‑up tensors should mimic production shapes and dtypes; otherwise kernels may still lazily compile.
+* **Static memory pools** – if you use fixed input sizes, set `zero_data=True` rather than `random_data` to avoid wasting entropy and to maximise deterministic behaviour.
+* **File‑based warm‑up** – use `input_data_file="warmup/sample.npy"` when zero or random data would not hit critical execution paths (e.g. text decoding).
+* **Monitoring** – count × batch × latency of warm‑up requests delays the server becoming `READY`; plan health‑checks accordingly.

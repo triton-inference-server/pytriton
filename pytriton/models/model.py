@@ -287,7 +287,8 @@ class Model:
                 decoupled=self.config.decoupled,
                 backend_parameters=backend_parameters,
                 instance_group={DeviceKind.KIND_CPU: len(self.infer_functions)},
-                model_warmup=self.config.model_warmup,
+                # model_warmup is intentionally excluded - it should only be used by PyTriton
+                # for internal warmup execution and never passed to Triton server
             )
             inputs = []
             for idx, input_spec in enumerate(self.inputs, start=1):
