@@ -20,7 +20,7 @@ import random
 
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 METADATA = {
-    "image_name": "ubuntu:22.04",
+    "image_name": "nvcr.io/nvidia/pytorch:{TEST_CONTAINER_VERSION}-py3",
     "platforms": ["amd64", "arm64"],
 }
 
