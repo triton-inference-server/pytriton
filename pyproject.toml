@@ -79,7 +79,8 @@ doc = [
     "mkdocs-htmlproofer-plugin >= 1.1",
     "mkdocs-material >= 9.5",
     "mkdocstrings[python] < 0.28.3",
-    "mkdocstrings-python >= 1.8"
+    "mkdocstrings-python >= 1.8",
+    "mkdocs-mermaid2-plugin >= 1.2.1",
 ]
 dev = [
     "nvidia-pytriton[test]",
