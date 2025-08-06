@@ -1,4 +1,4 @@
-# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2023-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -317,9 +317,9 @@ def test_infer_batch_blocking_behaviour(mocker):
         # Wait for the first future to finish
         assert first_future.result() is ret
 
-        assert (
-            patch_client_infer_batch.call_count == 2
-        ), "infer_batch should have been called twice (one blocked, one released)."
+        assert patch_client_infer_batch.call_count == 2, (
+            "infer_batch should have been called twice (one blocked, one released)."
+        )
 
 
 @patch_server_model_addsub_no_batch_ready

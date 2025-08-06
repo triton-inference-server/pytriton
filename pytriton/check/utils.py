@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ import subprocess
 import threading
 import typing
 
-LOGGER = logging.getLogger(__name__)
 DEFAULT_LOG_FORMAT = "%(asctime)s - %(levelname)8s - %(process)8d - %(threadName)s - %(name)s: %(message)s"
 
 
@@ -341,6 +340,8 @@ class ProcessMonitoringThread:
         """
         self._monitoring = monitoring
         self._interval = interval
+        self._thread = None
+        self._logger = None
 
     def start(self) -> None:
         """Starts the monitoring thread.
@@ -351,6 +352,7 @@ class ProcessMonitoringThread:
         """
         self._stop_event = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
+        self._logger = logging.getLogger(self._thread.name)
         self._thread.start()
 
     def stop(self) -> None:
@@ -361,6 +363,7 @@ class ProcessMonitoringThread:
         """
         self._stop_event.set()
         self._thread.join()
+        self._thread = None
 
     def __enter__(self):
         """Enters the context manager for the monitoring thread."""
@@ -372,10 +375,10 @@ class ProcessMonitoringThread:
         self.stop()
 
     def _run(self):
-        logging.info("Monitoring process")
+        self._logger.info("Monitoring process")
         self._monitoring.dump_state()
         while not self._stop_event.wait(self._interval):
-            logging.info("Monitoring process")
+            self._logger.info("Monitoring process")
             self._monitoring.dump_state()
 
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2023-2025, NVIDIA CORPORATION. All rights reserved.
 # Copyright (c) 2023, vllm-project. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -200,7 +200,7 @@ def main(args: argparse.Namespace):
     ])
     print(f"Average latency per token: {avg_per_token_latency:.2f} s")  # noqa: T201
     avg_per_output_token_latency = np.mean([latency / output_len for _, output_len, latency in REQUEST_LATENCY])
-    print("Average latency per output token: " f"{avg_per_output_token_latency:.2f} s")  # noqa: T201
+    print(f"Average latency per output token: {avg_per_output_token_latency:.2f} s")  # noqa: T201
 
     with open(f"outputs-{args.backend}.jsonl", "w") as output_file:
         output_file.writelines([json.dumps(entry) + "\n" for entry in OUTPUTS])

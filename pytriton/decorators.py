@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -386,7 +386,7 @@ class ConstantPadder:
             # for bytes (encoded string) or unicode string need to obtain the max length
             if result_dtype.kind in "SU":
                 order_and_kind = result_dtype.str[:2]
-                max_len = max([int(dtype.str[2:]) for dtype in dtypes])
+                max_len = max(int(dtype.str[2:]) for dtype in dtypes)
                 result_dtype = f"{order_and_kind}{max_len}"
             else:
                 if not all(dtype == result_dtype for dtype in dtypes):

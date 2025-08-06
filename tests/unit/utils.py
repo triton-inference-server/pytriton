@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,9 +27,9 @@ from pytriton.model_config.triton_model_config import TritonModelConfig
 def verify_equalness_of_dicts_with_ndarray(a_dict, b_dict):
     assert a_dict.keys() == b_dict.keys(), f"{a_dict} != {b_dict}"
     for output_name in a_dict:
-        assert isinstance(
-            a_dict[output_name], type(b_dict[output_name])
-        ), f"type(a[{output_name}])={type(a_dict[output_name])} != type(b[{output_name}])={type(b_dict[output_name])}"
+        assert isinstance(a_dict[output_name], type(b_dict[output_name])), (
+            f"type(a[{output_name}])={type(a_dict[output_name])} != type(b[{output_name}])={type(b_dict[output_name])}"
+        )
         if isinstance(a_dict[output_name], np.ndarray):
             assert a_dict[output_name].dtype == b_dict[output_name].dtype
             assert a_dict[output_name].shape == b_dict[output_name].shape

@@ -1,4 +1,4 @@
-# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2023-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -90,8 +90,7 @@ class NemoGptCallable:
             generate_fn = self._task_generate_fn
             if generate_fn is None:
                 raise PyTritonInvalidOperationError(
-                    f"Model {self.model_name} does not support task {tasks[0]}. "
-                    "Only text_generation task is supported."
+                    f"Model {self.model_name} does not support task {tasks[0]}. Only text_generation task is supported."
                 )
             prompts = self._format_prompts(tasks, prompts)
 

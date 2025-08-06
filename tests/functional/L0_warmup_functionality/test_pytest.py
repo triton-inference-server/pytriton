@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -589,12 +589,12 @@ def test_llm_style_warmup_with_all_types(find_free_ports):
 
             # Verify exact content matches expected data from files
             assert np.array_equal(call_0["token_ids"], expected_token_ids), "Token IDs don't match expected content"
-            assert np.array_equal(
-                call_0["attention_mask"], expected_attention_mask
-            ), "Attention mask doesn't match expected content"
-            assert np.array_equal(
-                call_0["position_ids"], expected_position_ids
-            ), "Position IDs don't match expected content"
+            assert np.array_equal(call_0["attention_mask"], expected_attention_mask), (
+                "Attention mask doesn't match expected content"
+            )
+            assert np.array_equal(call_0["position_ids"], expected_position_ids), (
+                "Position IDs don't match expected content"
+            )
 
             _LOGGER.info("✓ input_data_file warmup: Exact content validation passed")
 
@@ -645,9 +645,9 @@ def test_llm_style_warmup_with_all_types(find_free_ports):
                 # Verify normal inference outputs
                 assert "next_token_logits" in result
                 assert "last_hidden_state" in result
-                assert result["next_token_logits"].shape == (
-                    50257,
-                ), f"Logits shape: {result['next_token_logits'].shape}"
+                assert result["next_token_logits"].shape == (50257,), (
+                    f"Logits shape: {result['next_token_logits'].shape}"
+                )
                 assert result["last_hidden_state"].shape == (
                     5,
                     768,
@@ -902,9 +902,9 @@ def test_comprehensive_int64_warmup_patterns(find_free_ports):
                     "random_tokens_validated",
                     "zero_padding_validated",
                 }
-                assert (
-                    set(result.keys()) == expected_outputs
-                ), f"Output mismatch: {set(result.keys())} vs {expected_outputs}"
+                assert set(result.keys()) == expected_outputs, (
+                    f"Output mismatch: {set(result.keys())} vs {expected_outputs}"
+                )
 
                 for output_name, output_tensor in result.items():
                     assert output_tensor.dtype == np.int64, f"{output_name} should be int64"

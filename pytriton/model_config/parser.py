@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -116,7 +116,7 @@ class ModelConfigParser:
         if isinstance(backend_parameters_config, list):
             # If the backend_parameters_config is a list of strings, use them as keys with empty values
             LOGGER.debug("backend_parameters_config is a list of strings: %s", backend_parameters_config)
-            backend_parameters = {name: "" for name in backend_parameters_config}
+            backend_parameters = dict.fromkeys(backend_parameters_config, "")
         elif isinstance(backend_parameters_config, dict):
             # If the backend_parameters_config is a dictionary, use the key and "string_value" fields as key-value pairs
             LOGGER.debug("backend_parameters_config is a dictionary: %s", backend_parameters_config)

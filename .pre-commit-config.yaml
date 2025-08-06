@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 exclude: kubernetes
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.3.0
+    rev: v0.12.7
     hooks:
       - id: ruff
         args: [--fix]
@@ -23,7 +23,7 @@ repos:
         types_or: [ python, pyi ]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v5.0.0
     hooks:
       - id: check-docstring-first
       - id: check-executables-have-shebangs
@@ -43,11 +43,7 @@ repos:
         exclude: setup.cfg
       - id: mixed-line-ending
         args: [--fix=lf]
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v3.15.0
-    hooks:
-      - id: pyupgrade
-        args: [--py38-plus]
+
   - repo: https://github.com/thlorenz/doctoc
     rev: v2.2.0
     hooks:

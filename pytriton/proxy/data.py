@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -131,9 +131,9 @@ _PARTIAL_HEADER_FORMAT = f"<{_MAX_DTYPE_DESCR}scH"
 def _pack_header(shape: Tuple[int, ...], dtype: np.dtype, order: Literal["C", "F"] = "C") -> bytes:
     header_format = _PARTIAL_HEADER_FORMAT + "Q" * len(shape)
     dtype_descr = np.lib.format.dtype_to_descr(dtype)
-    assert (
-        len(dtype_descr) <= _MAX_DTYPE_DESCR
-    ), f"dtype descr is too long; dtype_descr={dtype_descr} max={_MAX_DTYPE_DESCR}"
+    assert len(dtype_descr) <= _MAX_DTYPE_DESCR, (
+        f"dtype descr is too long; dtype_descr={dtype_descr} max={_MAX_DTYPE_DESCR}"
+    )
     return struct.pack(header_format, dtype_descr.encode("utf-8"), order.encode("ascii"), len(shape), *shape)
 
 
