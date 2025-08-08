@@ -166,7 +166,7 @@ Fine-tune your model deployment strategy with our targeted documentation:
 - [Initialize Triton](initialization.md) for seamless startup.
 - Bind your [models to Triton](binding_models.md) for enhanced communication.
 - Adjust your [binding configurations](binding_configuration.md) for improved control.
-- Expand your reach by [deploying on clusters](guides/deploying_in_clusters.md).
+- Expand your reach by [deploying in production](guides/deploy.md).
 - Master the use of [Triton in remote mode](remote_triton.md).
 
 

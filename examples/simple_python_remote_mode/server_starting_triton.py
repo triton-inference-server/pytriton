@@ -15,12 +15,13 @@
 """Server starting triton with simple python model performing adding and subtract operation."""
 
 import logging
+import os
 
 import numpy as np
 
 from pytriton.decorators import batch
 from pytriton.model_config import ModelConfig, Tensor
-from pytriton.triton import Triton
+from pytriton.triton import Triton, TritonSecurityConfig
 
 logger = logging.getLogger("examples.simple_python_remote_mode.server_starting_triton")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s: %(message)s")
@@ -34,7 +35,7 @@ def _add_sub(**inputs):
     return {"add": add_batch, "sub": sub_batch}
 
 
-with Triton() as triton:
+with Triton(security_config=TritonSecurityConfig(access_token=os.getenv("TRITON_ACCESS_TOKEN"))) as triton:
     logger.info("Loading and serve AddSub model")
 
     # triton.bind() is optional here (you can use Triton class for starting server only without binding any model

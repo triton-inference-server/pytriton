@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ import logging
 import os
 import pathlib
 import re
+import secrets
 import shutil
 import sys
 import threading as th
@@ -78,6 +79,31 @@ MODEL_READY_URL = f"{MODEL_URL}/ready/"
 MODEL_CONFIG_URL = f"{MODEL_URL}/config/"
 MODEL_INFER_URL = f"{MODEL_URL}/infer/"
 
+# Valid Triton Server endpoint names for restriction configuration
+VALID_TRITON_ENDPOINTS = {
+    "health",
+    "metadata",
+    "inference",
+    "shared-memory",
+    "model-config",
+    "model-repository",
+    "statistics",
+    "trace",
+    "logging",
+}
+
+# Default endpoints to protect with token-based access restriction
+DEFAULT_PROTECTED_ENDPOINTS = [
+    "shared-memory",
+    "model-repository",
+    "statistics",
+    "trace",
+    "logging",
+]
+
+# Header name for token-based access restriction
+TRITON_ACCESS_HEADER = "triton-access" + "-token"
+
 
 # see https://github.com/triton-inference-server/server/blob/main/src/command_line_parser.cc for more details
 @kwonly_dataclass
@@ -103,6 +129,11 @@ class TritonConfig:
         http_header_forward_pattern: The regular expression pattern
             that will be used for forwarding HTTP headers as inference request parameters.
         http_thread_count: Number of threads handling HTTP requests.
+        http_restricted_api: Specify restricted HTTP API setting.
+            The format of this flag is `<APIs>,<key>=<value>`.
+            Where `<APIs>` is a comma-separated list of APIs to be restricted.
+            `<key>` will be additional header key to be checked when an HTTP request
+            is received, and `<value>` is the value expected to be matched.
         allow_grpc: Allow the server to listen for GRPC requests.
         grpc_address: The address for the grpc server to binds to. Default is 0.0.0.0.
         grpc_port: The port for the server to listen on for GRPC requests. Default is 8001.
@@ -182,6 +213,7 @@ class TritonConfig:
     http_port: Optional[int] = None
     http_header_forward_pattern: Optional[str] = None
     http_thread_count: Optional[int] = None
+    http_restricted_api: Optional[str] = None
     allow_grpc: Optional[bool] = None
     grpc_address: Optional[str] = None
     grpc_port: Optional[int] = None
@@ -199,6 +231,7 @@ class TritonConfig:
     grpc_http2_max_pings_without_data: Optional[int] = None
     grpc_http2_min_recv_ping_interval_without_data: Optional[int] = None
     grpc_http2_max_ping_strikes: Optional[int] = None
+    grpc_restricted_protocol: Optional[str] = None
     allow_metrics: Optional[bool] = None
     allow_gpu_metrics: Optional[bool] = None
     allow_cpu_metrics: Optional[bool] = None
@@ -323,20 +356,69 @@ DefaultTritonLifecyclePolicy = TritonLifecyclePolicy()
 VertextAILifecyclePolicy = TritonLifecyclePolicy(launch_triton_on_startup=False, local_model_store=True)
 
 
+@dataclasses.dataclass
+class TritonSecurityConfig:
+    """Triton Inference Server security configuration.
+
+    Configuration for token-based access restriction to secure model endpoints.
+    """
+
+    access_token: Optional[str] = None
+    restricted_endpoints: Optional[List[str]] = None
+
+    def __post_init__(self):
+        """Validate security configuration."""
+        # Handle None vs empty list: None means use defaults, [] means no restrictions
+        if self.restricted_endpoints is None:
+            self.restricted_endpoints = DEFAULT_PROTECTED_ENDPOINTS.copy()
+        self._validate_endpoint_names(self.restricted_endpoints)
+
+        # Only auto-generate token if we have endpoints to protect
+        # This allows for tests to check default None state
+        if self.access_token is None and self.restricted_endpoints:
+            self.access_token = secrets.token_urlsafe(32)
+
+    @staticmethod
+    def _validate_endpoint_names(endpoints: List[str]) -> None:
+        """Validate that all endpoint names are recognized by Triton Server.
+
+        Args:
+            endpoints: List of endpoint names to validate
+
+        Raises:
+            PyTritonValidationError: If any endpoint name is invalid
+        """
+        invalid_endpoints = set(endpoints) - VALID_TRITON_ENDPOINTS
+        if invalid_endpoints:
+            valid_endpoints_str = ", ".join(sorted(VALID_TRITON_ENDPOINTS))
+            invalid_endpoints_str = ", ".join(sorted(invalid_endpoints))
+            raise PyTritonValidationError(
+                f"Invalid endpoint names: {invalid_endpoints_str}. Valid endpoints are: {valid_endpoints_str}"
+            )
+
+
 class _LogLevelChecker:
     """Check if log level is too verbose."""
 
-    def __init__(self, url: str) -> None:
+    def __init__(self, url: str, access_token: Optional[str] = None) -> None:
         """Initialize LogLevelChecker.
 
         Args:
             url: Triton Inference Server URL in form of <scheme>://<host>:<port>
+            access_token: Access token for the Triton Inference Server
 
         Raises:
             PyTritonClientInvalidUrlError: if url is invalid
         """
         self._log_settings = None
         self._url = url
+        self._headers = None
+        if access_token is not None:
+            from pytriton.client.auth import create_auth_headers
+
+            # Parse URL to determine protocol
+            triton_url = TritonUrl.from_url(url)
+            self._headers = create_auth_headers(access_token, triton_url.scheme)
 
     def check(self, skip_update: bool = False):
         """Check if log level is too verbose.
@@ -348,8 +430,8 @@ class _LogLevelChecker:
         """
         if self._log_settings is None and not skip_update:
             with contextlib.closing(create_client_from_url(self._url)) as client:
-                wait_for_server_ready(client, timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S)
-                self._log_settings = client.get_log_settings()
+                wait_for_server_ready(client, timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S, headers=self._headers)
+                self._log_settings = client.get_log_settings(headers=self._headers)
 
         if self._log_settings is not None:
             log_settings = self._log_settings
@@ -378,6 +460,7 @@ class TritonBase:
         url: str,
         workspace: Union[Workspace, str, pathlib.Path, None] = None,
         triton_lifecycle_policy: TritonLifecyclePolicy = DefaultTritonLifecyclePolicy,
+        access_token: Optional[str] = None,
     ):
         """Initialize TritonBase.
 
@@ -386,7 +469,7 @@ class TritonBase:
             workspace: Workspace for storing communication sockets and the other temporary files.
             triton_lifecycle_policy:  policy indicating when Triton server is launched and where the model store is located
             (locally or remotely managed by Triton server).
-
+            access_token: Access token for the Triton Inference Server
         """
         self._triton_lifecycle_policy = triton_lifecycle_policy
         self._workspace = workspace if isinstance(workspace, Workspace) else Workspace(workspace)
@@ -394,10 +477,18 @@ class TritonBase:
         _local_model_config_path = (
             self._workspace.model_store_path if triton_lifecycle_policy.local_model_store else None
         )
-        self._model_manager = ModelManager(self._url, _local_model_config_path)
+        self._model_manager = ModelManager(self._url, _local_model_config_path, access_token=access_token)
         self._cv = th.Condition()
         self._triton_context = TritonContext()
-        self._log_level_checker = _LogLevelChecker(self._url)
+        self._access_token = access_token
+        self._log_level_checker = _LogLevelChecker(self._url, access_token=access_token)
+        self._headers = None
+        if access_token is not None:
+            from pytriton.client.auth import create_auth_headers
+
+            # Parse URL to determine protocol
+            triton_url = TritonUrl.from_url(self._url)
+            self._headers = create_auth_headers(access_token, triton_url.scheme)
 
         with self._cv:
             self._stopped = True
@@ -572,7 +663,7 @@ class TritonBase:
         self._log_level_checker.check()
         try:
             with contextlib.closing(create_client_from_url(self._url)) as client:
-                wait_for_server_ready(client, timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S)
+                wait_for_server_ready(client, timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S, headers=self._headers)
         except TimeoutError as e:
             LOGGER.warning(
                 "Could not verify locally if Triton Inference Server is ready using %s. "
@@ -588,7 +679,10 @@ class TritonBase:
         try:
             for model in self._model_manager.models:
                 with ModelClient(
-                    url=self._url, model_name=model.model_name, model_version=str(model.model_version)
+                    url=self._url,
+                    model_name=model.model_name,
+                    model_version=str(model.model_version),
+                    access_token=self._access_token,
                 ) as client:
                     # This waits for only tritonserver and lightweight proxy backend to be ready
                     # timeout should be short as model is loaded before execution of Triton.start() method
@@ -641,6 +735,7 @@ class Triton(TritonBase):
         config: Optional[TritonConfig] = None,
         workspace: Union[Workspace, str, pathlib.Path, None] = None,
         triton_lifecycle_policy: Optional[TritonLifecyclePolicy] = None,
+        security_config: Optional[TritonSecurityConfig] = None,
     ):
         """Initialize Triton Inference Server context for starting server and loading models.
 
@@ -661,6 +756,9 @@ class Triton(TritonBase):
                 (locally or remotely managed by Triton server). If triton_lifecycle_policy is None,
                 DefaultTritonLifecyclePolicy is used by default (Triton server is launched on startup and model store is not local).
                 Only if triton_lifecycle_policy is None and config.allow_vertex_ai is True, VertextAILifecyclePolicy is used instead.
+            security_config: TritonSecurityConfig object with security settings for token-based access restriction.
+                If not provided, DefaultTritonSecurityConfig is used, which auto-generates a secure token and protects
+                the default endpoints: shared-memory, model-repository, statistics, trace, logging.
         """
         _triton_lifecycle_policy = (
             VertextAILifecyclePolicy
@@ -676,6 +774,8 @@ class Triton(TritonBase):
         explicit_config_dict = _without_none_values(config.to_dict() if config else {})
         config_dict = {**default_config_dict, **env_config_dict, **explicit_config_dict}
         self._config = TritonConfig(**config_dict)
+        self._security_config = security_config or TritonSecurityConfig()
+
         workspace_instance = workspace if isinstance(workspace, Workspace) else Workspace(workspace)
         self._prepare_triton_config(workspace_instance)
         endpoint_protocol = "http" if self._config.allow_http in [True, None] else "grpc"
@@ -683,6 +783,7 @@ class Triton(TritonBase):
             url=endpoint_utils.get_endpoint(self._triton_server_config, endpoint_protocol),
             workspace=workspace_instance,
             triton_lifecycle_policy=_triton_lifecycle_policy,
+            access_token=self._security_config.access_token,
         )
         self._triton_server = None
 
@@ -727,7 +828,7 @@ class Triton(TritonBase):
             if (self._config.allow_http is None or self._config.allow_http)
             else self._triton_server.get_endpoint("grpc")
         )
-        self._log_level_checker = _LogLevelChecker(url)
+        self._log_level_checker = _LogLevelChecker(url, access_token=self._security_config.access_token)
 
     def _prepare_triton_config(self, workspace: Workspace) -> None:
         self._triton_server_config = TritonServerConfig()
@@ -758,6 +859,17 @@ class Triton(TritonBase):
         self._triton_server_config["backend_config"] = self._python_backend_config.to_list_args()
         if "model_repository" not in self._triton_server_config:
             self._triton_server_config["model_repository"] = workspace.model_store_path.as_posix()
+
+        # Configure token-based access restrictions
+        # Only apply restrictions if we have a token AND non-empty endpoint list
+        # Empty list [] means no restrictions (unrestricted behavior)
+        if self._security_config.access_token and self._security_config.restricted_endpoints:
+            endpoints_str = ",".join(self._security_config.restricted_endpoints)
+            restriction_value = f"{endpoints_str}:{TRITON_ACCESS_HEADER}={self._security_config.access_token}"
+
+            # Set both HTTP and gRPC restrictions with the same configuration
+            self._triton_server_config["grpc-restricted-protocol"] = restriction_value
+            self._triton_server_config["http-restricted-api"] = restriction_value
 
     def _prepare_triton_inference_server(self) -> pathlib.Path:
         """Prepare binaries and libraries of Triton Inference Server for execution.
@@ -838,11 +950,21 @@ class Triton(TritonBase):
         LOGGER.debug("Got callback that tritonserver process finished")
         self.stop()
 
+    def get_access_token(self) -> str:
+        """Get the current access token for endpoint restrictions.
+
+        Returns:
+            The access token string (explicit or generated)
+        """
+        return self._security_config.access_token
+
 
 class RemoteTriton(TritonBase):
     """RemoteTriton connects to Triton Inference Server running on remote host."""
 
-    def __init__(self, url: str, workspace: Union[Workspace, str, pathlib.Path, None] = None):
+    def __init__(
+        self, url: str, workspace: Union[Workspace, str, pathlib.Path, None] = None, access_token: Optional[str] = None
+    ):
         """Initialize RemoteTriton.
 
         Args:
@@ -855,12 +977,13 @@ class RemoteTriton(TritonBase):
                 Workspace should be created in shared filesystem space between RemoteTriton
                 and Triton Inference Server to allow access to socket files
                 (if you use containers, folder must be shared between containers).
-
+            access_token: Access token for the Triton Inference Server
         """
         super().__init__(
             url=TritonUrl.from_url(url).with_scheme,
             workspace=workspace,
             triton_lifecycle_policy=TritonLifecyclePolicy(launch_triton_on_startup=True, local_model_store=False),
+            access_token=access_token,
         )
 
         with self._cv:

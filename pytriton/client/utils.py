@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -98,6 +98,7 @@ def get_model_state(
     client: _TritonSyncClientType,
     model_name: str,
     model_version: Optional[str] = None,
+    headers: Optional[dict] = None,
 ) -> ModelState:
     """Obtains state of the model deployed in Triton Inference Server.
 
@@ -108,12 +109,13 @@ def get_model_state(
             version of the model which state we're requesting.
             If model_version is None state of latest model is returned.
             The latest versions of the model are the numerically greatest version numbers.
+        headers: headers to use for the request.
 
     Returns:
         Model state. _ModelState.UNAVAILABLE is returned in case if model with given name and version is not found.
 
     """
-    repository_index = client.get_model_repository_index()
+    repository_index = client.get_model_repository_index(headers=headers)
     if isinstance(repository_index, list):
         models_states = parse_http_response(models=repository_index)
     else:
@@ -139,6 +141,7 @@ def get_model_config(
     model_name: str,
     model_version: Optional[str] = None,
     timeout_s: Optional[float] = None,
+    headers: Optional[dict] = None,
 ):
     """Obtain configuration of model deployed on the Triton Inference Server.
 
@@ -158,6 +161,7 @@ def get_model_config(
             If model_version is None configuration of the latest model is returned.
             The latest versions of the model are the numerically greatest version numbers.
         timeout_s: timeout to finish model configuration obtain. Default value is 300.0 s.
+        headers: headers to use for the request.
 
     Returns:
         Configuration of requested model.
@@ -172,10 +176,10 @@ def get_model_config(
 
     _LOGGER.debug("Obtaining model %s config", model_name)
     if isinstance(client, tritonclient.grpc.InferenceServerClient):
-        response = client.get_model_config(model_name, model_version, as_json=True)
+        response = client.get_model_config(model_name, model_version, as_json=True, headers=headers)
         model_config = response["config"]
     else:
-        model_config = client.get_model_config(model_name, model_version)
+        model_config = client.get_model_config(model_name, model_version, headers=headers)
     model_config = ModelConfigParser.from_dict(model_config)
     _LOGGER.debug("Model config: %s", model_config)
     return model_config
@@ -201,6 +205,7 @@ def _warn_on_too_big_network_timeout(client: _TritonSyncClientType, timeout_s: f
 def wait_for_server_ready(
     client: _TritonSyncClientType,
     timeout_s: Optional[float] = None,
+    headers: Optional[dict] = None,
 ):
     """Waits for Triton Inference Server to be ready.
 
@@ -212,6 +217,7 @@ def wait_for_server_ready(
     Args:
         client: Triton Inference Server client to use for communication
         timeout_s: timeout to server get into readiness state. Default value is 60.0 s.
+        headers: headers to use for the request.
 
     Raises:
         PyTritonClientTimeoutError: If obtain of model configuration didn't finish before given timeout.
@@ -222,7 +228,7 @@ def wait_for_server_ready(
 
     def _is_server_ready():
         try:
-            return client.is_server_ready() and client.is_server_live()
+            return client.is_server_ready(headers=headers) and client.is_server_live(headers=headers)
         except InferenceServerException:
             return False
         except (RpcError, ConnectionError, socket.gaierror):  # GRPC and HTTP clients raises these errors
@@ -246,6 +252,7 @@ def wait_for_model_ready(
     model_name: str,
     model_version: Optional[str] = None,
     timeout_s: Optional[float] = None,
+    headers: Optional[dict] = None,
 ):
     """Wait for Triton Inference Server to be ready.
 
@@ -257,6 +264,7 @@ def wait_for_model_ready(
             If model_version is None waiting for latest version of the model.
             The latest versions of the model are the numerically greatest version numbers.
         timeout_s: timeout to server and model get into readiness state. Default value is 300.0 s.
+        headers: headers to use for the request.
 
     Raises:
         PyTritonClientTimeoutError: If server readiness didn't finish before given timeout.
@@ -266,13 +274,13 @@ def wait_for_model_ready(
     timeout_s = timeout_s if timeout_s is not None else _DEFAULT_WAIT_FOR_MODEL_TIMEOUT_S
     should_finish_before_s = time.time() + timeout_s
 
-    wait_for_server_ready(client, timeout_s=timeout_s)
+    wait_for_server_ready(client, timeout_s=timeout_s, headers=headers)
     timeout_s = max(0.0, should_finish_before_s - time.time())
     _LOGGER.debug("Waiting for model %s/%s to be ready (timeout=%s)", model_name, model_version_msg, timeout_s)
-    is_model_ready = client.is_model_ready(model_name, model_version)
+    is_model_ready = client.is_model_ready(model_name, model_version, headers=headers)
     while not is_model_ready:
         time.sleep(min(1.0, timeout_s))
-        is_model_ready = client.is_model_ready(model_name, model_version)
+        is_model_ready = client.is_model_ready(model_name, model_version, headers=headers)
 
         if not is_model_ready and time.time() >= should_finish_before_s:
             raise PyTritonClientTimeoutError(

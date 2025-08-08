@@ -185,6 +185,7 @@ def test_sync_grpc_client_init_obtain_expected_model_config_when_lazy_init_is_di
         ADD_SUB_WITH_BATCHING_MODEL_CONFIG.model_name,
         "",
         as_json=True,
+        headers=None,
         # FIXME: GRPC client get_model_config doesn't support client_timeout parameter
         # client_timeout=60.0,
     )

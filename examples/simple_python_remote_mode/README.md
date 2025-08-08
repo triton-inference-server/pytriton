@@ -45,7 +45,15 @@ The step-by-step guide:
 ./install.sh
 ```
 
-3. In separate terminals first start triton server using `server_starting_triton.py` and then start
+3. Set the access token environment variable that will be used for authentication between the Triton server and remote models:
+
+```shell
+export TRITON_ACCESS_TOKEN="your-secret-token-here"
+```
+
+Note: Use the same access token value in all terminals where you'll run the server scripts. This token ensures secure communication between the main Triton server and the remote models.
+
+4. In separate terminals (make sure to set the same `TRITON_ACCESS_TOKEN` in each terminal) first start triton server using `server_starting_triton.py` and then start
 remote models using `server_remote_mul.py` and `server_remote_power.py`:
 
 ```shell
@@ -60,9 +68,9 @@ remote models using `server_remote_mul.py` and `server_remote_power.py`:
 ./server_remote_power.py
 ```
 
-4. Open new terminal tab (ex. `Ctrl + T` on Ubuntu) or window
-5. Go to the example directory
-6. Run the `client.py` to perform queries on model:
+5. Open new terminal tab (ex. `Ctrl + T` on Ubuntu) or window
+6. Go to the example directory
+7. Run the `client.py` to perform queries on model:
 
 ```shell
 ./client.py

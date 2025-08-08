@@ -16,6 +16,7 @@
 
 import argparse
 import logging
+import os
 import signal
 import sys
 import time
@@ -64,6 +65,9 @@ def main():
 
     if install_thread.returncode != 0:
         raise RuntimeError(f"Install thread returned {install_thread.returncode}")
+
+    # Set access token for secure communication between Triton server and remote models
+    os.environ["TRITON_ACCESS_TOKEN"] = "test-access-token-12345"
 
     start_time = time.time()
     elapsed_s = 0

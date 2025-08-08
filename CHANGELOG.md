@@ -16,6 +16,21 @@ limitations under the License.
 
 # Changelog
 
+## 0.7.0 (TBD)
+
+### Added
+
+- Token-based access restriction for endpoints
+- Deployment guide with security best practices
+
+**BREAKING CHANGES:**
+- By default, `shared-memory`, `model-repository`, `statistics`, `trace`, and `logging` endpoints now require access token
+- To restore previous unrestricted behavior, use: `Triton(security_config=TritonSecurityConfig(restricted_endpoints=[]))`
+
+[//]: <> (put here on external component update with short summary what change or link to changelog)
+
+- Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.51.0](https://github.com/triton-inference-server/server/releases/tag/v2.51.0)
+
 ## 0.6.0 (2025-07-30)
 
 - New: Warmup functionality for Triton models. Thanks @Zhylkaaa

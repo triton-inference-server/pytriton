@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -115,6 +115,7 @@ class BaseModelClient:
         inference_timeout_s: Optional[float] = None,
         model_config: Optional[TritonModelConfig] = None,
         ensure_model_is_ready: bool = True,
+        access_token: Optional[str] = None,
     ):
         """Inits BaseModelClient for given model deployed on the Triton Inference Server.
 
@@ -140,6 +141,7 @@ class BaseModelClient:
             inference_timeout_s: timeout in seconds for a single model inference request. If not passed, the default timeout of 60 seconds will be used.
             model_config: model configuration. If not passed, it will be read from inference server during initialization.
             ensure_model_is_ready: if model should be checked if it is ready before first inference request.
+            access_token: access token for the Triton Inference Server.
 
         Raises:
             PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
@@ -147,12 +149,17 @@ class BaseModelClient:
                 if `lazy_init` argument is False and wait time for server and model being ready exceeds `init_timeout_s`.
             PyTritonClientInvalidUrlError: If provided Triton Inference Server url is invalid.
         """
+        from pytriton.client.auth import create_auth_headers
+
         self._init_timeout_s = _DEFAULT_SYNC_INIT_TIMEOUT_S if init_timeout_s is None else init_timeout_s
         self._inference_timeout_s = DEFAULT_INFERENCE_TIMEOUT_S if inference_timeout_s is None else inference_timeout_s
         self._network_timeout_s = min(_DEFAULT_NETWORK_TIMEOUT_S, self._init_timeout_s)
 
         self._general_client = self.create_client_from_url(url, network_timeout_s=self._network_timeout_s)
         self._infer_client = self.create_client_from_url(url, network_timeout_s=self._inference_timeout_s)
+        self._headers = None
+        if access_token is not None:
+            self._headers = create_auth_headers(access_token, self._triton_url.scheme)
 
         self._model_name = model_name
         self._model_version = model_version
@@ -190,11 +197,15 @@ class BaseModelClient:
         Returns:
             A new instance of the same subclass with shared configuration and readiness state.
         """
+        from pytriton.client.auth import extract_access_token_from_headers
+
         kwargs = {}
         # Copy model configuration and readiness state if present
         if hasattr(existing_client, "_model_config"):
             kwargs["model_config"] = existing_client._model_config
             kwargs["ensure_model_is_ready"] = False
+            headers = getattr(existing_client, "_headers", None)
+            kwargs["access_token"] = extract_access_token_from_headers(headers)
 
         new_client = cls(
             url=existing_client._url,
@@ -319,6 +330,7 @@ class ModelClient(BaseModelClient):
         inference_timeout_s: Optional[float] = None,
         model_config: Optional[TritonModelConfig] = None,
         ensure_model_is_ready: bool = True,
+        access_token: Optional[str] = None,
     ):
         """Inits ModelClient for given model deployed on the Triton Inference Server.
 
@@ -363,6 +375,7 @@ class ModelClient(BaseModelClient):
                 - get model config, is model loaded. For GRPC client it is only inference timeout.
             model_config: model configuration. If not passed, it will be read from inference server during initialization.
             ensure_model_is_ready: if model should be checked if it is ready before first inference request.
+            access_token: access token for the Triton Inference Server.
 
         Raises:
             PyTritonClientModelUnavailableError: If model with given name (and version) is unavailable.
@@ -379,6 +392,7 @@ class ModelClient(BaseModelClient):
             inference_timeout_s=inference_timeout_s,
             model_config=model_config,
             ensure_model_is_ready=ensure_model_is_ready,
+            access_token=access_token,
         )
 
     def get_lib(self):
@@ -406,11 +420,11 @@ class ModelClient(BaseModelClient):
                 loaded from. If specified, 'config' must be provided to be
                 the model configuration of the override model directory.
         """
-        self._general_client.load_model(self._model_name, config=config, files=files)
+        self._general_client.load_model(self._model_name, config=config, files=files, headers=self._headers)
 
     def unload_model(self):
         """Unload model from the Triton Inference Server."""
-        self._general_client.unload_model(self._model_name)
+        self._general_client.unload_model(self._model_name, headers=self._headers)
 
     def close(self):
         """Close resources used by ModelClient.
@@ -664,7 +678,7 @@ class ModelClient(BaseModelClient):
                 model_name=self._model_name,
                 model_version=self._model_version or "",
                 inputs=inputs_wrapped,
-                headers=headers,
+                headers={**(self._headers or {}), **(headers or {})} or None,
                 outputs=outputs_wrapped,
                 request_id=self._next_request_id,
                 parameters=parameters,
@@ -836,7 +850,9 @@ class DecoupledModelClient(ModelClient):
         try:
             _LOGGER.debug("Sending inference request to Triton Inference Server")
             if self._infer_client._stream is None:
-                self._infer_client.start_stream(callback=lambda result, error: self._response_callback(result, error))
+                self._infer_client.start_stream(
+                    callback=lambda result, error: self._response_callback(result, error), headers=self._headers
+                )
 
             self._infer_client.async_stream_infer(
                 model_name=self._model_name,
@@ -1256,7 +1272,7 @@ class AsyncioModelClient(BaseModelClient):
                 model_name=self._model_name,
                 model_version=self._model_version or "",
                 inputs=inputs_wrapped,
-                headers=headers,
+                headers={**(self._headers or {}), **(headers or {})} or None,
                 outputs=outputs_wrapped,
                 request_id=self._next_request_id,
                 parameters=parameters,
@@ -1545,7 +1561,7 @@ class AsyncioDecoupledModelClient(AsyncioModelClient):
 
             response_iterator = self._infer_client.stream_infer(
                 inputs_iterator=async_request_iterator(error_raised_inside_async_request_iterator),
-                headers=headers,
+                headers={**(self._headers or {}), **(headers or {})} or None,
                 **kwargs,
             )
             _LOGGER.debug("End preparing InferRequest for %s", self._model_name)

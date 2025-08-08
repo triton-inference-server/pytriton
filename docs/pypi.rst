@@ -28,42 +28,26 @@ Features at a Glance
 
 The distinct capabilities of PyTriton are summarized in the feature matrix:
 
-+------------------------+--------------------------------------------------------------------------------------+
-| Feature                | Description                                                                          |
-+========================+======================================================================================+
-| Native Python support  | You can create any `Python function <https://triton-inference-server.github.io/pytri |
-|                        | ton/latest/inference_callables/>`_ and expose it as an HTTP/gRPC API.                |
-+------------------------+--------------------------------------------------------------------------------------+
-| Framework-agnostic     | You can run any Python code with any framework of your choice, such as: PyTorch,     |
-|                        | TensorFlow, or JAX.                                                                  |
-+------------------------+--------------------------------------------------------------------------------------+
-| Performance            | You can benefit from `dynamic batching <https://triton-inference-server.github.io/py |
-| optimization           | triton/latest/inference_callables/decorators/#batch>`_, response cache, model        |
-|                        | pipelining, `clusters <https://triton-inference-server.github.io/pytriton/latest/    |
-|                        | guides/deploying_in_clusters/>`_, performance `tracing <https://triton-inference-    |
-|                        | server.github.io/pytriton/latest/guides/distributed_tracing/>`_, and GPU/CPU         |
-|                        | inference.                                                                           |
-+------------------------+--------------------------------------------------------------------------------------+
-| Decorators             | You can use batching `decorators <https://triton-inference-server.github.io/pytriton |
-|                        | /latest/inference_callables/decorators/>`_ to handle batching  and other             |
-|                        | pre-processing tasks for your inference function.                                    |
-+------------------------+--------------------------------------------------------------------------------------+
-| Easy `installation     | You can use a simple and familiar interface based on Flask/FastAPI for easy          |
-| <https://triton-infer  | installation and `setup <https://triton-inference-server.github.io/pytriton/latest/b |
-| ence-server.github.io/ | inding_models/>`_.                                                                   |
-| pytriton/latest/instal |                                                                                      |
-| lation/>`_ and setup   |                                                                                      |
-+------------------------+--------------------------------------------------------------------------------------+
-| `Model clients         | You can access high-level model clients for HTTP/gRPC requests with configurable     |
-| <https://triton-infer  | options and both synchronous and `asynchronous <https://triton-inference-server.gith |
-| ence-server.github.io/ | ub.io/pytriton/latest/clients/#asynciomodelclient>`_  API.                           |
-| pytriton/latest/clien  |                                                                                      |
-| ts>`_                  |                                                                                      |
-+------------------------+--------------------------------------------------------------------------------------+
-| Streaming (alpha)      | You can stream partial responses from a model by serving it in a `decoupled mode     |
-|                        | <https://triton-inference-server.github.io/pytriton/latest/clients/#decoupledmodelcl |
-|                        | ient>`_.                                                                             |
-+------------------------+--------------------------------------------------------------------------------------+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Feature
+     - Description
+   * - Native Python support
+     - You can create any `Python function <https://triton-inference-server.github.io/pytriton/latest/inference_callables/>`_ and expose it as an HTTP/gRPC API.
+   * - Framework-agnostic
+     - You can run any Python code with any framework of your choice, such as: PyTorch, TensorFlow, or JAX.
+   * - Performance optimization
+     - You can benefit from `dynamic batching <https://triton-inference-server.github.io/pytriton/latest/inference_callables/decorators/#batch>`_, response cache, model pipelining, `clusters <https://triton-inference-server.github.io/pytriton/latest/guides/deploy/>`_, performance `tracing <https://triton-inference-server.github.io/pytriton/latest/guides/distributed_tracing/>`_, and GPU/CPU inference.
+   * - Decorators
+     - You can use batching `decorators <https://triton-inference-server.github.io/pytriton/latest/inference_callables/decorators/>`_ to handle batching and other pre-processing tasks for your inference function.
+   * - Easy installation and setup
+     - You can use a simple and familiar interface based on Flask/FastAPI for easy `installation <https://triton-inference-server.github.io/pytriton/latest/installation/>`_ and `setup <https://triton-inference-server.github.io/pytriton/latest/binding_models/>`_.
+   * - Model clients
+     - You can access high-level `model clients <https://triton-inference-server.github.io/pytriton/latest/clients/>`_ for HTTP/gRPC requests with configurable options and both synchronous and `asynchronous <https://triton-inference-server.github.io/pytriton/latest/clients/#asynciomodelclient>`_ API.
+   * - Streaming (alpha)
+     - You can stream partial responses from a model by serving it in a `decoupled mode <https://triton-inference-server.github.io/pytriton/latest/clients/#decoupledmodelclient>`_.
 
 Learn more about PyTriton's `architecture <https://triton-inference-server.github.io/pytriton/latest/#architecture>`_.
 

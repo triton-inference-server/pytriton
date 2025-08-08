@@ -15,6 +15,7 @@
 """Starting PyTriton in remote mode and binding model calculating element wise power."""
 
 import logging
+import os
 
 import numpy as np
 
@@ -33,7 +34,7 @@ def _power(**inputs):
     return {"power": dot_result}
 
 
-with RemoteTriton(url="localhost") as remote_triton:
+with RemoteTriton(url="localhost", access_token=os.getenv("TRITON_ACCESS_TOKEN")) as remote_triton:
     remote_triton.bind(
         model_name="Power",
         infer_func=_power,

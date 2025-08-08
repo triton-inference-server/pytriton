@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -49,16 +49,27 @@ class ModelManager:
         self,
         triton_url: str,
         model_store_path: Optional[pathlib.Path] = None,
+        access_token: Optional[str] = None,
     ):
         """Create ModelManager object.
 
         Args:
             triton_url: Triton server URL
             model_store_path: Path to local model store
+            access_token: Access token for the Triton Inference Server
         """
+        from pytriton.client.auth import create_auth_headers
+        from pytriton.client.utils import TritonUrl
+
         self._triton_url = triton_url
         self._models: Dict[Tuple[str, int], Model] = {}
         self._model_store_path = model_store_path
+        self._access_token = access_token
+        self._headers = None
+        if access_token is not None:
+            # Parse URL to determine protocol
+            triton_url_parsed = TritonUrl.from_url(triton_url)
+            self._headers = create_auth_headers(access_token, triton_url_parsed.scheme)
 
     @property
     def models(self) -> Iterable[Model]:
@@ -109,7 +120,7 @@ class ModelManager:
         ) as client:
             server_live = False
             try:
-                server_live = client.is_server_live()
+                server_live = client.is_server_live(headers=self._headers)
             # TimeoutError and ConnectionRefusedError are derived from OSError so they are redundant here
             # OSError is raised from gevent/_socketcommon.py:590 sometimes, when server is not ready
             except (socket.timeout, OSError, InferenceServerException):
@@ -122,11 +133,11 @@ class ModelManager:
                 LOGGER.debug("Clean model %s.", name)
                 model.clean()
                 if server_live:
-                    client.unload_model(model.model_name)
+                    client.unload_model(model.model_name, headers=self._headers)
 
             if server_live:
                 # after unload there is a short period of time when server is not ready
-                wait_for_server_ready(client, timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S)
+                wait_for_server_ready(client, timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S, headers=self._headers)
 
         self._models.clear()
 
@@ -217,8 +228,12 @@ class ModelManager:
         LOGGER.debug("Creating model %s with version %s.", model.model_name, model.model_version)
         config = None if local_model_store else json.dumps(model.get_model_config())
         files = None if local_model_store else model.get_proxy_model_files()
+
         with ModelClient(
-            url=self._triton_url, model_name=model.model_name, model_version=str(model.model_version)
+            url=self._triton_url,
+            model_name=model.model_name,
+            model_version=str(model.model_version),
+            access_token=self._access_token,
         ) as client:
             client.wait_for_server(timeout_s=DEFAULT_TRITON_STARTUP_TIMEOUT_S)
             client.load_model(config=config, files=files)

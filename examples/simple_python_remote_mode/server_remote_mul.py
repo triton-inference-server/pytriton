@@ -15,6 +15,7 @@
 """Starting PyTriton in remote mode and binding model calculating element wise multiplication."""
 
 import logging
+import os
 
 import numpy as np
 
@@ -33,7 +34,7 @@ def _mul(**inputs):
     return {"mul": dot_result}
 
 
-with RemoteTriton(url="localhost") as remote_triton:
+with RemoteTriton(url="localhost", access_token=os.getenv("TRITON_ACCESS_TOKEN")) as remote_triton:
     remote_triton.bind(
         model_name="Mul",
         infer_func=_mul,
