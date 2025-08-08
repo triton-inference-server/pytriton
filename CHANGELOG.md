@@ -16,7 +16,7 @@ limitations under the License.
 
 # Changelog
 
-## 0.7.0 (TBD)
+## 0.7.0 (2025-08-08)
 
 ### Added
 
