@@ -140,7 +140,7 @@ def _create_hf_tensorflow_distilbert_base_uncased_fn(model_name: str) -> Callabl
         TFDistilBertForMaskedLM,
     )
 
-    model = TFDistilBertForMaskedLM.from_pretrained(model_name)
+    model = TFDistilBertForMaskedLM.from_pretrained(model_name, use_safetensors=False)
     model.config.return_dict = True
     model.config.use_cache = False
 
