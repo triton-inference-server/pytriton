@@ -44,6 +44,15 @@ repos:
       - id: mixed-line-ending
         args: [--fix=lf]
 
+  - repo: local
+    hooks:
+      - id: generate-client-pyproject
+        name: Regenerate client/pyproject.toml from pyproject.toml
+        entry: python scripts/generate_client_pyproject.py
+        language: python
+        files: ^pyproject\.toml$
+        pass_filenames: false
+
   - repo: https://github.com/thlorenz/doctoc
     rev: v2.2.0
     hooks:

@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# AUTO-GENERATED — do not edit manually.
+# Source: pyproject.toml  |  Script: scripts/generate_client_pyproject.py
 [project]
 name = "nvidia-pytriton-client"
 description = "PyTriton - client-side package for macOS/Windows development environments."

@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+# Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Generate client/pyproject.toml from root pyproject.toml.
+
+When run as a pre-commit hook, exits 1 if the file was regenerated so the
+committer can review the changes before re-staging and re-committing.
+"""
+
+import pathlib
+import sys
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    try:
+        import tomli as tomllib
+    except ImportError:
+        sys.exit("tomli is required for Python < 3.11: pip install tomli")
+
+ROOT = pathlib.Path(__file__).parent.parent
+OUTPUT = ROOT / "client" / "pyproject.toml"
+
+
+def _deps_block(deps: list) -> str:
+    return "\n".join(f'    "{d}",' for d in deps)
+
+
+def generate(deps: list) -> str:
+    return f"""\
+# Copyright (c) 2022-2024, NVIDIA CORPORATION. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# AUTO-GENERATED — do not edit manually.
+# Source: pyproject.toml  |  Script: scripts/generate_client_pyproject.py
+[project]
+name = "nvidia-pytriton-client"
+description = "PyTriton - client-side package for macOS/Windows development environments."
+dynamic = ["version"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development",
+    "Topic :: Scientific/Engineering",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+]
+authors = []
+maintainers = []
+keywords = []
+license = {{ text = "Apache 2.0" }}
+requires-python = ">=3.8,<4"
+dependencies = [
+{_deps_block(deps)}
+]
+
+[project.urls]
+"Documentation" = "https://triton-inference-server.github.io/pytriton"
+"Source" = "https://github.com/triton-inference-server/pytriton"
+"Tracker" = "https://github.com/triton-inference-server/pytriton/issues"
+
+[build-system]
+requires = [
+    "setuptools>=69.2.0",
+    "setuptools_scm[toml]>=8.0",
+    "wheel>=0.42",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = [".."]
+namespaces = false
+include = ["pytriton*"]
+
+[tool.setuptools.package-data]
+pytriton = [
+    "**/*",
+]
+
+[tool.setuptools.exclude-package-data]
+pytriton = [
+    "tritonserver/**",
+    "tritonserver/external_libs/*",
+]
+
+[tool.setuptools_scm]
+root = ".."
+"""
+
+
+def main() -> None:
+    with open(ROOT / "pyproject.toml", "rb") as f:
+        main_config = tomllib.load(f)
+
+    deps = main_config["project"]["dependencies"]
+    new_content = generate(deps)
+
+    existing = OUTPUT.read_text(encoding="utf-8") if OUTPUT.exists() else ""
+
+    if existing == new_content:
+        sys.exit(0)
+
+    OUTPUT.write_text(new_content, encoding="utf-8")
+    print(
+        "\n"
+        "  client/pyproject.toml was regenerated from pyproject.toml.\n"
+        "  Please review the changes, then re-stage and commit:\n\n"
+        "    git diff client/pyproject.toml\n"
+        "    git add client/pyproject.toml\n"
+    )
+    sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
