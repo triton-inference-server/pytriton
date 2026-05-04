@@ -136,6 +136,29 @@ Ready to contribute? Here's how to set up the `PyTriton` for local development.
     $ make install-dev
     ```
 
+    > **macOS / Windows developers:** The full `nvidia-pytriton` package (including the
+    > Triton Inference Server binary) is Linux-only. On macOS or Windows, install the
+    > client package instead:
+    >
+    > ```shell
+    > $ pip install -e ./client/
+    > ```
+    >
+    > This installs all Python code under the `pytriton` namespace — IDE navigation,
+    > type hints, and unit tests all work. Attempting to start the Triton server
+    > (`Triton().serve()`) will fail at runtime with a missing-binary error, which is
+    > expected on non-Linux platforms.
+    >
+    > **Downstream projects** that depend on `nvidia-pytriton` should use conditional
+    > dependencies in their `pyproject.toml`:
+    >
+    > ```toml
+    > dependencies = [
+    >     "nvidia-pytriton; sys_platform == 'linux'",
+    >     "nvidia-pytriton-client; sys_platform != 'linux'",
+    > ]
+    > ```
+
 4. Extract Triton Server to your environment so you can debug PyTriton while serving some models on Triton:
 
     ```shell
