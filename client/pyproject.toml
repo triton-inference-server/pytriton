@@ -13,7 +13,6 @@
 # limitations under the License.
 [project]
 name = "nvidia-pytriton-client"
-readme = "../docs/pypi.rst"
 description = "PyTriton - client-side package for macOS/Windows development environments."
 dynamic = ["version"]
 classifiers = [
@@ -64,7 +63,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 include-package-data = true
-license-files = ["../LICENSE"]
 
 [tool.setuptools.packages.find]
 where = [".."]
