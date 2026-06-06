@@ -197,6 +197,11 @@ class ModelManager:
 
             LOGGER.info("Generated %d warmup requests for model %s", len(warmup_requests), model.model_name)
 
+            # Inference functions are invoked directly here, before model.setup()
+            # binds the Triton context. Bind it now so callables relying on the
+            # @triton_context decorator do not fail during warmup.
+            model.bind_triton_context()
+
             # Warm up each inference function with the generated data
             for i, infer_function in enumerate(model.infer_functions):
                 LOGGER.debug("Warming up inference function %d for model %s", i, model.model_name)

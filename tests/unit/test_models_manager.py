@@ -14,9 +14,11 @@
 from typing import Iterable
 from unittest.mock import Mock
 
+import numpy as np
 import pytest
 
 from pytriton.exceptions import PyTritonInvalidOperationError
+from pytriton.model_config.common import ModelWarmup, WarmupInput
 from pytriton.models.manager import ModelManager
 
 
@@ -93,3 +95,41 @@ def test_clean_call_clean_on_each_model_and_remove_models_from_registry_when_mod
     assert model2.clean.called is True
 
     assert _match_length(model_manager.models, 0) is True
+
+
+def test_perform_warmup_binds_triton_context_before_calling_infer_function():
+    """Regression test for #111.
+
+    Warmup invokes the inference functions directly, before ``model.setup()``
+    binds the Triton context. ``_perform_warmup`` must therefore bind the
+    context first, otherwise callables using the ``@triton_context`` decorator
+    fail during warmup. This verifies the bind happens before any inference call.
+    """
+    call_order = []
+
+    def infer_function(requests):
+        call_order.append("infer")
+        return [{}]
+
+    warmup = ModelWarmup(
+        name="warmup",
+        batch_size=1,
+        inputs={"in1": WarmupInput(dtype=np.float32, shape=(1,), random_data=True)},
+        count=1,
+    )
+
+    triton_config = Mock()
+    triton_config.inputs = []
+    triton_config.outputs = []
+
+    model = Mock(model_name="Test", model_version=1)
+    model.config.model_warmup = [warmup]
+    model.infer_functions = [infer_function]
+    model._get_triton_model_config.return_value = triton_config
+    model.bind_triton_context = Mock(side_effect=lambda: call_order.append("bind"))
+
+    model_manager = ModelManager(triton_url="")
+    model_manager._perform_warmup(model)
+
+    model.bind_triton_context.assert_called_once()
+    assert call_order == ["bind", "infer"]

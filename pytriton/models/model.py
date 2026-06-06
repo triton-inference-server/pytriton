@@ -192,6 +192,20 @@ class Model:
             dst_file_path = model_version_catalog / script_file
             shutil.copy(src_file_path, dst_file_path)
 
+    def bind_triton_context(self) -> None:
+        """Bind the Triton context to each inference function.
+
+        Registers the model configuration and injects ``__triton_context__`` into
+        every inference callable so that decorators such as ``@triton_context``
+        can access the context. This must run before the inference functions are
+        invoked directly, including the pre-Triton warmup performed by the model
+        manager. The operation is idempotent and safe to call more than once.
+        """
+        triton_model_config = self._get_triton_model_config()
+        for infer_function in self.infer_functions:
+            self.triton_context.model_configs[infer_function] = copy.deepcopy(triton_model_config)
+            _inject_triton_context(self.triton_context, infer_function)
+
     def setup(self) -> None:
         """Create deployments and bindings to Triton Inference Server."""
         with self._inference_handlers_lock:
@@ -207,10 +221,9 @@ class Model:
                 authkey = base64.decodebytes(inference_handler_config["authkey"].encode("ascii"))
                 self._serializer_deserializer.connect(data_socket.as_posix(), authkey)
 
-                for i, infer_function in enumerate(self.infer_functions):
-                    self.triton_context.model_configs[infer_function] = copy.deepcopy(triton_model_config)
-                    _inject_triton_context(self.triton_context, infer_function)
+                self.bind_triton_context()
 
+                for i, infer_function in enumerate(self.infer_functions):
                     request_server_socket = workspace_path / f"{self.model_name}_0_{i}-server.sock"
                     request_server_socket = f"ipc://{request_server_socket.as_posix()}"
 
