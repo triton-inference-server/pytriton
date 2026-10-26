@@ -37,8 +37,8 @@ keywords = []
 license = { text = "Apache 2.0" }
 requires-python = ">=3.8,<4"
 dependencies = [
-    "numpy >= 1.21, <2.0.0",
-    "protobuf >= 3.7",
+    "numpy >= 1.21",
+    "protobuf >= 6.33.5",  # tritonclient 2.72+ needs it but declares only >= 6.30
     "pyzmq >= 23.0",
     "sh >= 1.14",
     "tritonclient[grpc,http] ~= 2.50",

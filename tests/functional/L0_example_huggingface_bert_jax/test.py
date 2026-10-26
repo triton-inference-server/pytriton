@@ -23,7 +23,7 @@ import time
 
 LOGGER = logging.getLogger((__package__ or "main").split(".")[-1])
 METADATA = {
-    "image_name": "nvcr.io/nvidia/tensorflow:{TEST_CONTAINER_VERSION}-tf2-py3",
+    "image_name": "nvcr.io/nvidia/tensorflow:25.02-tf2-py3",
 }
 
 

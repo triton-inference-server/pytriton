@@ -43,14 +43,14 @@ docker cp "${TRITON_LOCAL_DIR}" "${DOCKER_CONTAINER_ID}:${TRITON_LOCAL_DIR}"
 
 # The setuptools and packaging are necessary for Python 3.12
 # pyproject.toml also contains the setuptools and packaging versions so please update it accordingly
-docker exec "${DOCKER_CONTAINER_ID}" pip install auditwheel==5.3.0 patchelf==0.17.2 setuptools==69.2.0 packaging==24.0
+docker exec "${DOCKER_CONTAINER_ID}" pip install auditwheel==6.8.2 patchelf==0.17.2 setuptools==69.2.0 packaging==24.0
 
 docker cp "${SCRIPTS_DIR}/manylinux_version.py" "${DOCKER_CONTAINER_ID}:/tmp/"
 MANYLINUX_VERSION=$(docker exec "${DOCKER_CONTAINER_ID}" bash -c "/tmp/manylinux_version.py --triton-path ${TRITON_LOCAL_DIR}")
 WHEEL_PLATFORM=manylinux_${MANYLINUX_VERSION}_${WHEEL_ARCH}
 
-docker cp "${SCRIPTS_DIR}/auditwheel_patched.py" "${DOCKER_CONTAINER_ID}:/tmp/"
-docker exec "${DOCKER_CONTAINER_ID}" bash -c "LD_LIBRARY_PATH=${TRITON_LOCAL_DIR}/external_libs /tmp/auditwheel_patched.py -vvvv repair --plat ${WHEEL_PLATFORM} ${WHEEL_PATH}"
+# libpython is excluded so the Python backend stubs keep linking the host's interpreter library
+docker exec "${DOCKER_CONTAINER_ID}" bash -c "LD_LIBRARY_PATH=${TRITON_LOCAL_DIR}/external_libs auditwheel -vvvv repair --exclude 'libpython3*.so*' --plat ${WHEEL_PLATFORM} ${WHEEL_PATH}"
 
 WHEELHOUSE_DIR="$(dirname "${DIST_DIR}")/wheelhouse"
 RESULT_WHEEL_PATH=$(docker exec "${DOCKER_CONTAINER_ID}" bash -c "find ${WHEELHOUSE_DIR} -type f -name *.whl")

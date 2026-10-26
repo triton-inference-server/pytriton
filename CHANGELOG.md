@@ -16,6 +16,18 @@ limitations under the License.
 
 # Changelog
 
+## Unreleased
+
+- New: NumPy 2 support. The Python backend stub is now built against Triton 25.08, whose pybind11 (2.12) handles NumPy 2, so the `numpy < 2` requirement is removed.
+
+**BREAKING CHANGES:**
+- The wheel now requires glibc 2.39 or newer (Ubuntu 24.04+), up from 2.35, because Triton 24.11 and later are built on Ubuntu 24.04.
+- protobuf 6.33.5 or newer is now required. tritonclient 2.72 and later need it but only declare 6.30, so pytriton failed to import with a protobuf `VersionError` in containers that ship an older protobuf, such as NVIDIA PyTorch 25.08.
+
+[//]: <> (put here on external component update with short summary what change or link to changelog)
+
+- Version of [Triton Inference Server](https://github.com/triton-inference-server/) embedded in wheel: [2.60.0](https://github.com/triton-inference-server/server/releases/tag/v2.60.0)
+
 ## 0.7.0 (2025-08-08)
 
 ### Added

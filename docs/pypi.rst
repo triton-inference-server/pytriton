@@ -56,9 +56,9 @@ Prerequisites
 
 Before proceeding with the installation of PyTriton, ensure your system meets the following criteria:
 
-- **Operating System**: Compatible with glibc version ``2.35`` or higher.
-  - Primarily tested on Ubuntu 22.04.
-  - Other supported OS include Debian 11+, Rocky Linux 9+, and Red Hat UBI 9+.
+- **Operating System**: Compatible with glibc version ``2.39`` or higher.
+  - Primarily tested on Ubuntu 24.04.
+  - Other supported OS include Debian 13+, Rocky Linux 10+, and Red Hat UBI 10+.
   - Use ``ldd --version`` to verify your glibc version.
 - **Python**: Version ``3.8`` or newer.
 - **pip**: Version ``20.3`` or newer.

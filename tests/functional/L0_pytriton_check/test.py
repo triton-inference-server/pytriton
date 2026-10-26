@@ -34,7 +34,7 @@ def verify_output(output):
         "sub: [[0.0], [0.0]]",
         "nvidia-smi process finished with 0",
         "Checking OS version",
-        'OS version: "Ubuntu 22.04.',
+        'OS version: "Ubuntu 24.04.',
         "Checking installed packages",
         "nvidia-pytriton==",
         "Checking psutil stats",

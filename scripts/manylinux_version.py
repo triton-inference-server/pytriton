@@ -25,7 +25,23 @@ from packaging.version import parse
 LOGGER = logging.getLogger("manylinux_version")
 
 # Policy list for auditwheel: https://github.com/pypa/auditwheel/blob/main/src/auditwheel/policy/manylinux-policy.json
-MANYLINUX_GLIBC_VERSIONS = ["2.5", "2.12", "2.17", "2.24", "2.27", "2.28", "2.31", "2.34", "2.35"]
+MANYLINUX_GLIBC_VERSIONS = [
+    "2.5",
+    "2.12",
+    "2.17",
+    "2.24",
+    "2.27",
+    "2.28",
+    "2.31",
+    "2.34",
+    "2.35",
+    "2.36",
+    "2.37",
+    "2.38",
+    "2.39",
+    "2.40",
+    "2.41",
+]
 
 
 def _glibc_library_version(file_path: Union[pathlib.Path, str]) -> Set[str]:

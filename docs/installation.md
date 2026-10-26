@@ -22,7 +22,7 @@ This guide shows you how to install PyTriton for your machine learning inference
 
 Before installing PyTriton, ensure your system meets these requirements:
 
-- An operating system with glibc >= `2.35`
+- An operating system with glibc >= `2.39`
 - Python version >= `3.8`
 - `pip >= 20.3`
 
@@ -143,7 +143,7 @@ For detailed instructions, see the [Building Guide](guides/building.md).
 
 | Requirement | Version |
 |-------------|---------|
-| Operating System | glibc >= 2.35 (Ubuntu 22.04+, Debian 11+, Rocky Linux 9+, Red Hat UBI 9+) |
+| Operating System | glibc >= 2.39 (Ubuntu 24.04+, Debian 13+, Rocky Linux 10+, Red Hat UBI 10+) |
 | Python | >= 3.8 |
 | pip | >= 20.3 |
 

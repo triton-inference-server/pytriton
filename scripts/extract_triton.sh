@@ -34,16 +34,18 @@ docker cp "${PYTRITON_CONTAINER_ID}":/opt/tritonserver/backends/python/triton_py
 docker cp "${PYTRITON_CONTAINER_ID}:/opt/workspace/python_backend_stubs" "${TARGET_DIR}"
 
 mkdir -p "${TARGET_DIR}"/external_libs
+# libpython is skipped: the stubs link the host's interpreter library, and a copy here would
+# shadow the libpython of the interpreter that runs auditwheel in add_libs_to_wheel.sh
 function extract_binary_dependencies() {
   BINARY_PATH="${1}"
   export BINARY_PATH
   echo "==== Extracting dependencies of ${BINARY_PATH}"
-  DEPS_SYMLINKS=$(docker exec -e BINARY_PATH  "${PYTRITON_CONTAINER_ID}" bash -c 'ldd ${BINARY_PATH} | awk "/=>/ {print \$3}" | sort -u | xargs realpath -s | sed "s/,\$/\n/"')
+  DEPS_SYMLINKS=$(docker exec -e BINARY_PATH  "${PYTRITON_CONTAINER_ID}" bash -c 'ldd ${BINARY_PATH} | awk "/=>/ {print \$3}" | grep -v libpython | sort -u | xargs realpath -s | sed "s/,\$/\n/"')
   for DEP in ${DEPS_SYMLINKS}
   do
       docker cp "${PYTRITON_CONTAINER_ID}:${DEP}" "${TARGET_DIR}/external_libs"
   done
-  DEPS_REALPATH=$(docker exec -e BINARY_PATH "${PYTRITON_CONTAINER_ID}" bash -c 'ldd ${BINARY_PATH} | awk "/=>/ {print \$3}" | sort -u | xargs realpath | sed "s/,\$/\n/"')
+  DEPS_REALPATH=$(docker exec -e BINARY_PATH "${PYTRITON_CONTAINER_ID}" bash -c 'ldd ${BINARY_PATH} | awk "/=>/ {print \$3}" | grep -v libpython | sort -u | xargs realpath | sed "s/,\$/\n/"')
   for DEP in ${DEPS_REALPATH}
   do
       docker cp "${PYTRITON_CONTAINER_ID}:${DEP}" "${TARGET_DIR}/external_libs"
